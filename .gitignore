@@ -12,3 +12,9 @@ Cargo.lock
 
 # MSVC Windows builds of rustc generate these, which store debugging information
 *.pdb
+
+# Useful dumping grounds for testing stuff that nobody cares about
+/*.obj
+/*.asm
+/*.ll
+/test.*
