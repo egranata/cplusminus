@@ -1135,7 +1135,37 @@ func main() ret int64 {
             helper_run_main_exit(
                 "
 func main() ret int32 {
-    return xAb12 as int32;
+    return xAb12;
+}
+"
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_octal() {
+        assert_eq!(
+            28362,
+            helper_run_main_exit(
+                "
+func main() ret int32 {
+    return o67312;
+}
+"
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_binary() {
+        assert_eq!(
+            153049,
+            helper_run_main_exit(
+                "
+func main() ret int32 {
+    return b100101010111011001;
 }
 "
             )

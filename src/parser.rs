@@ -46,8 +46,14 @@ peg::parser! {
         rule hex_integer() -> i64 =
         "x" n:$(['0'..='9' | 'A'..='F' | 'a'..='f']+) { i64::from_str_radix(n, 16).unwrap() }
 
+        rule octal_integer() -> i64 =
+        "o" n:$(['0'..='7']+) { i64::from_str_radix(n, 8).unwrap() }
+
+        rule binary_integer() -> i64 =
+        "b" n:$(['0'..='1']+) { i64::from_str_radix(n, 2).unwrap() }
+
         rule number() -> i64 =
-        (decimal_integer() / hex_integer()) / expected!("number");
+        (decimal_integer() / hex_integer() / octal_integer() / binary_integer()) / expected!("number");
 
         rule strlit() -> String
         = "\"" s:$((!"\"" [_])*) "\"" { escape_string(s) }
