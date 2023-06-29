@@ -282,6 +282,16 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     None
                 };
             }
+            UnaryMinus(x) => {
+                let bx = self.build_expr(builder, fd, x.as_ref(), locals, type_hint);
+                if let Some(IntValue(x)) = bx {
+                    Some(IntValue(builder.build_int_neg(x, "")))
+                } else {
+                    self.iw
+                        .error(CompilerError::new(node.loc, Error::UnexpectedType(None)));
+                    None
+                }
+            }
             GreaterThan(x, y)
             | GreaterEqual(x, y)
             | LessThan(x, y)

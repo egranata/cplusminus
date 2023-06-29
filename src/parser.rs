@@ -113,6 +113,7 @@ peg::parser! {
             --
             x:(@) _ "+" _ y:@ { Expr::Addition(Box::new(x), Box::new(y)) }
             x:(@) _ "-" _ y:@ { Expr::Subtraction(Box::new(x), Box::new(y)) }
+                    "-" _ y:@ { Expr::UnaryMinus(Box::new(y)) }
             --
             x:(@) _ "*" _ y:@ { Expr::Multiplication(Box::new(x), Box::new(y)) }
             x:(@) _ "/" _ y:@ { Expr::Division(Box::new(x), Box::new(y)) }

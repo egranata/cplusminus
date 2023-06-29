@@ -267,6 +267,25 @@ func main() ret int64 {
     }
 
     #[test]
+    fn test_int64_negation() {
+        assert_eq!(
+            1,
+            helper_run_main_exit(
+                "
+func main() ret int64 {
+    let a = 2;
+    let a = -a;
+    let n = a;
+    let n = a + (-1);
+    return n + 4;
+}
+"
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
     fn test_comments_everywhere() {
         assert_eq!(
             120,
