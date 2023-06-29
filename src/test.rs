@@ -286,6 +286,21 @@ func main() ret int64 {
     }
 
     #[test]
+    fn test_int64_not() {
+        assert_eq!(
+            0xFFFFFFFFFFFFFFF8,
+            helper_run_main_exit(
+                "
+func main() ret int64 {
+    return !7;
+}
+"
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
     fn test_comments_everywhere() {
         assert_eq!(
             120,
@@ -371,6 +386,132 @@ func main() ret int64 {
                 "
 func main() ret int64 {
     return 23 % 5;
+}
+"
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_int64_and() {
+        assert_eq!(
+            0b100,
+            helper_run_main_exit(
+                "
+func main() ret int64 {
+    let n = b100110;
+    let m = b011101;
+    return (n && m);
+}
+"
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_bool_and() {
+        assert_eq!(
+            0,
+            helper_run_main_exit(
+                "
+func main() ret int64 {
+    assert true == (true && true);
+    assert false == (true && false);
+    assert false == (false && false);
+    assert false == (false && true);
+    return 0;
+}
+"
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_int64_or() {
+        assert_eq!(
+            0b111110,
+            helper_run_main_exit(
+                "
+func main() ret int64 {
+    let n = b100110;
+    let m = b011100;
+    return (n || m);
+}
+"
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_bool_or() {
+        assert_eq!(
+            0,
+            helper_run_main_exit(
+                "
+func main() ret int64 {
+    assert true == (true || true);
+    assert true == (true || false);
+    assert false == (false || false);
+    assert true == (false || true);
+    return 0;
+}
+"
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_int64_xor() {
+        assert_eq!(
+            0b111010,
+            helper_run_main_exit(
+                "
+func main() ret int64 {
+    let n = b100110;
+    let m = b011100;
+    return (n ^^ m);
+}
+"
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_bool_xor() {
+        assert_eq!(
+            0,
+            helper_run_main_exit(
+                "
+func main() ret int64 {
+    assert false == (true ^^ true);
+    assert true == (true ^^ false);
+    assert false == (false ^^ false);
+    assert true == (false ^^ true);
+    return 0;
+}
+"
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_bool_not() {
+        assert_eq!(
+            0,
+            helper_run_main_exit(
+                "
+func main() ret int64 {
+    assert true == !false;
+    assert false == !true;
+    assert !!true;
+    return 0;
 }
 "
             )

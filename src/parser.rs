@@ -112,10 +112,14 @@ peg::parser! {
             "sizeof" _ "type" _ ty:typename() _ { Expr::SizeofTy(ty) }
             --
             x:(@) _ "+" _ y:@ { Expr::Addition(Box::new(x), Box::new(y)) }
+            x:(@) _ "||" _ y:@ { Expr::Or(Box::new(x), Box::new(y)) }
+            x:(@) _ "^^" _ y:@ { Expr::XOr(Box::new(x), Box::new(y)) }
             x:(@) _ "-" _ y:@ { Expr::Subtraction(Box::new(x), Box::new(y)) }
                     "-" _ y:@ { Expr::UnaryMinus(Box::new(y)) }
+                    "!" _ y:@ { Expr::UnaryNot(Box::new(y)) }
             --
             x:(@) _ "*" _ y:@ { Expr::Multiplication(Box::new(x), Box::new(y)) }
+            x:(@) _ "&&" _ y:@ { Expr::And(Box::new(x), Box::new(y)) }
             x:(@) _ "/" _ y:@ { Expr::Division(Box::new(x), Box::new(y)) }
             x:(@) _ "%" _ y:@ { Expr::Modulo(Box::new(x), Box::new(y)) }
             --

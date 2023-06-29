@@ -199,6 +199,21 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         }))
     }
 
+    fn build_int_bitwise_bin_op(
+        &self,
+        builder: &Builder<'a>,
+        x: IntValue<'a>,
+        y: IntValue<'a>,
+        op: &Expr,
+    ) -> Option<BasicValueEnum<'a>> {
+        Some(BasicValueEnum::IntValue(match op {
+            Expr::And(..) => builder.build_and(x, y, ""),
+            Expr::Or(..) => builder.build_or(x, y, ""),
+            Expr::XOr(..) => builder.build_xor(x, y, ""),
+            _ => panic!(""),
+        }))
+    }
+
     pub fn build_expr(
         &self,
         builder: &Builder<'a>,
@@ -282,10 +297,31 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     None
                 };
             }
+            And(x, y) | Or(x, y) | XOr(x, y) => {
+                let bx = self.build_expr(builder, fd, x.as_ref(), locals, type_hint);
+                let by = self.build_expr(builder, fd, y.as_ref(), locals, type_hint);
+                return if let (Some(IntValue(ix)), Some(IntValue(iy))) = (bx, by) {
+                    self.build_int_bitwise_bin_op(builder, ix, iy, &node.payload)
+                } else {
+                    self.iw
+                        .error(CompilerError::new(node.loc, Error::UnexpectedType(None)));
+                    None
+                };
+            }
             UnaryMinus(x) => {
                 let bx = self.build_expr(builder, fd, x.as_ref(), locals, type_hint);
                 if let Some(IntValue(x)) = bx {
                     Some(IntValue(builder.build_int_neg(x, "")))
+                } else {
+                    self.iw
+                        .error(CompilerError::new(node.loc, Error::UnexpectedType(None)));
+                    None
+                }
+            }
+            UnaryNot(x) => {
+                let bx = self.build_expr(builder, fd, x.as_ref(), locals, type_hint);
+                if let Some(IntValue(x)) = bx {
+                    Some(IntValue(builder.build_not(x, "")))
                 } else {
                     self.iw
                         .error(CompilerError::new(node.loc, Error::UnexpectedType(None)));
