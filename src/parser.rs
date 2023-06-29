@@ -72,7 +72,7 @@ peg::parser! {
         = "(*"
 
         rule comment_end() -> ()
-            = "*)\n"
+            = "*)" [' ']* "\n"
 
         rule comment_content() -> ()
             = comment()

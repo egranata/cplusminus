@@ -292,6 +292,7 @@ impl pair {
 func foo() ret pair {
     var p = alloc pair;
     (* more comments *)
+    (* this comment has spaces at the end    *)   
     p.x = 22;
     return p->copy();
 }
