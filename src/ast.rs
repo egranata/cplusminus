@@ -143,6 +143,19 @@ impl From<Lvalue> for String {
 }
 
 #[derive(Clone, Debug)]
+pub struct FieldInitializer {
+    pub field: String,
+    pub value: Box<Expression>,
+}
+
+#[derive(Clone, Debug)]
+pub enum AllocInitializer {
+    None,
+    ValueType(Vec<FieldInitializer>),
+    // ReferenceType(...),
+}
+
+#[derive(Clone, Debug)]
 pub enum Expr {
     ConstInt(i64),
     ConstString(String),
@@ -165,7 +178,7 @@ pub enum Expr {
     FunctionCall(String, Vec<Expression>),
     MethodCall(MethodCall),
     PointerFunctionCall(Box<Expression>, Vec<Expression>),
-    Alloc(TypeDescriptor),
+    Alloc(TypeDescriptor, AllocInitializer),
     Incref(Box<Expression>),
     Getref(Box<Expression>),
     Rvalue(Lvalue),

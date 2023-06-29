@@ -15,7 +15,7 @@
 use either::Either;
 use inkwell::{
     builder::Builder,
-    types::{BasicTypeEnum, FunctionType, IntType},
+    types::{BasicTypeEnum, FunctionType, IntType, StructType},
     values::{
         BasicMetadataValueEnum, BasicValueEnum, CallableValue, FunctionValue, IntValue,
         PointerValue,
@@ -24,7 +24,7 @@ use inkwell::{
 };
 
 use crate::{
-    ast::{Expr, Expression, FunctionDefinition},
+    ast::{AllocInitializer, Expr, Expression, FunctionDefinition},
     builders::{
         lvalue::LvalueBuilder,
         refcount::{
@@ -234,6 +234,61 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
     fn resolve_const_int(&self, n: i64, th: Option<IntType<'a>>) -> IntValue<'a> {
         let ty = th.unwrap_or(self.iw.builtins.int64);
         self.iw.builtins.n(n as u64, ty)
+    }
+
+    fn alloc_value_type(
+        &self,
+        builder: &Builder<'a>,
+        locals: &LocalVariables<'a>,
+        ty: StructType<'a>,
+        fd: &FunctionDefinition,
+        node: &Expression,
+        init: &AllocInitializer,
+    ) -> Option<BasicValueEnum<'a>> {
+        let mut val = ty.const_zero();
+        let struct_def = self.tb.struct_by_name(ty).unwrap();
+        if let AllocInitializer::ValueType(init_list) = init {
+            for fi in init_list {
+                if let Some(idx) = struct_def.field_idx_by_name(&fi.field) {
+                    let type_hint = struct_def.field_type_by_name(&fi.field);
+                    if let Some(finit) =
+                        self.build_expr(builder, fd, fi.value.as_ref(), locals, type_hint)
+                    {
+                        val = builder
+                            .build_insert_value(val, finit, idx as u32, "")
+                            .unwrap()
+                            .into_struct_value();
+                    } else {
+                        self.iw
+                            .error(CompilerError::new(fi.value.loc, Error::InvalidExpression));
+                        return None;
+                    }
+                } else {
+                    self.iw.error(CompilerError::new(
+                        node.loc,
+                        Error::FieldNotFound(fi.field.clone()),
+                    ));
+                    return None;
+                }
+            }
+        }
+
+        return Some(BasicValueEnum::StructValue(val));
+    }
+
+    fn alloc_ref_type(
+        &self,
+        builder: &Builder<'a>,
+        _locals: &LocalVariables<'a>,
+        ty: StructType<'a>,
+        _init: &AllocInitializer,
+    ) -> Option<BasicValueEnum<'a>> {
+        let pv = alloc_refcounted_type(builder, &self.iw, ty);
+        let temp_pv = builder.build_alloca(pv.get_type(), "temp_alloc");
+        builder.build_store(temp_pv, pv);
+        let ret = builder.build_load(temp_pv, "");
+        self.exit.decref_on_exit(temp_pv);
+        Some(ret)
     }
 
     fn do_build_expr(
@@ -458,18 +513,12 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     None
                 }
             }
-            Alloc(ty) => {
+            Alloc(ty, init) => {
                 if let Some(basic_type) = self.tb.llvm_type_by_descriptor(ty) {
                     if let Some(struct_type) = self.tb.is_refcounted_basic_type(basic_type) {
-                        let pv = alloc_refcounted_type(builder, &self.iw, struct_type);
-                        let temp_pv = builder.build_alloca(pv.get_type(), "temp_alloc");
-                        builder.build_store(temp_pv, pv);
-                        let ret = builder.build_load(temp_pv, "");
-                        self.exit.decref_on_exit(temp_pv);
-                        Some(ret)
+                        return self.alloc_ref_type(builder, locals, struct_type, init);
                     } else if let Some(struct_type) = self.tb.is_value_basic_type(basic_type) {
-                        let val = struct_type.const_zero();
-                        return Some(BasicValueEnum::StructValue(val));
+                        return self.alloc_value_type(builder, locals, struct_type, fd, node, init);
                     } else {
                         self.iw.error(CompilerError::new(
                             node.loc,

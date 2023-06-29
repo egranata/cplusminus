@@ -80,6 +80,17 @@ impl<'a> Structure<'a> {
         None
     }
 
+    pub fn field_type_by_name(&self, name: &str) -> Option<BasicTypeEnum<'a>> {
+        let fields: &Vec<Field<'a>> = &self.fields.borrow();
+        for fd in fields.iter() {
+            if fd.decl.name == name {
+                return Some(fd.ty);
+            };
+        }
+
+        None
+    }
+
     pub fn method_by_name(&self, name: &str) -> Option<Method<'a>> {
         for method in self.methods.borrow().iter() {
             if method.decl.imp.decl.name == name {

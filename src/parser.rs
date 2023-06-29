@@ -92,6 +92,14 @@ peg::parser! {
         rule array_expr() -> Expr =
         "[" _ es:top_level_expr()**"," _ "]" { Expr::Array(es) }
 
+        rule value_type_alloc_entry() -> FieldInitializer =
+        _ i:ident() _ ":" _ e:top_level_expr() _ {
+            FieldInitializer{ field: i, value: Box::new(e) }
+        }
+
+        rule value_type_alloc_entries() -> Vec<(FieldInitializer)> =
+        _ "{" _ p:value_type_alloc_entry()**"," _ "}" { p }
+
         pub rule expr() -> Expression = precedence!{
             start:position!() node:@ end:position!() { Expression { loc:Location{start,end}, payload:node} }
 
@@ -105,7 +113,14 @@ peg::parser! {
             x:(@) _ ">=" _ y:@ { Expr::GreaterEqual(Box::new(x), Box::new(y)) }
             x:(@) _ "<=" _ y:@ { Expr::LessEqual(Box::new(x), Box::new(y)) }
             --
-            "alloc" _ ty:typename() _ { Expr::Alloc(ty) }
+            "alloc" _ ty:typename() _ p:value_type_alloc_entries()? {
+                let init = if let Some(v) = p {
+                    AllocInitializer::ValueType(v)
+                } else {
+                    AllocInitializer::None
+                };
+                Expr::Alloc(ty, init)
+            }
             "incref" _ e:expr() _ { Expr::Incref(Box::new(e)) }
             "getref" _ e:expr() _ { Expr::Getref(Box::new(e)) }
             "sizeof" _ "expr" _ e:expr() _ { Expr::SizeofVar(Box::new(e)) }

@@ -104,7 +104,7 @@ impl<'a, 'b> LvalueBuilder<'a, 'b> {
                                 var: None,
                             })
                         } else {
-                            Err(Error::IdentifierNotFound(String::from(field_name)))
+                            Err(Error::FieldNotFound(String::from(field_name)))
                         }
                     } else {
                         Err(Error::DotAccessInvalid)
@@ -121,7 +121,7 @@ impl<'a, 'b> LvalueBuilder<'a, 'b> {
                                 var: None,
                             });
                         } else {
-                            return Err(Error::IdentifierNotFound(String::from(field_name)));
+                            return Err(Error::FieldNotFound(String::from(field_name)));
                         }
                     } else {
                         return Err(Error::DotAccessInvalid);
