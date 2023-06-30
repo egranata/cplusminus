@@ -33,6 +33,8 @@ pub enum Error {
     FieldNotFound(String),
     InvalidCast,
     ReservedIdentifier(String),
+    DuplicatedStructMember(String),
+    InitDisallowedInValueTypes,
     WarningAsError(Warning),
     InvalidTypeSpecifier(TypeDescriptor, TypeDescriptor),
     DuplicateArgumentName(String),
@@ -91,6 +93,12 @@ impl Display for Error {
             }
             Error::RefTypeInValTypeForbidden => {
                 write!(f, "ref type field of val type is not implemented")
+            }
+            Error::DuplicatedStructMember(name) => {
+                write!(f, "member {name} has already been defined for this type")
+            }
+            Error::InitDisallowedInValueTypes => {
+                write!(f, "init is only permitted for reference types")
             }
         }
     }

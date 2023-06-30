@@ -18,17 +18,21 @@ use inkwell::{
         AnyTypeEnum, ArrayType, BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FunctionType,
         StructType,
     },
-    values::{BasicValueEnum, IntValue},
+    values::{BasicValueEnum, FunctionValue, IntValue},
 };
 
 use crate::{
-    ast::{FieldDecl, ImplDecl, StructDecl, TypeDescriptor},
+    ast::{
+        FieldDecl, FunctionArgument, FunctionDecl, FunctionDefinition, ImplDecl, InitDecl,
+        ProperStructDecl, TypeDescriptor,
+    },
     codegen::{
         self,
         structure::{MemoryStrategy, Method, Structure},
     },
     err::{CompilerError, Error},
     iw::CompilerCore,
+    mangler::mangle_special_method,
 };
 
 use super::{func::FunctionBuilder, refcount::build_dealloc};
@@ -181,10 +185,47 @@ impl<'a> TypeBuilder<'a> {
         }
     }
 
-    pub fn build_structure(&self, sd: &StructDecl) -> Option<StructType> {
+    fn build_init(&self, this_ty: StructType<'a>, init: &InitDecl) -> Option<FunctionValue<'a>> {
+        let ty = TypeDescriptor::Name(this_ty.get_name().unwrap().to_str().unwrap().to_owned());
+        let mut real_args = vec![FunctionArgument {
+            loc: init.loc,
+            name: String::from("self"),
+            ty: ty.clone(),
+            rw: false,
+            explicit_rw: false,
+        }];
+        init.args.iter().for_each(|a| real_args.push(a.clone()));
+        let full_name =
+            mangle_special_method(this_ty, crate::mangler::SpecialMemberFunction::Initializer);
+
+        let func_def = FunctionDefinition {
+            decl: FunctionDecl {
+                loc: init.loc,
+                name: full_name,
+                args: real_args,
+                vararg: false,
+                ty,
+            },
+            body: init.body.clone(),
+        };
+
+        let fb = FunctionBuilder::new(self.iw.clone());
+        fb.compile(&func_def)
+    }
+
+    pub fn build_structure(&self, sd: &ProperStructDecl) -> Option<StructType> {
         let ms = sd.ms;
         let is_rc = sd.ms == MemoryStrategy::ByReference;
         let is_val = sd.ms == MemoryStrategy::ByValue;
+
+        if is_val && sd.init.is_some() {
+            self.iw.error(CompilerError::new(
+                sd.init.as_ref().unwrap().loc,
+                Error::InitDisallowedInValueTypes,
+            ));
+            return None;
+        }
+
         let st_ty = self.iw.context.opaque_struct_type(&sd.name);
 
         let var_ty = if is_rc {
@@ -201,6 +242,7 @@ impl<'a> TypeBuilder<'a> {
             implementations: Default::default(),
             fields: Default::default(),
             methods: Default::default(),
+            init: Default::default(),
             dealloc: Default::default(),
         };
         self.iw.add_struct(&cdg_st);
@@ -258,10 +300,22 @@ impl<'a> TypeBuilder<'a> {
         }
 
         st_ty.set_body(&fields, false);
+
         if is_rc {
             let dealloc_f = build_dealloc(self, &self.iw, st_ty);
             let _ = cdg_st.dealloc.set(dealloc_f);
         }
+
+        if let Some(init) = &sd.init {
+            if let Some(init_f) = self.build_init(st_ty, init) {
+                let _ = cdg_st.init.set(init_f);
+            } else {
+                self.iw
+                    .error(CompilerError::new(init.loc, Error::InvalidExpression));
+                return None;
+            }
+        }
+
         Some(st_ty)
     }
 

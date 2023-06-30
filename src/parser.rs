@@ -193,16 +193,27 @@ peg::parser! {
         rule elscheck() -> Box<Statement> =
         "else" _ blk:block() { Box::new(blk) }
 
-        rule field_decl() -> FieldDecl =
-        start:position!() _ n:ident() _ ty:type_decl() _ end:position!() { FieldDecl { loc:Location{start,end}, name:n, ty } }
+        rule field_decl() -> StructEntryDecl =
+        start:position!() _ n:ident() _ ty:type_decl() _ end:position!() {
+            let field = FieldDecl { loc:Location{start,end}, name:n, ty };
+            StructEntryDecl::Field(field)
+        }
+
+        rule init_decl() -> StructEntryDecl =
+        _ start:position!() _ "init" _ "(" _ args:func_arg()**"," _ ")" _ body:block() end:position!() _ {
+            let init = InitDecl { loc:Location{start, end}, args, body };
+            StructEntryDecl::Init(init)
+        }
+
+        rule struct_entry() -> StructEntryDecl = field_decl() / init_decl();
 
         rule ref_val_decl() -> bool =
         _ s:$("ref" / "val") _ { s == "ref" }
 
         rule struct_decl() -> TopLevelDeclaration =
-        _ start:position!() rd:ref_val_decl()? "type" _ n:ident() _ "{" _ f:(field_decl()**",") _ "}" end:position!() _ {
+        _ start:position!() rd:ref_val_decl()? "type" _ n:ident() _ "{" _ f:(struct_entry()**",") _ "}" end:position!() _ {
             let ms = if rd.unwrap_or(true) { crate::codegen::structure::MemoryStrategy::ByReference } else { crate::codegen::structure::MemoryStrategy::ByValue };
-            let sd = StructDecl { loc:Location{start,end}, name:n, ms, fields:f };
+            let sd = RawStructDecl { loc:Location{start,end}, name:n, ms, entries:f };
             TopLevelDeclaration::structure(sd.loc, sd)
         }
 

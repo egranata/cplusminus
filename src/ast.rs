@@ -62,11 +62,33 @@ pub struct MethodDecl {
 }
 
 #[derive(Clone, Debug)]
-pub struct StructDecl {
+pub struct InitDecl {
+    pub loc: Location,
+    pub args: Vec<FunctionArgument>,
+    pub body: Statement,
+}
+
+#[derive(Clone, Debug)]
+pub enum StructEntryDecl {
+    Field(FieldDecl),
+    Init(InitDecl),
+}
+
+#[derive(Clone, Debug)]
+pub struct RawStructDecl {
+    pub loc: Location,
+    pub name: String,
+    pub ms: MemoryStrategy,
+    pub entries: Vec<StructEntryDecl>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ProperStructDecl {
     pub loc: Location,
     pub name: String,
     pub ms: MemoryStrategy,
     pub fields: Vec<FieldDecl>,
+    pub init: Option<InitDecl>,
 }
 
 #[derive(Clone, Debug)]
@@ -280,7 +302,7 @@ pub struct Statement {
 pub enum TopLevelDecl {
     Function(FunctionDefinition),
     ExternFunction(FunctionDecl),
-    Structure(StructDecl),
+    Structure(RawStructDecl),
     Alias(TypeAliasDecl),
     Implementation(ImplDecl),
 }
@@ -306,7 +328,7 @@ impl TopLevelDeclaration {
         }
     }
 
-    pub fn structure(l: Location, s: StructDecl) -> Self {
+    pub fn structure(l: Location, s: RawStructDecl) -> Self {
         Self {
             loc: l,
             payload: TopLevelDecl::Structure(s),

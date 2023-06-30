@@ -23,7 +23,9 @@ use peg::{error::ParseError, str::LineCol};
 use std::{cell::RefCell, collections::HashMap, path::Path, rc::Rc};
 
 use crate::{
-    ast::{FunctionDecl, Location, TopLevelDecl, TopLevelDeclaration},
+    ast::{
+        FunctionDecl, Location, ProperStructDecl, RawStructDecl, TopLevelDecl, TopLevelDeclaration,
+    },
     builders::{func::FunctionBuilder, refcount::Refcounting, ty::TypeBuilder},
     err::{CompilerDiagnostic, CompilerError, CompilerWarning, Error},
     parser::cpm::source_file,
@@ -181,16 +183,50 @@ impl<'a> CompilerCore<'a> {
         source_file(&self.source.content)
     }
 
+    fn fixup_struct_decl(&self, raw: &RawStructDecl) -> Option<ProperStructDecl> {
+        let mut proper = ProperStructDecl {
+            loc: raw.loc,
+            name: raw.name.clone(),
+            ms: raw.ms,
+            fields: vec![],
+            init: None,
+        };
+
+        for entry in &raw.entries {
+            match entry {
+                crate::ast::StructEntryDecl::Field(field) => proper.fields.push(field.clone()),
+                crate::ast::StructEntryDecl::Init(init) => {
+                    if proper.init.is_some() {
+                        self.error(CompilerError::new(
+                            init.loc,
+                            Error::DuplicatedStructMember("init".to_owned()),
+                        ));
+                        return None;
+                    } else {
+                        proper.init = Some(init.clone());
+                    }
+                }
+            }
+        }
+
+        Some(proper)
+    }
+
     fn check_ast_decl(&self, tld: &TopLevelDecl) -> bool {
         match tld {
             TopLevelDecl::Structure(sd) => {
-                for field_decl in &sd.fields {
-                    if field_decl.name.starts_with("__") {
-                        self.error(CompilerError::new(
-                            field_decl.loc,
-                            Error::ReservedIdentifier(field_decl.name.clone()),
-                        ));
-                        return false;
+                for entry_decl in &sd.entries {
+                    match entry_decl {
+                        crate::ast::StructEntryDecl::Field(field_decl) => {
+                            if field_decl.name.starts_with("__") {
+                                self.error(CompilerError::new(
+                                    field_decl.loc,
+                                    Error::ReservedIdentifier(field_decl.name.clone()),
+                                ));
+                                return false;
+                            }
+                        }
+                        crate::ast::StructEntryDecl::Init(_) => {}
                     }
                 }
                 true
@@ -252,7 +288,14 @@ impl<'a> CompilerCore<'a> {
                         }
                         crate::ast::TopLevelDecl::Structure(sd) => {
                             let ty = TypeBuilder::new(self.clone());
-                            if ty.build_structure(sd).is_none() {
+                            if let Some(psd) = self.fixup_struct_decl(sd) {
+                                if ty.build_structure(&psd).is_none() {
+                                    self.error(CompilerError::new(
+                                        sd.loc,
+                                        Error::InvalidExpression,
+                                    ));
+                                }
+                            } else {
                                 self.error(CompilerError::new(sd.loc, Error::InvalidExpression));
                             }
                         }

@@ -22,7 +22,7 @@ use inkwell::{
 };
 
 use crate::{
-    ast::{FunctionArgument, FunctionDecl, FunctionDefinition, StructDecl, TypeDescriptor},
+    ast::{FunctionArgument, FunctionDecl, FunctionDefinition, ProperStructDecl, TypeDescriptor},
     err::{CompilerError, CompilerWarning, Error, Warning},
     iw::CompilerCore,
     mangler::mangle_method_name,
@@ -225,6 +225,11 @@ impl<'a> FunctionBuilder<'a> {
         }
     }
 
+    pub fn compile(&self, func: &FunctionDefinition) -> Option<FunctionValue<'a>> {
+        self.declare(&func.decl, false)?;
+        self.build(func)
+    }
+
     pub fn build(&self, func: &FunctionDefinition) -> Option<FunctionValue<'a>> {
         self.build_function(func)
     }
@@ -246,7 +251,11 @@ impl<'a> FunctionBuilder<'a> {
         ret
     }
 
-    pub fn as_method(&self, fd: &FunctionDefinition, self_decl: &StructDecl) -> FunctionDefinition {
+    pub fn as_method(
+        &self,
+        fd: &FunctionDefinition,
+        self_decl: &ProperStructDecl,
+    ) -> FunctionDefinition {
         let fqn = mangle_method_name(fd, self_decl);
         let self_tyd = TypeDescriptor::Name(self_decl.name.clone());
         let self_arg = FunctionArgument {

@@ -19,7 +19,7 @@ use inkwell::{
     values::FunctionValue,
 };
 
-use crate::ast::{FieldDecl, ImplDecl, MethodDecl, StructDecl};
+use crate::ast::{FieldDecl, ImplDecl, MethodDecl, ProperStructDecl};
 
 use super::MutableOf;
 
@@ -57,13 +57,14 @@ impl Display for MemoryStrategy {
 
 #[derive(Clone, Debug)]
 pub struct Structure<'a> {
-    pub decl: StructDecl,
+    pub decl: ProperStructDecl,
     pub str_ty: StructType<'a>,
     pub var_ty: BasicTypeEnum<'a>,
     pub ms: MemoryStrategy,
     pub implementations: MutableOf<Vec<ImplDecl>>,
     pub fields: MutableOf<Vec<Field<'a>>>,
     pub methods: MutableOf<Vec<Method<'a>>>,
+    pub init: OnceCell<FunctionValue<'a>>,
     pub dealloc: OnceCell<FunctionValue<'a>>,
 }
 

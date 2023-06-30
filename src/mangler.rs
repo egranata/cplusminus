@@ -14,9 +14,10 @@
 
 use inkwell::types::StructType;
 
-use crate::ast::{FunctionDefinition, StructDecl};
+use crate::ast::{FunctionDefinition, ProperStructDecl};
 
 pub enum SpecialMemberFunction {
+    Initializer,
     BuiltinDeallocator,
 }
 
@@ -26,11 +27,12 @@ pub fn mangle_special_method(self_decl: StructType<'_>, func: SpecialMemberFunct
         "__{}__@{}",
         type_name,
         match func {
+            SpecialMemberFunction::Initializer => "init",
             SpecialMemberFunction::BuiltinDeallocator => "dealloc",
         }
     )
 }
 
-pub fn mangle_method_name(fd: &FunctionDefinition, self_decl: &StructDecl) -> String {
+pub fn mangle_method_name(fd: &FunctionDefinition, self_decl: &ProperStructDecl) -> String {
     format!("__{}_@_{}", self_decl.name, fd.decl.name)
 }
