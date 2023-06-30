@@ -2834,6 +2834,30 @@ func main() ret int64 {
     }
 
     #[test]
+    fn test_ref_type_init_hints() {
+        assert_eq!(
+            12,
+            helper_run_main_exit(
+                "
+ref type pair {
+    x: int32,
+    y: int64,
+    init(a: int32) {
+        self.x = a;
+        self.y = a as int64;
+    }
+}
+
+func main() ret int64 {
+    let p = alloc pair(12);
+    return p.y;
+}"
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
     fn test_ref_type_init_declared_used() {
         assert_eq!(
             15,

@@ -48,7 +48,6 @@ pub struct ExpressionBuilder<'a, 'b> {
 
 enum FunctionCallArgument<'a> {
     Expr(Expression),
-    #[allow(dead_code)]
     Value(BasicMetadataValueEnum<'a>),
 }
 
@@ -353,19 +352,23 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 }
                 AllocInitializer::ByInit(args) => {
                     if let Some(init_func) = struct_def.init.get() {
-                        let mut eval_args: Vec<BasicMetadataValueEnum> =
-                            vec![BasicMetadataValueEnum::PointerValue(pv)];
-                        for arg in args {
-                            if let Some(eval_arg) = self.build_expr(builder, fd, arg, locals, None)
-                            {
-                                eval_args.push(eval_arg.into());
-                            } else {
-                                self.iw
-                                    .error(CompilerError::new(arg.loc, Error::InvalidExpression));
-                                return None;
-                            }
+                        let their_type = init_func.get_type();
+                        let mut eval_args: Vec<FunctionCallArgument> =
+                            vec![FunctionCallArgument::Value(
+                                BasicMetadataValueEnum::PointerValue(pv),
+                            )];
+                        args.iter().for_each(|arg| {
+                            eval_args.push(FunctionCallArgument::Expr(arg.clone()))
+                        });
+                        if let Some(call_args) = self
+                            .build_function_call_args(builder, fd, locals, &eval_args, their_type)
+                        {
+                            builder.build_call(*init_func, &call_args, "");
+                        } else {
+                            self.iw
+                                .error(CompilerError::new(node.loc, Error::InvalidExpression));
+                            return None;
                         }
-                        builder.build_call(*init_func, &eval_args, "");
                     } else {
                         self.iw.error(CompilerError::new(
                             node.loc,
