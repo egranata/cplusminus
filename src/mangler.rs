@@ -12,7 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use inkwell::types::StructType;
+
 use crate::ast::{FunctionDefinition, StructDecl};
+
+pub enum SpecialMemberFunction {
+    BuiltinDeallocator,
+}
+
+pub fn mangle_special_method(self_decl: StructType<'_>, func: SpecialMemberFunction) -> String {
+    let type_name = self_decl.get_name().unwrap().to_str().unwrap();
+    format!(
+        "__{}__@{}",
+        type_name,
+        match func {
+            SpecialMemberFunction::BuiltinDeallocator => "dealloc",
+        }
+    )
+}
 
 pub fn mangle_method_name(fd: &FunctionDefinition, self_decl: &StructDecl) -> String {
     format!("__{}_@_{}", self_decl.name, fd.decl.name)

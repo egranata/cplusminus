@@ -23,7 +23,10 @@ use inkwell::{
     },
 };
 
-use crate::iw::{CompilerCore, CompilerOptions};
+use crate::{
+    iw::{CompilerCore, CompilerOptions},
+    mangler::mangle_special_method,
+};
 
 use super::ty::TypeBuilder;
 
@@ -438,7 +441,10 @@ pub fn insert_getref_if_refcounted<'a>(
 }
 
 fn find_dealloc_for_type<'a>(iw: &CompilerCore<'a>, ty: StructType<'a>) -> FunctionValue<'a> {
-    let name = format!("__{}_@dealloc", ty.get_name().unwrap().to_str().unwrap());
+    let name = mangle_special_method(
+        ty,
+        crate::mangler::SpecialMemberFunction::BuiltinDeallocator,
+    );
     iw.module.get_function(&name).unwrap()
 }
 
@@ -458,7 +464,10 @@ pub fn build_dealloc<'a>(
         .builtins
         .void
         .fn_type(&[BasicMetadataTypeEnum::PointerType(this_type)], false);
-    let name = format!("__{}_@dealloc", ty.get_name().unwrap().to_str().unwrap());
+    let name = mangle_special_method(
+        ty,
+        crate::mangler::SpecialMemberFunction::BuiltinDeallocator,
+    );
     let func = iw.module.add_function(&name, func_type, Default::default());
     let builder = iw.context.create_builder();
 
