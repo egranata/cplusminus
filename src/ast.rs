@@ -172,9 +172,8 @@ pub struct FieldInitializer {
 
 #[derive(Clone, Debug)]
 pub enum AllocInitializer {
-    None,
     ByFieldList(Vec<FieldInitializer>),
-    // ReferenceType(...),
+    ByInit(Vec<Expression>),
 }
 
 #[derive(Clone, Debug)]
@@ -200,7 +199,7 @@ pub enum Expr {
     FunctionCall(String, Vec<Expression>),
     MethodCall(MethodCall),
     PointerFunctionCall(Box<Expression>, Vec<Expression>),
-    Alloc(TypeDescriptor, AllocInitializer),
+    Alloc(TypeDescriptor, Option<AllocInitializer>),
     Incref(Box<Expression>),
     Getref(Box<Expression>),
     Rvalue(Lvalue),

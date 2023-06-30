@@ -35,6 +35,7 @@ pub enum Error {
     ReservedIdentifier(String),
     DuplicatedStructMember(String),
     InitDisallowedInValueTypes,
+    InitMustBeUsed,
     WarningAsError(Warning),
     InvalidTypeSpecifier(TypeDescriptor, TypeDescriptor),
     DuplicateArgumentName(String),
@@ -99,6 +100,12 @@ impl Display for Error {
             }
             Error::InitDisallowedInValueTypes => {
                 write!(f, "init is only permitted for reference types")
+            }
+            Error::InitMustBeUsed => {
+                write!(
+                    f,
+                    "this type provides init, which must be called when allocating"
+                )
             }
         }
     }

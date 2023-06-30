@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{cell::OnceCell, fmt::Display, iter::zip};
+use std::{cell::OnceCell, fmt::Display, iter::zip, rc::Rc};
 
 use inkwell::{
     types::{BasicTypeEnum, StructType},
@@ -64,8 +64,8 @@ pub struct Structure<'a> {
     pub implementations: MutableOf<Vec<ImplDecl>>,
     pub fields: MutableOf<Vec<Field<'a>>>,
     pub methods: MutableOf<Vec<Method<'a>>>,
-    pub init: OnceCell<FunctionValue<'a>>,
-    pub dealloc: OnceCell<FunctionValue<'a>>,
+    pub init: Rc<OnceCell<FunctionValue<'a>>>,
+    pub dealloc: Rc<OnceCell<FunctionValue<'a>>>,
 }
 
 impl<'a> Structure<'a> {

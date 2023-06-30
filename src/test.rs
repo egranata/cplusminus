@@ -2832,4 +2832,119 @@ func main() ret int64 {
             .unwrap()
         );
     }
+
+    #[test]
+    fn test_ref_type_init_declared_used() {
+        assert_eq!(
+            15,
+            helper_run_main_exit(
+                "
+ref type ord_pair {
+    max: int64,
+    min: int64,
+    init(x: int64, y: int64) {
+        if (x > y) {
+            self.max = x;
+            self.min = y;
+        } else {
+            self.max = y;
+            self.min = y;
+        };
+    }
+}
+
+func main() ret int64 {
+    let p1 = alloc ord_pair(12,14);
+    let p2 = alloc ord_pair(15,1);
+    return p1.max + p2.min;
+}
+"
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_ref_type_init_declared_not_used() {
+        assert_ne!(
+            0,
+            helper_compile_errors(
+                "
+ref type ord_pair {
+    max: int64,
+    min: int64,
+    init(x: int64, y: int64) {
+        if (x > y) {
+            self.max = x;
+            self.min = y;
+        } else {
+            self.max = y;
+            self.min = y;
+        };
+    }
+}
+
+func main() ret int64 {
+    let p1 = alloc ord_pair;
+    let p2 = alloc ord_pair;
+    return p1.max + p2.min;
+}
+"
+            )
+            .len()
+        );
+    }
+
+    #[test]
+    fn test_ref_type_init_used_not_declared() {
+        assert_ne!(
+            0,
+            helper_compile_errors(
+                "
+ref type ord_pair {
+    max: int64,
+    min: int64,
+}
+
+func main() ret int64 {
+    let p1 = alloc ord_pair(3);
+    let p2 = alloc ord_pair(2,5);
+    return p1.max + p2.min;
+}
+"
+            )
+            .len()
+        );
+    }
+
+    #[test]
+    fn test_val_type_init_declared() {
+        assert_ne!(
+            0,
+            helper_compile_errors(
+                "
+val type ord_pair {
+    max: int64,
+    min: int64,
+    init(x: int64, y: int64) {
+        if (x > y) {
+            self.max = x;
+            self.min = y;
+        } else {
+            self.max = y;
+            self.min = y;
+        };
+    }
+}
+
+func main() ret int64 {
+    let p1 = alloc ord_pair;
+    let p2 = alloc ord_pair(3,4);
+    return p1.max + p2.min;
+}
+"
+            )
+            .len()
+        );
+    }
 }

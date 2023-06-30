@@ -97,8 +97,14 @@ peg::parser! {
             FieldInitializer{ field: i, value: Box::new(e) }
         }
 
-        rule value_type_alloc_entries() -> Vec<(FieldInitializer)> =
-        _ "{" _ p:value_type_alloc_entry()**"," _ "}" { p }
+        rule value_type_alloc_entries() -> AllocInitializer =
+        _ "{" _ p:value_type_alloc_entry()**"," _ "}" { AllocInitializer::ByFieldList(p) }
+
+        rule ref_type_alloc_entries() -> AllocInitializer =
+        _ "(" _ p:func_call_args() _ ")" { AllocInitializer::ByInit(p) }
+
+        rule alloc_init_expr() -> AllocInitializer =
+        value_type_alloc_entries() / ref_type_alloc_entries();
 
         pub rule expr() -> Expression = precedence!{
             start:position!() node:@ end:position!() { Expression { loc:Location{start,end}, payload:node} }
@@ -113,12 +119,7 @@ peg::parser! {
             x:(@) _ ">=" _ y:@ { Expr::GreaterEqual(Box::new(x), Box::new(y)) }
             x:(@) _ "<=" _ y:@ { Expr::LessEqual(Box::new(x), Box::new(y)) }
             --
-            "alloc" _ ty:typename() _ p:value_type_alloc_entries()? {
-                let init = if let Some(v) = p {
-                    AllocInitializer::ByFieldList(v)
-                } else {
-                    AllocInitializer::None
-                };
+            "alloc" _ ty:typename() _ init:alloc_init_expr()? {
                 Expr::Alloc(ty, init)
             }
             "incref" _ e:expr() _ { Expr::Incref(Box::new(e)) }

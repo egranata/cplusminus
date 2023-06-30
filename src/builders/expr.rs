@@ -243,34 +243,48 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         ty: StructType<'a>,
         fd: &FunctionDefinition,
         node: &Expression,
-        init: &AllocInitializer,
+        init: &Option<AllocInitializer>,
     ) -> Option<BasicValueEnum<'a>> {
         let mut val = ty.const_zero();
         let struct_def = self.tb.struct_by_name(ty).unwrap();
-        if let AllocInitializer::ByFieldList(init_list) = init {
-            for fi in init_list {
-                if let Some(idx) = struct_def.field_idx_by_name(&fi.field) {
-                    let type_hint = struct_def.field_type_by_name(&fi.field);
-                    if let Some(finit) =
-                        self.build_expr(builder, fd, fi.value.as_ref(), locals, type_hint)
-                    {
-                        val = builder
-                            .build_insert_value(val, finit, idx as u32, "")
-                            .unwrap()
-                            .into_struct_value();
-                    } else {
-                        self.iw
-                            .error(CompilerError::new(fi.value.loc, Error::InvalidExpression));
-                        return None;
+        match init {
+            Some(ai) => match ai {
+                AllocInitializer::ByFieldList(init_list) => {
+                    for fi in init_list {
+                        if let Some(idx) = struct_def.field_idx_by_name(&fi.field) {
+                            let type_hint = struct_def.field_type_by_name(&fi.field);
+                            if let Some(finit) =
+                                self.build_expr(builder, fd, fi.value.as_ref(), locals, type_hint)
+                            {
+                                val = builder
+                                    .build_insert_value(val, finit, idx as u32, "")
+                                    .unwrap()
+                                    .into_struct_value();
+                            } else {
+                                self.iw.error(CompilerError::new(
+                                    fi.value.loc,
+                                    Error::InvalidExpression,
+                                ));
+                                return None;
+                            }
+                        } else {
+                            self.iw.error(CompilerError::new(
+                                node.loc,
+                                Error::FieldNotFound(fi.field.clone()),
+                            ));
+                            return None;
+                        }
                     }
-                } else {
+                }
+                AllocInitializer::ByInit(_) => {
                     self.iw.error(CompilerError::new(
                         node.loc,
-                        Error::FieldNotFound(fi.field.clone()),
+                        Error::InitDisallowedInValueTypes,
                     ));
                     return None;
                 }
-            }
+            },
+            None => {}
         }
 
         return Some(BasicValueEnum::StructValue(val));
@@ -283,7 +297,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         ty: StructType<'a>,
         fd: &FunctionDefinition,
         node: &Expression,
-        init: &AllocInitializer,
+        init: &Option<AllocInitializer>,
     ) -> Option<BasicValueEnum<'a>> {
         let pv = alloc_refcounted_type(builder, &self.iw, ty);
         let temp_pv = builder.build_alloca(pv.get_type(), "temp_alloc");
@@ -292,27 +306,68 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         self.exit.decref_on_exit(temp_pv);
 
         let struct_def = self.tb.struct_by_name(ty).unwrap();
-        if let AllocInitializer::ByFieldList(init_list) = init {
-            for fi in init_list {
-                if let Some(idx) = struct_def.field_idx_by_name(&fi.field) {
-                    let type_hint = struct_def.field_type_by_name(&fi.field);
-                    if let Some(finit) =
-                        self.build_expr(builder, fd, fi.value.as_ref(), locals, type_hint)
-                    {
-                        let zero = self.iw.builtins.zero(self.iw.builtins.int32);
-                        let idx = self.iw.builtins.n(idx as u64, self.iw.builtins.int32);
-                        let gep = unsafe { builder.build_gep(pv, &[zero, idx], "") };
-                        builder.build_store(gep, finit);
-                    } else {
+        match init {
+            Some(ai) => match ai {
+                AllocInitializer::ByFieldList(init_list) => {
+                    if struct_def.init.get().is_some() {
                         self.iw
-                            .error(CompilerError::new(fi.value.loc, Error::InvalidExpression));
+                            .error(CompilerError::new(node.loc, Error::InitMustBeUsed));
                         return None;
                     }
-                } else {
-                    self.iw.error(CompilerError::new(
-                        node.loc,
-                        Error::FieldNotFound(fi.field.clone()),
-                    ));
+                    for fi in init_list {
+                        if let Some(idx) = struct_def.field_idx_by_name(&fi.field) {
+                            let type_hint = struct_def.field_type_by_name(&fi.field);
+                            if let Some(finit) =
+                                self.build_expr(builder, fd, fi.value.as_ref(), locals, type_hint)
+                            {
+                                let zero = self.iw.builtins.zero(self.iw.builtins.int32);
+                                let idx = self.iw.builtins.n(idx as u64, self.iw.builtins.int32);
+                                let gep = unsafe { builder.build_gep(pv, &[zero, idx], "") };
+                                builder.build_store(gep, finit);
+                            } else {
+                                self.iw.error(CompilerError::new(
+                                    fi.value.loc,
+                                    Error::InvalidExpression,
+                                ));
+                                return None;
+                            }
+                        } else {
+                            self.iw.error(CompilerError::new(
+                                node.loc,
+                                Error::FieldNotFound(fi.field.clone()),
+                            ));
+                            return None;
+                        }
+                    }
+                }
+                AllocInitializer::ByInit(args) => {
+                    if let Some(init_func) = struct_def.init.get() {
+                        let mut eval_args: Vec<BasicMetadataValueEnum> =
+                            vec![BasicMetadataValueEnum::PointerValue(pv)];
+                        for arg in args {
+                            if let Some(eval_arg) = self.build_expr(builder, fd, arg, locals, None)
+                            {
+                                eval_args.push(eval_arg.into());
+                            } else {
+                                self.iw
+                                    .error(CompilerError::new(arg.loc, Error::InvalidExpression));
+                                return None;
+                            }
+                        }
+                        builder.build_call(*init_func, &eval_args, "");
+                    } else {
+                        self.iw.error(CompilerError::new(
+                            node.loc,
+                            Error::FieldNotFound(String::from("init")),
+                        ));
+                        return None;
+                    }
+                }
+            },
+            None => {
+                if struct_def.init.get().is_some() {
+                    self.iw
+                        .error(CompilerError::new(node.loc, Error::InitMustBeUsed));
                     return None;
                 }
             }
