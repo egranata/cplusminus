@@ -46,6 +46,12 @@ pub struct ExpressionBuilder<'a, 'b> {
     exit: &'b FunctionExitData<'a>,
 }
 
+enum FunctionCallArgument<'a> {
+    Expr(Expression),
+    #[allow(dead_code)]
+    Value(BasicMetadataValueEnum<'a>),
+}
+
 struct FunctionCallData<'a> {
     dest: CallableValue<'a>,
     dest_src: Either<FunctionValue<'a>, PointerValue<'a>>,
@@ -154,22 +160,27 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         builder: &Builder<'a>,
         fd: &FunctionDefinition,
         locals: &LocalVariables<'a>,
-        args: &[Expression],
+        args: &[FunctionCallArgument<'a>],
         their_type: FunctionType<'a>,
     ) -> Option<Vec<BasicMetadataValueEnum<'a>>> {
-        let mut aargs: Vec<BasicMetadataValueEnum> = vec![];
+        let mut aargs: Vec<BasicMetadataValueEnum<'a>> = vec![];
         for (idx, arg) in args.iter().enumerate() {
             let type_hint = if their_type.get_param_types().len() > idx {
                 Some(their_type.get_param_types()[idx])
             } else {
                 None
             };
-            if let Some(aarg) = self.build_expr(builder, fd, arg, locals, type_hint) {
-                aargs.push(BasicMetadataValueEnum::from(aarg));
-            } else {
-                self.iw
-                    .error(CompilerError::new(arg.loc, Error::InvalidExpression));
-                return None;
+            match arg {
+                FunctionCallArgument::Expr(expr) => {
+                    if let Some(aarg) = self.build_expr(builder, fd, expr, locals, type_hint) {
+                        aargs.push(BasicMetadataValueEnum::from(aarg));
+                    } else {
+                        self.iw
+                            .error(CompilerError::new(expr.loc, Error::InvalidExpression));
+                        return None;
+                    }
+                }
+                FunctionCallArgument::Value(val) => aargs.push(*val),
             }
         }
 
@@ -496,8 +507,12 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                         return None;
                     }
                     let their_type = pv.get_type().get_element_type().into_function_type();
+                    let f_args: Vec<FunctionCallArgument> = args
+                        .iter()
+                        .map(|arg| FunctionCallArgument::Expr(arg.clone()))
+                        .collect();
                     if let Some(args) =
-                        self.build_function_call_args(builder, fd, locals, args, their_type)
+                        self.build_function_call_args(builder, fd, locals, &f_args, their_type)
                     {
                         if let Some(info) = FunctionCallData::from_pointer(pv, args) {
                             return self.build_function_call(node, builder, &info);
@@ -517,8 +532,12 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
             }
             FunctionCall(id, args) => {
                 if let Some((_, fv)) = self.iw.funcs.as_ref().borrow().get(id) {
+                    let f_args: Vec<FunctionCallArgument> = args
+                        .iter()
+                        .map(|arg| FunctionCallArgument::Expr(arg.clone()))
+                        .collect();
                     if let Some(args) =
-                        self.build_function_call_args(builder, fd, locals, args, fv.get_type())
+                        self.build_function_call_args(builder, fd, locals, &f_args, fv.get_type())
                     {
                         let info = FunctionCallData::from_function(*fv, args);
                         return self.build_function_call(node, builder, &info);
@@ -580,12 +599,17 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     }
 
                     let method_func = method_decl.unwrap().func;
+                    let f_args: Vec<FunctionCallArgument> = mc
+                        .args
+                        .iter()
+                        .map(|arg| FunctionCallArgument::Expr(arg.clone()))
+                        .collect();
 
                     return if let Some(mut args) = self.build_function_call_args(
                         builder,
                         fd,
                         locals,
-                        &mc.args,
+                        &f_args,
                         method_func.get_type(),
                     ) {
                         args.insert(0, this_arg.unwrap());
