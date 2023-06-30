@@ -57,6 +57,21 @@ impl<'a> TypeBuilder<'a> {
         }
     }
 
+    pub fn undef_for_type(ty: BasicTypeEnum) -> BasicValueEnum {
+        match ty {
+            BasicTypeEnum::ArrayType(at) => BasicValueEnum::from(at.get_undef()),
+            BasicTypeEnum::FloatType(ft) => BasicValueEnum::from(ft.get_undef()),
+            BasicTypeEnum::IntType(it) => BasicValueEnum::from(it.get_undef()),
+            BasicTypeEnum::PointerType(pt) => BasicValueEnum::from(pt.get_undef()),
+            BasicTypeEnum::StructType(st) => BasicValueEnum::from(st.get_undef()),
+            BasicTypeEnum::VectorType(vt) => BasicValueEnum::from(vt.get_undef()),
+        }
+    }
+
+    pub fn zero_for_type(ty: BasicTypeEnum) -> BasicValueEnum {
+        ty.const_zero()
+    }
+
     pub fn descriptor_by_llvm_type(ty: BasicTypeEnum) -> Option<TypeDescriptor> {
         match ty {
             BasicTypeEnum::ArrayType(at) => {

@@ -121,8 +121,9 @@ impl<'a> FunctionBuilder<'a> {
         builder.position_at_end(entry);
 
         let locals = self.build_argument_allocas(func, &builder, fd);
-        let ret_alloca =
-            builder.build_alloca(func.get_type().get_return_type().unwrap(), "ret_alloca");
+        let ret_ty = func.get_type().get_return_type().unwrap();
+        let ret_alloca = builder.build_alloca(ret_ty, "ret_alloca");
+        builder.build_store(ret_alloca, TypeBuilder::undef_for_type(ret_ty));
 
         let exit_block = self.iw.context.append_basic_block(func, "exit");
         builder.position_at_end(entry);
