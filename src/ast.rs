@@ -151,7 +151,7 @@ pub struct FieldInitializer {
 #[derive(Clone, Debug)]
 pub enum AllocInitializer {
     None,
-    ValueType(Vec<FieldInitializer>),
+    ByFieldList(Vec<FieldInitializer>),
     // ReferenceType(...),
 }
 

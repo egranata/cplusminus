@@ -247,7 +247,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
     ) -> Option<BasicValueEnum<'a>> {
         let mut val = ty.const_zero();
         let struct_def = self.tb.struct_by_name(ty).unwrap();
-        if let AllocInitializer::ValueType(init_list) = init {
+        if let AllocInitializer::ByFieldList(init_list) = init {
             for fi in init_list {
                 if let Some(idx) = struct_def.field_idx_by_name(&fi.field) {
                     let type_hint = struct_def.field_type_by_name(&fi.field);
@@ -279,15 +279,45 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
     fn alloc_ref_type(
         &self,
         builder: &Builder<'a>,
-        _locals: &LocalVariables<'a>,
+        locals: &LocalVariables<'a>,
         ty: StructType<'a>,
-        _init: &AllocInitializer,
+        fd: &FunctionDefinition,
+        node: &Expression,
+        init: &AllocInitializer,
     ) -> Option<BasicValueEnum<'a>> {
         let pv = alloc_refcounted_type(builder, &self.iw, ty);
         let temp_pv = builder.build_alloca(pv.get_type(), "temp_alloc");
         builder.build_store(temp_pv, pv);
         let ret = builder.build_load(temp_pv, "");
         self.exit.decref_on_exit(temp_pv);
+
+        let struct_def = self.tb.struct_by_name(ty).unwrap();
+        if let AllocInitializer::ByFieldList(init_list) = init {
+            for fi in init_list {
+                if let Some(idx) = struct_def.field_idx_by_name(&fi.field) {
+                    let type_hint = struct_def.field_type_by_name(&fi.field);
+                    if let Some(finit) =
+                        self.build_expr(builder, fd, fi.value.as_ref(), locals, type_hint)
+                    {
+                        let zero = self.iw.builtins.zero(self.iw.builtins.int32);
+                        let idx = self.iw.builtins.n(idx as u64, self.iw.builtins.int32);
+                        let gep = unsafe { builder.build_gep(pv, &[zero, idx], "") };
+                        builder.build_store(gep, finit);
+                    } else {
+                        self.iw
+                            .error(CompilerError::new(fi.value.loc, Error::InvalidExpression));
+                        return None;
+                    }
+                } else {
+                    self.iw.error(CompilerError::new(
+                        node.loc,
+                        Error::FieldNotFound(fi.field.clone()),
+                    ));
+                    return None;
+                }
+            }
+        }
+
         Some(ret)
     }
 
@@ -516,7 +546,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
             Alloc(ty, init) => {
                 if let Some(basic_type) = self.tb.llvm_type_by_descriptor(ty) {
                     if let Some(struct_type) = self.tb.is_refcounted_basic_type(basic_type) {
-                        return self.alloc_ref_type(builder, locals, struct_type, init);
+                        return self.alloc_ref_type(builder, locals, struct_type, fd, node, init);
                     } else if let Some(struct_type) = self.tb.is_value_basic_type(basic_type) {
                         return self.alloc_value_type(builder, locals, struct_type, fd, node, init);
                     } else {

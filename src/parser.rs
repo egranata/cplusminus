@@ -115,7 +115,7 @@ peg::parser! {
             --
             "alloc" _ ty:typename() _ p:value_type_alloc_entries()? {
                 let init = if let Some(v) = p {
-                    AllocInitializer::ValueType(v)
+                    AllocInitializer::ByFieldList(v)
                 } else {
                     AllocInitializer::None
                 };

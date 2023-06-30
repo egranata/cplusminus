@@ -2805,4 +2805,31 @@ func main() ret int64 {
             .unwrap()
         );
     }
+
+    #[test]
+    fn test_ref_type_alloc_init() {
+        assert_eq!(
+            247,
+            helper_run_main_exit(
+                "
+ref type pair {
+    x: int32,
+    y: int64
+}
+
+func make_pair(x: int32, y: int64) ret pair {
+    return alloc pair {
+        x: x,
+        y: y
+    };
+}
+
+func main() ret int64 {
+    let p = make_pair(200, 47);
+    return p.x as int64 + p.y;
+}"
+            )
+            .unwrap()
+        );
+    }
 }
