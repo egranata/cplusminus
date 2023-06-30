@@ -310,7 +310,15 @@ impl<'a> TypeBuilder<'a> {
                 1,
                 FieldDecl {
                     loc: sd.loc,
-                    name: "__dealloc".to_owned(),
+                    name: "__sys_dealloc".to_owned(),
+                    ty: TypeDescriptor::Name("int64".to_owned()),
+                },
+            );
+            sd_fields.insert(
+                2,
+                FieldDecl {
+                    loc: sd.loc,
+                    name: "__usr_dealloc".to_owned(),
                     ty: TypeDescriptor::Name("int64".to_owned()),
                 },
             );
@@ -357,7 +365,7 @@ impl<'a> TypeBuilder<'a> {
 
         if let Some(init) = &sd.init {
             if let Some(init_f) = self.build_init(st_ty, init) {
-                let _ = cdg_st.init.set(init_f);
+                cdg_st.init.set(init_f).unwrap();
             } else {
                 self.iw
                     .error(CompilerError::new(init.loc, Error::InvalidExpression));
@@ -367,7 +375,7 @@ impl<'a> TypeBuilder<'a> {
 
         if let Some(dealloc) = &sd.dealloc {
             if let Some(dealloc_f) = self.build_usr_dealloc(st_ty, dealloc) {
-                let _ = cdg_st.init.set(dealloc_f);
+                cdg_st.usr_dealloc.set(dealloc_f).unwrap();
             } else {
                 self.iw
                     .error(CompilerError::new(dealloc.loc, Error::InvalidExpression));

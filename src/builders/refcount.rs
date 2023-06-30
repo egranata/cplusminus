@@ -59,6 +59,7 @@ fn build_refcount_type(c: &Context) -> StructType<'_> {
     let fields = [
         BasicTypeEnum::IntType(c.i64_type()),
         BasicTypeEnum::PointerType(dealloc_f_ty),
+        BasicTypeEnum::PointerType(dealloc_f_ty),
     ];
     __refcount_t.set_body(&fields, false);
     __refcount_t
@@ -353,14 +354,22 @@ pub fn alloc_refcounted_type<'a>(
         ty.size_of().unwrap(),
     );
 
-    let dealloc_f = find_dealloc_for_type(iw, ty);
+    let sys_dealloc_f = find_sys_dealloc_for_type(iw, ty);
+    let usr_dealloc_f = find_usr_dealloc_for_type(iw, ty);
     let as_decref = builder.build_pointer_cast(
         malloc,
         iw.refcnt.refcount_type.ptr_type(Default::default()),
         "",
     );
-    let dealloc_gep = builder.build_struct_gep(as_decref, 1, "").unwrap();
-    builder.build_store(dealloc_gep, dealloc_f.as_global_value().as_pointer_value());
+    let sys_dealloc_gep = builder.build_struct_gep(as_decref, 1, "").unwrap();
+    builder.build_store(
+        sys_dealloc_gep,
+        sys_dealloc_f.as_global_value().as_pointer_value(),
+    );
+    if let Some(udf) = usr_dealloc_f {
+        let usr_dealloc_gep = builder.build_struct_gep(as_decref, 2, "").unwrap();
+        builder.build_store(usr_dealloc_gep, udf.as_global_value().as_pointer_value());
+    }
 
     malloc
 }
@@ -440,12 +449,20 @@ pub fn insert_getref_if_refcounted<'a>(
     None
 }
 
-fn find_dealloc_for_type<'a>(iw: &CompilerCore<'a>, ty: StructType<'a>) -> FunctionValue<'a> {
+fn find_sys_dealloc_for_type<'a>(iw: &CompilerCore<'a>, ty: StructType<'a>) -> FunctionValue<'a> {
     let name = mangle_special_method(
         ty,
         crate::mangler::SpecialMemberFunction::BuiltinDeallocator,
     );
     iw.module.get_function(&name).unwrap()
+}
+
+fn find_usr_dealloc_for_type<'a>(
+    iw: &CompilerCore<'a>,
+    ty: StructType<'a>,
+) -> Option<FunctionValue<'a>> {
+    let name = mangle_special_method(ty, crate::mangler::SpecialMemberFunction::UserDeallocator);
+    iw.module.get_function(&name)
 }
 
 pub fn build_dealloc<'a>(
@@ -474,10 +491,34 @@ pub fn build_dealloc<'a>(
     let decref_f = &iw.refcnt.decref_func;
 
     let entry = iw.context.append_basic_block(func, "entry");
+    let call_drop = iw.context.append_basic_block(func, "call_drop");
+    let do_free = iw.context.append_basic_block(func, "do_free");
+
     builder.position_at_end(entry);
     let arg0 = func.get_nth_param(0).unwrap().into_pointer_value();
     let arg0_retyped = builder.build_pointer_cast(arg0, ty.ptr_type(Default::default()), "");
 
+    let usr_dealloc_ptr = builder.build_struct_gep(arg0, 2, "usr_dealloc").unwrap();
+    let usr_dealloc_f = builder.build_load(usr_dealloc_ptr, "");
+    let usr_dealloc_int =
+        builder.build_ptr_to_int(usr_dealloc_f.into_pointer_value(), iw.builtins.int64, "");
+    let is_null = builder.build_int_compare(
+        inkwell::IntPredicate::EQ,
+        usr_dealloc_int,
+        iw.builtins.zero(iw.builtins.int64),
+        "",
+    );
+    builder.build_conditional_branch(is_null, do_free, call_drop);
+
+    builder.position_at_end(call_drop);
+    builder.build_call(
+        CallableValue::try_from(usr_dealloc_f.into_pointer_value()).unwrap(),
+        &[BasicMetadataValueEnum::PointerValue(arg0)],
+        "",
+    );
+    builder.build_unconditional_branch(do_free);
+
+    builder.position_at_end(do_free);
     for i in 0..ty.get_field_types().len() {
         if let Some(field_ty) = ty.get_field_type_at_index(i as u32) {
             if tb.is_refcounted_basic_type(field_ty).is_some() {
