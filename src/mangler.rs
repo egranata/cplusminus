@@ -18,6 +18,7 @@ use crate::ast::{FunctionDefinition, ProperStructDecl};
 
 pub enum SpecialMemberFunction {
     Initializer,
+    UserDeallocator,
     BuiltinDeallocator,
 }
 
@@ -28,6 +29,7 @@ pub fn mangle_special_method(self_decl: StructType<'_>, func: SpecialMemberFunct
         type_name,
         match func {
             SpecialMemberFunction::Initializer => "init",
+            SpecialMemberFunction::UserDeallocator => "drop",
             SpecialMemberFunction::BuiltinDeallocator => "dealloc",
         }
     )

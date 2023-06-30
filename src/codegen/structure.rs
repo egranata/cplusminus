@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{cell::OnceCell, fmt::Display, iter::zip, rc::Rc};
+use std::{fmt::Display, iter::zip};
 
 use inkwell::{
     types::{BasicTypeEnum, StructType},
@@ -21,7 +21,7 @@ use inkwell::{
 
 use crate::ast::{FieldDecl, ImplDecl, MethodDecl, ProperStructDecl};
 
-use super::MutableOf;
+use super::{MutableOf, OnceOf};
 
 #[derive(Clone, Debug)]
 pub struct Field<'a> {
@@ -64,8 +64,9 @@ pub struct Structure<'a> {
     pub implementations: MutableOf<Vec<ImplDecl>>,
     pub fields: MutableOf<Vec<Field<'a>>>,
     pub methods: MutableOf<Vec<Method<'a>>>,
-    pub init: Rc<OnceCell<FunctionValue<'a>>>,
-    pub dealloc: Rc<OnceCell<FunctionValue<'a>>>,
+    pub init: OnceOf<FunctionValue<'a>>,
+    pub usr_dealloc: OnceOf<FunctionValue<'a>>,
+    pub sys_dealloc: OnceOf<FunctionValue<'a>>,
 }
 
 impl<'a> Structure<'a> {

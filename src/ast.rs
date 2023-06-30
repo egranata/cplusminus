@@ -69,9 +69,16 @@ pub struct InitDecl {
 }
 
 #[derive(Clone, Debug)]
+pub struct DeallocDecl {
+    pub loc: Location,
+    pub body: Statement,
+}
+
+#[derive(Clone, Debug)]
 pub enum StructEntryDecl {
     Field(FieldDecl),
     Init(InitDecl),
+    Dealloc(DeallocDecl),
 }
 
 #[derive(Clone, Debug)]
@@ -89,6 +96,7 @@ pub struct ProperStructDecl {
     pub ms: MemoryStrategy,
     pub fields: Vec<FieldDecl>,
     pub init: Option<InitDecl>,
+    pub dealloc: Option<DeallocDecl>,
 }
 
 #[derive(Clone, Debug)]

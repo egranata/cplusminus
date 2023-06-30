@@ -12,8 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::{OnceCell, RefCell},
+    rc::Rc,
+};
 
 pub mod structure;
 
 pub type MutableOf<T> = Rc<RefCell<T>>;
+pub type OnceOf<T> = Rc<OnceCell<T>>;

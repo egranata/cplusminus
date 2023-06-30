@@ -206,7 +206,13 @@ peg::parser! {
             StructEntryDecl::Init(init)
         }
 
-        rule struct_entry() -> StructEntryDecl = field_decl() / init_decl();
+        rule dealloc_decl() -> StructEntryDecl =
+        _ start:position!() _ "dealloc" _ body:block() end:position!() _ {
+            let dealloc = DeallocDecl { loc:Location{start, end}, body };
+            StructEntryDecl::Dealloc(dealloc)
+        }
+
+        rule struct_entry() -> StructEntryDecl = field_decl() / init_decl() / dealloc_decl();
 
         rule ref_val_decl() -> bool =
         _ s:$("ref" / "val") _ { s == "ref" }

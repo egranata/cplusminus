@@ -190,6 +190,7 @@ impl<'a> CompilerCore<'a> {
             ms: raw.ms,
             fields: vec![],
             init: None,
+            dealloc: None,
         };
 
         for entry in &raw.entries {
@@ -204,6 +205,17 @@ impl<'a> CompilerCore<'a> {
                         return None;
                     } else {
                         proper.init = Some(init.clone());
+                    }
+                }
+                crate::ast::StructEntryDecl::Dealloc(dealloc) => {
+                    if proper.dealloc.is_some() {
+                        self.error(CompilerError::new(
+                            dealloc.loc,
+                            Error::DuplicatedStructMember("dealloc".to_owned()),
+                        ));
+                        return None;
+                    } else {
+                        proper.dealloc = Some(dealloc.clone());
                     }
                 }
             }
@@ -226,7 +238,8 @@ impl<'a> CompilerCore<'a> {
                                 return false;
                             }
                         }
-                        crate::ast::StructEntryDecl::Init(_) => {}
+                        crate::ast::StructEntryDecl::Init(..)
+                        | crate::ast::StructEntryDecl::Dealloc(..) => {}
                     }
                 }
                 true

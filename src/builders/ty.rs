@@ -23,8 +23,8 @@ use inkwell::{
 
 use crate::{
     ast::{
-        FieldDecl, FunctionArgument, FunctionDecl, FunctionDefinition, ImplDecl, InitDecl,
-        ProperStructDecl, TypeDescriptor,
+        DeallocDecl, FieldDecl, FunctionArgument, FunctionDecl, FunctionDefinition, ImplDecl,
+        InitDecl, ProperStructDecl, TypeDescriptor,
     },
     codegen::{
         self,
@@ -228,6 +228,39 @@ impl<'a> TypeBuilder<'a> {
         fb.compile(&func_def)
     }
 
+    fn build_usr_dealloc(
+        &self,
+        this_ty: StructType<'a>,
+        dealloc: &DeallocDecl,
+    ) -> Option<FunctionValue<'a>> {
+        let ty = TypeDescriptor::Name(this_ty.get_name().unwrap().to_str().unwrap().to_owned());
+        let real_args = vec![FunctionArgument {
+            loc: dealloc.loc,
+            name: String::from("self"),
+            ty: ty.clone(),
+            rw: false,
+            explicit_rw: false,
+        }];
+        let full_name = mangle_special_method(
+            this_ty,
+            crate::mangler::SpecialMemberFunction::UserDeallocator,
+        );
+
+        let func_def = FunctionDefinition {
+            decl: FunctionDecl {
+                loc: dealloc.loc,
+                name: full_name,
+                args: real_args,
+                vararg: false,
+                ty,
+            },
+            body: dealloc.body.clone(),
+        };
+
+        let fb = FunctionBuilder::new(self.iw.clone());
+        fb.compile(&func_def)
+    }
+
     pub fn build_structure(&self, sd: &ProperStructDecl) -> Option<StructType> {
         let ms = sd.ms;
         let is_rc = sd.ms == MemoryStrategy::ByReference;
@@ -258,7 +291,8 @@ impl<'a> TypeBuilder<'a> {
             fields: Default::default(),
             methods: Default::default(),
             init: Default::default(),
-            dealloc: Default::default(),
+            usr_dealloc: Default::default(),
+            sys_dealloc: Default::default(),
         };
         self.iw.add_struct(&cdg_st);
 
@@ -318,7 +352,7 @@ impl<'a> TypeBuilder<'a> {
 
         if is_rc {
             let dealloc_f = build_dealloc(self, &self.iw, st_ty);
-            let _ = cdg_st.dealloc.set(dealloc_f);
+            let _ = cdg_st.sys_dealloc.set(dealloc_f);
         }
 
         if let Some(init) = &sd.init {
@@ -327,6 +361,16 @@ impl<'a> TypeBuilder<'a> {
             } else {
                 self.iw
                     .error(CompilerError::new(init.loc, Error::InvalidExpression));
+                return None;
+            }
+        }
+
+        if let Some(dealloc) = &sd.dealloc {
+            if let Some(dealloc_f) = self.build_usr_dealloc(st_ty, dealloc) {
+                let _ = cdg_st.init.set(dealloc_f);
+            } else {
+                self.iw
+                    .error(CompilerError::new(dealloc.loc, Error::InvalidExpression));
                 return None;
             }
         }
