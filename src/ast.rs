@@ -135,7 +135,7 @@ pub struct FunctionDecl {
     pub name: String,
     pub args: Vec<FunctionArgument>,
     pub vararg: bool,
-    pub ty: TypeDescriptor,
+    pub ty: Option<TypeDescriptor>,
 }
 
 #[derive(Clone, Debug)]
@@ -259,7 +259,7 @@ pub struct WhileStmt {
 #[derive(Clone, Debug)]
 pub enum Stmt {
     VarDecl(VarDecl),
-    Return(Box<Expression>),
+    Return(Option<Expression>),
     Assignment(Lvalue, Box<Expression>),
     If(IfStatement),
     Block(Vec<Statement>),

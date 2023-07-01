@@ -232,13 +232,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         locals: &LocalVariables<'a>,
         type_hint: Option<BasicTypeEnum<'a>>,
     ) -> Option<BasicValueEnum<'a>> {
-        if let Some(val) = self.do_build_expr(builder, fd, node, locals, type_hint) {
-            Some(val)
-        } else {
-            self.iw
-                .error(CompilerError::new(node.loc, Error::InvalidExpression));
-            None
-        }
+        self.do_build_expr(builder, fd, node, locals, type_hint)
     }
 
     fn resolve_const_int(&self, n: i64, th: Option<IntType<'a>>) -> IntValue<'a> {

@@ -57,6 +57,17 @@ impl<'a> TypeBuilder<'a> {
         }
     }
 
+    pub fn any_type_from_basic(ty: BasicTypeEnum) -> AnyTypeEnum {
+        match ty {
+            BasicTypeEnum::ArrayType(at) => AnyTypeEnum::ArrayType(at),
+            BasicTypeEnum::FloatType(ft) => AnyTypeEnum::FloatType(ft),
+            BasicTypeEnum::IntType(it) => AnyTypeEnum::IntType(it),
+            BasicTypeEnum::PointerType(pt) => AnyTypeEnum::PointerType(pt),
+            BasicTypeEnum::StructType(st) => AnyTypeEnum::StructType(st),
+            BasicTypeEnum::VectorType(vt) => AnyTypeEnum::VectorType(vt),
+        }
+    }
+
     pub fn undef_for_type(ty: BasicTypeEnum) -> BasicValueEnum {
         match ty {
             BasicTypeEnum::ArrayType(at) => BasicValueEnum::from(at.get_undef()),
@@ -171,18 +182,20 @@ impl<'a> TypeBuilder<'a> {
     pub fn llvm_function_type(
         &self,
         args: &[BasicTypeEnum<'a>],
-        ret: Option<BasicTypeEnum<'a>>,
+        ret: Option<AnyTypeEnum<'a>>,
         va: bool,
     ) -> FunctionType<'a> {
         let args: Vec<BasicMetadataTypeEnum> = args.iter().map(|arg| (*arg).into()).collect();
         if let Some(ret) = ret {
             match ret {
-                BasicTypeEnum::ArrayType(at) => at.fn_type(&args, va),
-                BasicTypeEnum::FloatType(ft) => ft.fn_type(&args, va),
-                BasicTypeEnum::IntType(it) => it.fn_type(&args, va),
-                BasicTypeEnum::PointerType(pt) => pt.fn_type(&args, va),
-                BasicTypeEnum::StructType(st) => st.fn_type(&args, va),
-                BasicTypeEnum::VectorType(vt) => vt.fn_type(&args, va),
+                AnyTypeEnum::ArrayType(at) => at.fn_type(&args, va),
+                AnyTypeEnum::FloatType(ft) => ft.fn_type(&args, va),
+                AnyTypeEnum::IntType(it) => it.fn_type(&args, va),
+                AnyTypeEnum::PointerType(pt) => pt.fn_type(&args, va),
+                AnyTypeEnum::StructType(st) => st.fn_type(&args, va),
+                AnyTypeEnum::VectorType(vt) => vt.fn_type(&args, va),
+                AnyTypeEnum::VoidType(vt) => vt.fn_type(&args, va),
+                _ => panic!("unexpected function type {}", ret),
             }
         } else {
             self.iw.context.void_type().fn_type(&args, va)
@@ -205,7 +218,7 @@ impl<'a> TypeBuilder<'a> {
         let mut real_args = vec![FunctionArgument {
             loc: init.loc,
             name: String::from("self"),
-            ty: ty.clone(),
+            ty,
             rw: false,
             explicit_rw: false,
         }];
@@ -219,7 +232,7 @@ impl<'a> TypeBuilder<'a> {
                 name: full_name,
                 args: real_args,
                 vararg: false,
-                ty,
+                ty: None,
             },
             body: init.body.clone(),
         };
@@ -237,7 +250,7 @@ impl<'a> TypeBuilder<'a> {
         let real_args = vec![FunctionArgument {
             loc: dealloc.loc,
             name: String::from("self"),
-            ty: ty.clone(),
+            ty,
             rw: false,
             explicit_rw: false,
         }];
@@ -252,7 +265,7 @@ impl<'a> TypeBuilder<'a> {
                 name: full_name,
                 args: real_args,
                 vararg: false,
-                ty,
+                ty: None,
             },
             body: dealloc.body.clone(),
         };

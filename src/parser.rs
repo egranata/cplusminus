@@ -171,7 +171,7 @@ peg::parser! {
         start:position!() rw:var_decl_rw_ro() _ i:ident() _ ty:type_decl()? _ e:eq_assignment()? _ end:position!() { Statement { loc:Location{start,end}, payload:Stmt::VarDecl(VarDecl{name:i,ty,val:e,rw}) } }
 
         rule ret() -> Statement =
-        start:position!() "return" _ e:top_level_expr() end:position!() { Statement { loc:Location{start,end}, payload:Stmt::Return(Box::new(e)) } }
+        start:position!() "return" _ e:top_level_expr()? end:position!() { Statement { loc:Location{start,end}, payload:Stmt::Return(e) } }
 
         #[cache_left_rec]
         rule lvalue() -> Lvalue =
@@ -255,14 +255,17 @@ peg::parser! {
         rule func_arg() -> FunctionArgument =
         _ start:position!() rw:var_decl_rw_ro()? _ name:ident() _ ty:type_decl() end:position!() _ { FunctionArgument{loc:Location{start,end}, name,ty,rw:rw.unwrap_or(false), explicit_rw:rw.is_some()} }
 
+        rule function_ret() -> TypeDescriptor =
+        _ "ret" _ ty:typename() _ { ty }
+
         rule extern_function() -> TopLevelDeclaration =
-        _ start:position!() "extern" _ v:("vararg")? _ "func" _ name:ident() "(" _ args:func_arg()**"," _ ")" _ "ret" _ ty:typename() _ ";" _ end:position!() _ {
+        _ start:position!() "extern" _ v:("vararg")? _ "func" _ name:ident() "(" _ args:func_arg()**"," _ ")" _ ty:function_ret()? _ ";" _ end:position!() _ {
             let decl = FunctionDecl { loc:Location{start,end}, name,args,vararg:v.is_some(),ty };
             TopLevelDeclaration::extern_function(decl.loc, decl)
         }
 
         rule inner_function_def() -> FunctionDefinition =
-        _ start:position!() "func" _ name:ident() "(" _ args:func_arg()**"," _ ")" _ "ret" _ ty:typename() decl_end:position!() _ body:block() end:position!() _ {
+        _ start:position!() "func" _ name:ident() "(" _ args:func_arg()**"," _ ")" _ ty:function_ret()? decl_end:position!() _ body:block() end:position!() _ {
             let decl = FunctionDecl { loc:Location{start,end:decl_end}, name,args,vararg:false,ty };
             FunctionDefinition { decl,body }
         }

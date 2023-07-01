@@ -120,29 +120,35 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                 self.warn_on_unwritten_locals(&block_locals);
             }
             Return(expr) => {
-                let type_hint = func.get_type().get_return_type();
-                if let Some(value) =
-                    self.eb
-                        .build_expr(builder, fd, expr.as_ref(), locals, type_hint)
-                {
-                    if self.tb.is_same_type(
-                        value.get_type(),
-                        self.exit.ret_alloca.get_type().get_element_type(),
-                    ) {
-                        if self.tb.is_refcounted_basic_type(value.get_type()).is_some() {
-                            let tmp = builder.build_alloca(value.get_type(), "temp_ret");
-                            builder.build_store(tmp, value);
-                            insert_incref_if_refcounted(&self.iw, builder, value);
+                if expr.is_some() != func.get_type().get_return_type().is_some() {
+                    self.iw
+                        .error(CompilerError::new(node.loc, Error::UnexpectedType(None)));
+                } else if expr.is_none() {
+                    builder.build_unconditional_branch(self.exit.exit_block);
+                    return;
+                } else {
+                    let expr = expr.as_ref().unwrap();
+                    let type_hint = func.get_type().get_return_type();
+                    if let Some(value) = self.eb.build_expr(builder, fd, expr, locals, type_hint) {
+                        if self.tb.is_same_type(
+                            value.get_type(),
+                            self.exit.ret_alloca.unwrap().get_type().get_element_type(),
+                        ) {
+                            if self.tb.is_refcounted_basic_type(value.get_type()).is_some() {
+                                let tmp = builder.build_alloca(value.get_type(), "temp_ret");
+                                builder.build_store(tmp, value);
+                                insert_incref_if_refcounted(&self.iw, builder, value);
+                            }
+                            builder.build_store(self.exit.ret_alloca.unwrap(), value);
+                            builder.build_unconditional_branch(self.exit.exit_block);
+                        } else {
+                            self.iw
+                                .error(CompilerError::new(node.loc, Error::UnexpectedType(None)));
                         }
-                        builder.build_store(self.exit.ret_alloca, value);
-                        builder.build_unconditional_branch(self.exit.exit_block);
                     } else {
                         self.iw
-                            .error(CompilerError::new(node.loc, Error::UnexpectedType(None)));
+                            .error(CompilerError::new(expr.loc, Error::InvalidExpression));
                     }
-                } else {
-                    self.iw
-                        .error(CompilerError::new(expr.loc, Error::InvalidExpression));
                 }
             }
             Decref(expr) => {

@@ -84,12 +84,70 @@ func main() ret int64 {
     }
 
     #[test]
+    fn test_call_void_func() {
+        assert_eq!(
+            0,
+            helper_run_main_exit(
+                "
+func foo() {
+    return;
+}
+
+func main() ret int64 {
+    foo();
+    return 0;
+}
+"
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
     fn test_main_type_err() {
         assert_ne!(
             0,
             helper_compile_errors(
                 "
 func main() ret int24 {
+    return 0;
+}
+"
+            )
+            .len()
+        );
+    }
+
+    #[test]
+    fn test_valued_return_in_void() {
+        assert_ne!(
+            0,
+            helper_compile_errors(
+                "
+func foo() {
+    return 1;
+}
+
+func main() ret int64 {
+    return 0;
+}
+"
+            )
+            .len()
+        );
+    }
+
+    #[test]
+    fn test_void_return_in_valued() {
+        assert_ne!(
+            0,
+            helper_compile_errors(
+                "
+func foo() ret byte {
+    return;
+}
+
+func main() ret int64 {
     return 0;
 }
 "

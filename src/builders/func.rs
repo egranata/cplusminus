@@ -17,7 +17,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use inkwell::{
     basic_block::BasicBlock,
     builder::Builder,
-    types::{BasicTypeEnum, FunctionType},
+    types::{AnyTypeEnum, BasicTypeEnum, FunctionType},
     values::{FunctionValue, InstructionValue, PointerValue},
 };
 
@@ -64,7 +64,7 @@ pub fn is_block_terminated(blk: Option<BasicBlock>) -> bool {
 }
 
 pub struct FunctionExitData<'a> {
-    pub ret_alloca: PointerValue<'a>,
+    pub ret_alloca: Option<PointerValue<'a>>,
     pub exit_block: BasicBlock<'a>,
     pub need_decref: Rc<RefCell<Vec<PointerValue<'a>>>>,
 }
@@ -78,27 +78,39 @@ impl<'a> FunctionExitData<'a> {
 impl<'a> FunctionBuilder<'a> {
     fn build_function_type(&self, fd: &FunctionDecl) -> Option<FunctionType<'a>> {
         let tb = TypeBuilder::new(self.iw.clone());
-        if let Some(ret_type) = tb.llvm_type_by_descriptor(&fd.ty) {
-            let mut arg_types: Vec<BasicTypeEnum> = vec![];
-            for argt in &fd.args {
-                if let Some(argty) = tb.llvm_type_by_descriptor(&argt.ty) {
-                    arg_types.push(argty);
-                } else {
-                    self.iw.error(CompilerError::new(
-                        fd.loc,
-                        Error::TypeNotFound(argt.ty.clone()),
-                    ));
-                    return None;
-                }
-            }
-            Some(tb.llvm_function_type(&arg_types, Some(ret_type), fd.vararg))
+        let ret_type: Option<AnyTypeEnum> = if let Some(rt_decl) = &fd.ty {
+            tb.llvm_type_by_descriptor(rt_decl)
+                .map(TypeBuilder::any_type_from_basic)
         } else {
-            self.iw.error(CompilerError::new(
-                fd.loc,
-                Error::TypeNotFound(fd.ty.clone()),
-            ));
-            None
+            Some(AnyTypeEnum::VoidType(self.iw.builtins.void))
+        };
+
+        if ret_type.is_none() {
+            let td = if let Some(td) = &fd.ty {
+                td.clone()
+            } else {
+                TypeDescriptor::Name(String::from("void"))
+            };
+            self.iw
+                .error(CompilerError::new(fd.loc, Error::TypeNotFound(td)));
+            return None;
         }
+
+        let ret_type = ret_type.unwrap();
+
+        let mut arg_types: Vec<BasicTypeEnum> = vec![];
+        for argt in &fd.args {
+            if let Some(argty) = tb.llvm_type_by_descriptor(&argt.ty) {
+                arg_types.push(argty);
+            } else {
+                self.iw.error(CompilerError::new(
+                    fd.loc,
+                    Error::TypeNotFound(argt.ty.clone()),
+                ));
+                return None;
+            }
+        }
+        Some(tb.llvm_function_type(&arg_types, Some(ret_type), fd.vararg))
     }
 
     fn decref_locals(&self, builder: &Builder<'a>, vc: &FunctionExitData<'a>) {
@@ -120,10 +132,15 @@ impl<'a> FunctionBuilder<'a> {
         let builder = self.iw.context.create_builder();
         builder.position_at_end(entry);
 
+        let ret_alloca: Option<PointerValue<'a>>;
+
         let locals = self.build_argument_allocas(func, &builder, fd);
-        let ret_ty = func.get_type().get_return_type().unwrap();
-        let ret_alloca = builder.build_alloca(ret_ty, "ret_alloca");
-        builder.build_store(ret_alloca, TypeBuilder::undef_for_type(ret_ty));
+        if let Some(ret_ty) = func.get_type().get_return_type() {
+            ret_alloca = Some(builder.build_alloca(ret_ty, "ret_alloca"));
+            builder.build_store(ret_alloca.unwrap(), TypeBuilder::undef_for_type(ret_ty));
+        } else {
+            ret_alloca = None;
+        }
 
         let exit_block = self.iw.context.append_basic_block(func, "exit");
         builder.position_at_end(entry);
@@ -138,9 +155,14 @@ impl<'a> FunctionBuilder<'a> {
         sb.build_stmt(&builder, fd, &fd.body, &locals, func);
 
         builder.position_at_end(exit_block);
-        let ret_val = builder.build_load(ret_alloca, "ret");
-        self.decref_locals(&builder, &exit);
-        builder.build_return(Some(&ret_val));
+        if let Some(ret_alloca) = ret_alloca {
+            let ret_val = builder.build_load(ret_alloca, "ret");
+            self.decref_locals(&builder, &exit);
+            builder.build_return(Some(&ret_val));
+        } else {
+            self.decref_locals(&builder, &exit);
+            builder.build_return(None);
+        }
 
         self.build_failsafe_returns(func, &builder, exit_block);
     }
