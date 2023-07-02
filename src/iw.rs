@@ -26,7 +26,12 @@ use crate::{
     ast::{
         FunctionDecl, Location, ProperStructDecl, RawStructDecl, TopLevelDecl, TopLevelDeclaration,
     },
-    builders::{func::FunctionBuilder, refcount::Refcounting, ty::TypeBuilder},
+    builders::{
+        func::FunctionBuilder,
+        refcount::Refcounting,
+        ty::TypeBuilder,
+        var::{LocalVariables, VarContext},
+    },
     err::{CompilerDiagnostic, CompilerError, CompilerWarning, Error},
     parser::cpm::source_file,
 };
@@ -110,6 +115,7 @@ pub struct CompilerCore<'a> {
     pub structs: MutableOf<HashMap<String, Structure<'a>>>,
     pub diagnostics: MutableOf<Vec<CompilerDiagnostic>>,
     pub builtins: BuiltinTypes<'a>,
+    pub globals: LocalVariables<'a>,
 }
 
 impl<'a> CompilerCore<'a> {
@@ -135,6 +141,7 @@ impl<'a> CompilerCore<'a> {
             structs: Rc::new(RefCell::new(HashMap::new())),
             diagnostics: Rc::new(RefCell::new(Vec::new())),
             builtins: BuiltinTypes::new(context),
+            globals: VarContext::root(),
         };
         new.fill_default_types();
         new

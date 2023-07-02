@@ -173,7 +173,7 @@ impl<'a> FunctionBuilder<'a> {
         builder: &Builder<'a>,
         fd: &FunctionDefinition,
     ) -> LocalVariables<'a> {
-        let ret = VarContext::root();
+        let ret = VarContext::child(&self.iw.globals);
         for i in 0..func.get_params().len() {
             let param_name = &fd.decl.args[i].name;
             let param_rw = fd.decl.args[i].rw;
