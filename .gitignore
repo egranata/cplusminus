@@ -18,3 +18,4 @@ Cargo.lock
 /*.asm
 /*.ll
 /test.*
+/a.out

@@ -20,7 +20,7 @@ use inkwell::{
     values::{BasicValueEnum, FunctionValue, IntValue},
 };
 use peg::{error::ParseError, str::LineCol};
-use std::{cell::RefCell, collections::HashMap, path::Path, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, path::Path, process::Command, rc::Rc};
 
 use crate::{
     ast::{
@@ -363,6 +363,10 @@ impl<'a> CompilerCore<'a> {
     }
 
     fn dump_to_ir(&self, out: &Path) {
+        let _ = self.module.print_to_file(out);
+    }
+
+    fn dump_to_bc(&self, out: &Path) {
         self.module.write_bitcode_to_path(out);
     }
 
@@ -393,7 +397,7 @@ impl<'a> CompilerCore<'a> {
                 Default::default(),
                 Default::default(),
                 Default::default(),
-                inkwell::targets::RelocMode::Default,
+                inkwell::targets::RelocMode::DynamicNoPic,
                 inkwell::targets::CodeModel::Default,
             ) {
                 let _ = tm.write_to_file(&self.module, inkwell::targets::FileType::Object, out);
@@ -404,15 +408,41 @@ impl<'a> CompilerCore<'a> {
         panic!("unable to create a target");
     }
 
+    fn dump_to_binary(&self, out: &Path) {
+        if let Ok(temp_obj_file) = tempfile::NamedTempFile::new() {
+            let temp_obj_path = temp_obj_file.path();
+            self.dump_to_obj(temp_obj_path);
+
+            let process = Command::new("clang")
+                .arg("-fPIC")
+                .arg(temp_obj_path.as_os_str().to_str().unwrap())
+                .arg("-o")
+                .arg(out.as_os_str().to_str().unwrap())
+                .spawn();
+            if let Ok(mut child) = process {
+                match child.wait() {
+                    Ok(_) => {}
+                    Err(err) => {
+                        panic!("compilation failed: {err}");
+                    }
+                }
+            } else {
+                panic!("unable to spawn system compiler; consider installing clang");
+            }
+        } else {
+            panic!("unable to create a temporary file");
+        }
+    }
+
     pub fn dump(&self, dest: &String) {
         let path = Path::new(dest);
-        let binding = path.extension().unwrap().to_owned();
-        let ext = binding.to_str().unwrap();
+        let ext = path.extension().map(|osstr| osstr.to_str().unwrap());
         match ext {
-            "ll" => self.dump_to_ir(path),
-            "asm" => self.dump_to_asm(path),
-            "obj" => self.dump_to_obj(path),
-            _ => self.dump_to_obj(path),
+            Some("ir") => self.dump_to_ir(path),
+            Some("ll") => self.dump_to_bc(path),
+            Some("asm") => self.dump_to_asm(path),
+            Some("obj") => self.dump_to_obj(path),
+            _ => self.dump_to_binary(path),
         }
     }
 
