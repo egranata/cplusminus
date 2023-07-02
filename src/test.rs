@@ -3115,4 +3115,31 @@ func main() ret int64 {
             .len()
         );
     }
+
+    #[test]
+    fn test_global_variable() {
+        assert_eq!(
+            5,
+            helper_run_main_exit(
+                "
+var counter: int64;
+
+func increase() {
+    counter = counter + 1;
+}
+
+func main() ret int64 {
+    increase();
+    increase();
+    increase();
+    increase();
+    increase();
+
+    return counter;
+}
+"
+            )
+            .unwrap()
+        );
+    }
 }

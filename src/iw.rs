@@ -30,7 +30,7 @@ use crate::{
         func::FunctionBuilder,
         refcount::Refcounting,
         ty::TypeBuilder,
-        var::{LocalVariables, VarContext},
+        var::{LocalVariables, VarContext, VarInfo},
     },
     err::{CompilerDiagnostic, CompilerError, CompilerWarning, Error},
     parser::cpm::source_file,
@@ -338,6 +338,54 @@ impl<'a> CompilerCore<'a> {
                                 ));
                             }
                         }
+                        crate::ast::TopLevelDecl::Variable(vd) => {
+                            if vd.val.is_some() {
+                                self.error(CompilerError::new(
+                                    tld.loc,
+                                    Error::InternalError(String::from(
+                                        "globals cannot be initialized",
+                                    )),
+                                ));
+                            } else if !vd.rw {
+                                self.error(CompilerError::new(
+                                    tld.loc,
+                                    Error::InternalError(String::from(
+                                        "globals cannot be read-only",
+                                    )),
+                                ));
+                            } else if vd.ty.is_none() {
+                                self.error(CompilerError::new(
+                                    tld.loc,
+                                    Error::InternalError(String::from(
+                                        "globals must be explicitly typed",
+                                    )),
+                                ));
+                            } else {
+                                let tb = TypeBuilder::new(self.clone());
+                                if let Some(var_type) =
+                                    tb.llvm_type_by_descriptor(vd.ty.as_ref().unwrap())
+                                {
+                                    let global = self.module.add_global(
+                                        var_type,
+                                        Default::default(),
+                                        &vd.name,
+                                    );
+                                    global.set_initializer(&TypeBuilder::zero_for_type(var_type));
+                                    let vi = VarInfo::new(
+                                        tld.loc,
+                                        vd.name.clone(),
+                                        global.as_pointer_value(),
+                                        true,
+                                    );
+                                    self.globals.insert(&vd.name, vi, true);
+                                } else {
+                                    self.error(CompilerError::new(
+                                        tld.loc,
+                                        Error::TypeNotFound(vd.ty.as_ref().unwrap().clone()),
+                                    ));
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -351,6 +399,7 @@ impl<'a> CompilerCore<'a> {
                         crate::ast::TopLevelDecl::Structure(..) => {}
                         crate::ast::TopLevelDecl::Alias(..) => {}
                         crate::ast::TopLevelDecl::Implementation(..) => {}
+                        crate::ast::TopLevelDecl::Variable(..) => {}
                     }
                 }
             }

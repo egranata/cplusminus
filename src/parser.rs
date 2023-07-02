@@ -167,8 +167,15 @@ peg::parser! {
         rule eq_assignment() -> Expression =
         _ "=" _ e:top_level_expr() _ { e }
 
-        rule var_decl() -> Statement =
-        start:position!() rw:var_decl_rw_ro() _ i:ident() _ ty:type_decl()? _ e:eq_assignment()? _ end:position!() { Statement { loc:Location{start,end}, payload:Stmt::VarDecl(VarDecl{name:i,ty,val:e,rw}) } }
+        rule var_decl_body() -> VarDecl =
+        rw:var_decl_rw_ro() _ i:ident() _ ty:type_decl()? _ e:eq_assignment()? {
+            VarDecl{name:i,ty,val:e,rw}
+        }
+
+        rule var_decl_stmt() -> Statement =
+        start:position!() vd:var_decl_body() _ end:position!() {
+            Statement { loc:Location{start,end}, payload:Stmt::VarDecl(vd) }
+        }
 
         rule ret() -> Statement =
         start:position!() "return" _ e:top_level_expr()? end:position!() { Statement { loc:Location{start,end}, payload:Stmt::Return(e) } }
@@ -247,7 +254,7 @@ peg::parser! {
         start:position!() "assert" _ c:top_level_expr() _ end:position!() { Statement { loc:Location{start,end}, payload:Stmt::Assert(Box::new(c)) } }
 
         rule top_level_statement() -> Statement =
-        _ v:(var_decl() / assignment() / ifstmt() / whilestmt() / ret() / decrefstmt() / assertstmt() / block() / expr_stmt()) _ ";" {v}
+        _ v:(var_decl_stmt() / assignment() / ifstmt() / whilestmt() / ret() / decrefstmt() / assertstmt() / block() / expr_stmt()) _ ";" {v}
 
         rule block() -> Statement =
         start:position!() "{" _ s:top_level_statement()* _ "}" end:position!() { Statement { loc:Location{start,end}, payload:Stmt::Block(s) } }
@@ -293,10 +300,16 @@ peg::parser! {
             TopLevelDeclaration::implementation(id.loc, id)
         }
 
+        rule var_decl_toplevel() -> TopLevelDeclaration =
+        _ start:position!() vd:var_decl_body() _ ";" _ end:position!() {
+            let loc = Location{start,end};
+            TopLevelDeclaration::variable(loc, vd)
+        }
+
         rule func_call_args() -> Vec<Expression> =
         top_level_expr()**","
 
         pub rule source_file() -> Vec<TopLevelDeclaration> =
-        (struct_decl() / function() / extern_function() / typealias() / implementation())* / expected!("function or structure")
+        (struct_decl() / function() / extern_function() / typealias() / implementation() / var_decl_toplevel())* / expected!("function or structure")
     }
 }

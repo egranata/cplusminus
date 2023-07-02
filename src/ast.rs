@@ -312,6 +312,7 @@ pub enum TopLevelDecl {
     Structure(RawStructDecl),
     Alias(TypeAliasDecl),
     Implementation(ImplDecl),
+    Variable(VarDecl),
 }
 
 #[derive(Clone, Debug)]
@@ -353,6 +354,13 @@ impl TopLevelDeclaration {
         Self {
             loc: l,
             payload: TopLevelDecl::Implementation(i),
+        }
+    }
+
+    pub fn variable(l: Location, v: VarDecl) -> Self {
+        Self {
+            loc: l,
+            payload: TopLevelDecl::Variable(v),
         }
     }
 }
