@@ -15,6 +15,7 @@
 use inkwell::{
     context::Context,
     module::{Linkage, Module},
+    passes::{PassManager, PassManagerBuilder},
     targets::{Target, TargetTriple},
     types::{BasicTypeEnum, IntType, VoidType},
     values::{BasicValueEnum, FunctionValue, IntValue},
@@ -417,6 +418,25 @@ impl<'a> CompilerCore<'a> {
         };
 
         self.success()
+    }
+
+    pub fn run_passes(&self) {
+        let pmb = PassManagerBuilder::create();
+        pmb.set_optimization_level(inkwell::OptimizationLevel::Aggressive);
+
+        let func_pass: PassManager<FunctionValue> = PassManager::create(self.module.as_ref());
+        let module_pass: PassManager<Module> = PassManager::create(());
+        let lto_pass: PassManager<Module> = PassManager::create(());
+
+        pmb.populate_function_pass_manager(&func_pass);
+        pmb.populate_module_pass_manager(&module_pass);
+        pmb.populate_lto_pass_manager(&lto_pass, true, true);
+
+        self.module.get_functions().for_each(|func| {
+            func_pass.run_on(&func);
+        });
+        module_pass.run_on(&self.module);
+        lto_pass.run_on(&self.module);
     }
 
     fn dump_to_ir(&self, out: &Path) {

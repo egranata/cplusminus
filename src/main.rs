@@ -75,6 +75,10 @@ pub fn main() {
     if ok {
         iwell.display_diagnostics();
 
+        if args.optimize {
+            iwell.run_passes();
+        }
+
         if args.dump {
             iwell.module.print_to_stderr();
         }
