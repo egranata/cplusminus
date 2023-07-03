@@ -48,6 +48,8 @@ struct Args {
     instrument_refcount: bool,
     #[arg(long = "Werr", default_value_t = false)]
     warn_as_err: bool,
+    #[arg(short = 'l', long = "link")]
+    link_extras: Vec<String>,
 }
 
 impl Args {
@@ -55,6 +57,7 @@ impl Args {
         CompilerOptions {
             warn_as_err: self.warn_as_err,
             instrument_refcount: self.instrument_refcount,
+            link_extras: self.link_extras.clone(),
         }
     }
 }

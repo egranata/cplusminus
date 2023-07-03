@@ -69,7 +69,7 @@ fn build_incref_api<'a>(
     m: &Module<'a>,
     c: &'a Context,
     __refcount_t: StructType<'a>,
-    options: CompilerOptions,
+    options: &CompilerOptions,
 ) -> FunctionValue<'a> {
     let void = c.void_type();
     let int64 = c.i64_type();
@@ -140,7 +140,7 @@ fn build_getref_api<'a>(
     m: &Module<'a>,
     c: &'a Context,
     __refcount_t: StructType<'a>,
-    options: CompilerOptions,
+    options: &CompilerOptions,
 ) -> FunctionValue<'a> {
     let int64 = c.i64_type();
     let arg_ty = BasicMetadataTypeEnum::PointerType(__refcount_t.ptr_type(Default::default()));
@@ -208,7 +208,7 @@ fn build_decref_api<'a>(
     m: &Module<'a>,
     c: &'a Context,
     __refcount_t: StructType<'a>,
-    options: CompilerOptions,
+    options: &CompilerOptions,
 ) -> FunctionValue<'a> {
     let void = c.void_type();
     let int64 = c.i64_type();
@@ -316,7 +316,7 @@ pub struct Refcounting<'a> {
 pub fn build_refcount_apis<'a>(
     m: &Module<'a>,
     c: &'a Context,
-    options: CompilerOptions,
+    options: &CompilerOptions,
 ) -> Refcounting<'a> {
     if options.instrument_refcount {
         let i32 = c.i32_type();

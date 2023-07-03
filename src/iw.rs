@@ -64,10 +64,11 @@ impl Input {
     }
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Default)]
 pub struct CompilerOptions {
     pub warn_as_err: bool,
     pub instrument_refcount: bool,
+    pub link_extras: Vec<String>,
 }
 
 #[derive(Clone, Copy)]
@@ -129,7 +130,7 @@ impl<'a> CompilerCore<'a> {
         let module = Rc::new(context.create_module(""));
         module.set_triple(&triple);
         CompilerCore::fill_globals(&module, context);
-        let refcnt = CompilerCore::fill_refcounting(&module, context, options);
+        let refcnt = CompilerCore::fill_refcounting(&module, context, &options);
         let new = Self {
             context,
             refcnt,
@@ -181,7 +182,7 @@ impl<'a> CompilerCore<'a> {
     fn fill_refcounting(
         m: &Module<'a>,
         c: &'a Context,
-        options: CompilerOptions,
+        options: &CompilerOptions,
     ) -> Refcounting<'a> {
         crate::builders::refcount::build_refcount_apis(m, c, options)
     }
@@ -469,12 +470,22 @@ impl<'a> CompilerCore<'a> {
             let temp_obj_path = temp_obj_file.path();
             self.dump_to_obj(temp_obj_path);
 
-            let process = Command::new("clang")
+            let mut clang = Command::new("clang");
+            clang
                 .arg("-fPIC")
                 .arg(temp_obj_path.as_os_str().to_str().unwrap())
                 .arg("-o")
-                .arg(out.as_os_str().to_str().unwrap())
-                .spawn();
+                .arg(out.as_os_str().to_str().unwrap());
+
+            self.options
+                .link_extras
+                .iter()
+                .map(|item| format!("-l{item}"))
+                .for_each(|item| {
+                    clang.arg(&item);
+                });
+
+            let process = clang.spawn();
             if let Ok(mut child) = process {
                 match child.wait() {
                     Ok(_) => {}
