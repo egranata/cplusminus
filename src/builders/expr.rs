@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::cmp::max;
+
 use either::Either;
 use inkwell::{
     builder::Builder,
@@ -186,13 +188,36 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         Some(aargs)
     }
 
-    fn build_int_arith_bin_op(
+    fn widen_int_if_needed(
+        &self,
+        builder: &Builder<'a>,
+        x: IntValue<'a>,
+        y: IntValue<'a>,
+    ) -> (IntValue<'a>, IntValue<'a>) {
+        let x_wide = x.get_type().get_bit_width();
+        let y_wide = y.get_type().get_bit_width();
+        if x_wide == y_wide {
+            return (x, y);
+        }
+        // should boolean values be widened to int? eh..
+        if x_wide == 1 || y_wide == 1 {
+            return (x, y);
+        }
+        let max_wide = max(x_wide, y_wide);
+        let max_wide_type = self.iw.context.custom_width_int_type(max_wide);
+        let x = builder.build_int_s_extend(x, max_wide_type, "");
+        let y = builder.build_int_s_extend(y, max_wide_type, "");
+        (x, y)
+    }
+
+    fn build_int_bin_op(
         &self,
         builder: &Builder<'a>,
         x: IntValue<'a>,
         y: IntValue<'a>,
         op: &Expr,
     ) -> Option<BasicValueEnum<'a>> {
+        let (x, y) = self.widen_int_if_needed(builder, x, y);
         Some(BasicValueEnum::IntValue(match op {
             Expr::Addition(..) => builder.build_int_add(x, y, ""),
             Expr::Subtraction(..) => builder.build_int_sub(x, y, ""),
@@ -205,18 +230,6 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
             Expr::LessThan(..) => builder.build_int_compare(IntPredicate::SLT, x, y, ""),
             Expr::GreaterEqual(..) => builder.build_int_compare(IntPredicate::SGE, x, y, ""),
             Expr::LessEqual(..) => builder.build_int_compare(IntPredicate::SLE, x, y, ""),
-            _ => panic!(""),
-        }))
-    }
-
-    fn build_int_bitwise_bin_op(
-        &self,
-        builder: &Builder<'a>,
-        x: IntValue<'a>,
-        y: IntValue<'a>,
-        op: &Expr,
-    ) -> Option<BasicValueEnum<'a>> {
-        Some(BasicValueEnum::IntValue(match op {
             Expr::And(..) => builder.build_and(x, y, ""),
             Expr::Or(..) => builder.build_or(x, y, ""),
             Expr::XOr(..) => builder.build_xor(x, y, ""),
@@ -384,6 +397,24 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         Some(ret)
     }
 
+    fn get_binop_args(
+        &self,
+        builder: &Builder<'a>,
+        fd: &FunctionDefinition,
+        x: &Expression,
+        y: &Expression,
+        locals: &LocalVariables<'a>,
+        type_hint: Option<BasicTypeEnum<'a>>,
+    ) -> (Option<BasicValueEnum<'a>>, Option<BasicValueEnum<'a>>) {
+        let mut th = type_hint;
+        let bx = self.build_expr(builder, fd, x, locals, th);
+        if th.is_none() {
+            th = bx.map(|bv| bv.get_type());
+        }
+        let by = self.build_expr(builder, fd, y, locals, th);
+        (bx, by)
+    }
+
     fn do_build_expr(
         &self,
         builder: &Builder<'a>,
@@ -412,10 +443,11 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 Some(PointerValue(gv.as_pointer_value()))
             }
             Addition(x, y) | Subtraction(x, y) => {
-                let bx = self.build_expr(builder, fd, x.as_ref(), locals, type_hint);
-                let by = self.build_expr(builder, fd, y.as_ref(), locals, type_hint);
+                let (bx, by) =
+                    self.get_binop_args(builder, fd, x.as_ref(), y.as_ref(), locals, type_hint);
+
                 if let (Some(IntValue(ix)), Some(IntValue(iy))) = (bx, by) {
-                    return self.build_int_arith_bin_op(builder, ix, iy, &node.payload);
+                    return self.build_int_bin_op(builder, ix, iy, &node.payload);
                 }
 
                 if let (Some(PointerValue(px)), Some(IntValue(iy))) = (bx, by) {
@@ -423,7 +455,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     let st = px.get_type().get_element_type().size_of().unwrap();
                     let iy_sized = builder.build_int_mul(iy, st, "");
                     let ix_inc = self
-                        .build_int_arith_bin_op(builder, ix, iy_sized, &node.payload)
+                        .build_int_bin_op(builder, ix, iy_sized, &node.payload)
                         .unwrap()
                         .into_int_value();
                     let px_inc = builder.build_int_to_ptr(ix_inc, px.get_type(), "");
@@ -435,10 +467,11 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 None
             }
             Multiplication(x, y) | Division(x, y) | Modulo(x, y) => {
-                let bx = self.build_expr(builder, fd, x.as_ref(), locals, type_hint);
-                let by = self.build_expr(builder, fd, y.as_ref(), locals, type_hint);
+                let (bx, by) =
+                    self.get_binop_args(builder, fd, x.as_ref(), y.as_ref(), locals, type_hint);
+
                 return if let (Some(IntValue(ix)), Some(IntValue(iy))) = (bx, by) {
-                    self.build_int_arith_bin_op(builder, ix, iy, &node.payload)
+                    self.build_int_bin_op(builder, ix, iy, &node.payload)
                 } else {
                     self.iw
                         .error(CompilerError::new(node.loc, Error::UnexpectedType(None)));
@@ -446,10 +479,11 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 };
             }
             And(x, y) | Or(x, y) | XOr(x, y) => {
-                let bx = self.build_expr(builder, fd, x.as_ref(), locals, type_hint);
-                let by = self.build_expr(builder, fd, y.as_ref(), locals, type_hint);
+                let (bx, by) =
+                    self.get_binop_args(builder, fd, x.as_ref(), y.as_ref(), locals, type_hint);
+
                 return if let (Some(IntValue(ix)), Some(IntValue(iy))) = (bx, by) {
-                    self.build_int_bitwise_bin_op(builder, ix, iy, &node.payload)
+                    self.build_int_bin_op(builder, ix, iy, &node.payload)
                 } else {
                     self.iw
                         .error(CompilerError::new(node.loc, Error::UnexpectedType(None)));
@@ -482,10 +516,11 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
             | LessEqual(x, y)
             | Equality(x, y)
             | NotEqual(x, y) => {
-                let bx = self.build_expr(builder, fd, x.as_ref(), locals, type_hint);
-                let by = self.build_expr(builder, fd, y.as_ref(), locals, type_hint);
+                let (bx, by) =
+                    self.get_binop_args(builder, fd, x.as_ref(), y.as_ref(), locals, type_hint);
+
                 return if let (Some(IntValue(ix)), Some(IntValue(iy))) = (bx, by) {
-                    self.build_int_arith_bin_op(builder, ix, iy, &node.payload)
+                    self.build_int_bin_op(builder, ix, iy, &node.payload)
                 } else {
                     self.iw
                         .error(CompilerError::new(node.loc, Error::UnexpectedType(None)));

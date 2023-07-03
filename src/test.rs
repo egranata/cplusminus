@@ -918,6 +918,39 @@ func main() ret int32 {
     }
 
     #[test]
+    fn test_if_bitsize() {
+        assert_eq!(
+            102,
+            helper_run_main_exit(
+                "
+func foo() ret int32 {
+    return 230;
+}
+
+func main() ret int64 {
+    let ch = foo();
+    var n = 0;
+    if (ch == 265) {
+        n = 10;
+    } else {
+        n = 100;
+    };
+
+    if (265 == ch) {
+        n = n + 1;
+    } else {
+        n = n + 2;
+    };
+
+    return n;
+}
+"
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
     fn test_if_not_taken() {
         assert_eq!(
             1,
@@ -1464,7 +1497,8 @@ func main() ret int64 {
                 "
 func main() ret int64 {
     var b = 32 as byte;
-    return (sizeof expr b+1)+1;
+    let n = sizeof expr b+1;
+    return n+1;
 }
 "
             )
