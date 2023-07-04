@@ -1,0 +1,4 @@
+func main() ret int32 {
+    assert true;
+    return 0;
+}

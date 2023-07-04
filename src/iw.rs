@@ -521,7 +521,7 @@ impl<'a> CompilerCore<'a> {
         }
     }
 
-    pub fn dump(&self, dest: &String) {
+    pub fn dump(&self, dest: &str) {
         let path = Path::new(dest);
         let ext = path.extension().map(|osstr| osstr.to_str().unwrap());
         match ext {

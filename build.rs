@@ -41,7 +41,47 @@ fn build_jit_tests(indir: &Path, outdir: &Path, pass: bool) {
         }
         let test_name = entry_path.file_stem().unwrap().to_str().unwrap();
         let content = format!(
-            "#[test]\nfn {test_name}() {{ {func_to_call}(include_str!(\"{}\")); }}\n",
+            "#[test]\nfn jit_{test_name}() {{ {func_to_call}(include_str!(\"{}\")); }}\n",
+            entry_path.as_os_str().to_str().unwrap()
+        );
+        write!(outfile_handle, "{content}").unwrap();
+    }
+}
+
+fn build_aout_tests(indir: &Path, outdir: &Path, pass: bool) {
+    let mut outfile_path = PathBuf::from(outdir);
+    let outfile_name = format!("test_aout{}.rs", if pass { "pass" } else { "fail" });
+    outfile_path.push(outfile_name);
+    let mut outfile_handle = File::create(&outfile_path).unwrap();
+    let func_to_call = if pass {
+        "expect_aout_pass"
+    } else {
+        "expect_aout_fail"
+    };
+
+    status_msg(format!(
+        "building a.out tests from {} into {}\n",
+        indir.display(),
+        outfile_path.display()
+    ));
+    let iter = std::fs::read_dir(indir);
+    if iter.is_err() {
+        return;
+    }
+    let iter = iter.unwrap();
+    for entry in iter {
+        let entry = entry.unwrap();
+        if !entry.file_type().unwrap().is_file() {
+            continue;
+        }
+        let entry_path = entry.path();
+        let is_cpm_file = entry_path.extension().map_or(false, |ext| ext == "cpm");
+        if !is_cpm_file {
+            continue;
+        }
+        let test_name = entry_path.file_stem().unwrap().to_str().unwrap();
+        let content = format!(
+            "#[test]\nfn aout_{test_name}() {{ {func_to_call}(include_str!(\"{}\")); }}\n",
             entry_path.as_os_str().to_str().unwrap()
         );
         write!(outfile_handle, "{content}").unwrap();
@@ -64,6 +104,16 @@ fn build_tests(indir: &mut Path, outdir: &Path) {
 
     build_jit_tests(&jit_pass_indir, outdir, true);
     build_jit_tests(&jit_fail_indir, outdir, false);
+
+    let mut aout_pass_indir = indir.to_path_buf();
+    let mut aout_fail_indir = indir.to_path_buf();
+    aout_pass_indir.push("aout");
+    aout_pass_indir.push("pass");
+    aout_fail_indir.push("aout");
+    aout_fail_indir.push("fail");
+
+    build_aout_tests(&aout_pass_indir, outdir, true);
+    build_aout_tests(&aout_fail_indir, outdir, false);
 }
 
 fn main() {

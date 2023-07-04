@@ -12,6 +12,61 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod aout_tests {
+    use crate::{
+        err::CompilerDiagnostic,
+        iw::{self, Input},
+    };
+    use inkwell::context::Context;
+    use rand::Rng;
+
+    fn compile_run_temp(program: &str) -> Result<i32, Vec<CompilerDiagnostic>> {
+        let mut rng = rand::thread_rng();
+        let llvm = Context::create();
+        let source = Input::from_string(program);
+        let iwell =
+            iw::CompilerCore::new(&llvm, "x86_64-pc-linux-gnu", &source, Default::default());
+        if iwell.compile() {
+            let mut temp_dir = std::env::temp_dir();
+            let n: u32 = rng.gen();
+            temp_dir.push(format!("test{}.out", n));
+            let temp_aout_path = temp_dir.as_path().as_os_str().to_str().unwrap();
+            iwell.dump(temp_aout_path);
+            println!("trying to run {temp_aout_path}");
+            let mut cmd = std::process::Command::new(temp_aout_path);
+            if let Ok(mut child) = cmd.spawn() {
+                if let Ok(exit) = child.wait() {
+                    std::fs::remove_file(temp_aout_path).unwrap();
+                    return if let Some(code) = exit.code() {
+                        Ok(code)
+                    } else {
+                        Err(vec![])
+                    };
+                } else {
+                    return Err(vec![]);
+                }
+            } else {
+                return Err(vec![]);
+            }
+        } else {
+            return Err(iwell.diagnostics.as_ref().borrow().clone());
+        }
+    }
+
+    fn expect_aout_pass(program: &str) {
+        let result = compile_run_temp(program);
+        assert!(result.is_ok() && result.unwrap() == 0);
+    }
+
+    fn expect_aout_fail(program: &str) {
+        let result = compile_run_temp(program);
+        assert!(result.is_err());
+    }
+
+    include!(concat!(env!("OUT_DIR"), "/test_aoutpass.rs"));
+    include!(concat!(env!("OUT_DIR"), "/test_aoutfail.rs"));
+}
+
 mod jit_tests {
     use crate::{
         err::CompilerDiagnostic,
