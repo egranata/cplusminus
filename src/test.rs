@@ -33,13 +33,23 @@ impl Display for TestFailure {
     }
 }
 
+struct FileToBeDropped {
+    path: String,
+}
+
+impl Drop for FileToBeDropped {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.path);
+    }
+}
+
 #[cfg(test)]
 mod aout_tests {
     use crate::iw::{self, Input};
     use inkwell::context::Context;
     use rand::Rng;
 
-    use super::TestFailure;
+    use super::{FileToBeDropped, TestFailure};
 
     fn compile_run_temp(program: &str, optimize: bool) -> Result<i32, TestFailure> {
         let mut rng = rand::thread_rng();
@@ -54,10 +64,12 @@ mod aout_tests {
             let mut temp_dir = std::env::temp_dir();
             let n: u32 = rng.gen();
             temp_dir.push(format!("test{}.out", n));
-            let temp_aout_path = temp_dir.as_path().as_os_str().to_str().unwrap();
-            iwell.dump(temp_aout_path);
-            println!("trying to run {temp_aout_path}");
-            let mut cmd = std::process::Command::new(temp_aout_path);
+            let temp_aout_path = FileToBeDropped {
+                path: temp_dir.as_path().as_os_str().to_str().unwrap().to_string(),
+            };
+            iwell.dump(&temp_aout_path.path);
+            println!("trying to run {}", &temp_aout_path.path);
+            let mut cmd = std::process::Command::new(&temp_aout_path.path);
             match cmd.spawn() {
                 Ok(mut child) => match child.wait() {
                     Ok(exit) => match exit.code() {
