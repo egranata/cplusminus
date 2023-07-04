@@ -1,0 +1,3 @@
+func main() ret int64 {
+    return 0;
+}

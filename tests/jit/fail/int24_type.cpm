@@ -1,0 +1,3 @@
+func main() ret int24 {
+    return 0;
+}

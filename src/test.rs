@@ -12,6 +12,48 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod jit_tests {
+    use crate::{
+        err::CompilerDiagnostic,
+        iw::{self, Input},
+        jit,
+    };
+    use inkwell::{context::Context, execution_engine::JitFunction};
+
+    fn run_jit_source(program: &str) -> Result<u64, Vec<CompilerDiagnostic>> {
+        type MainFunc = unsafe extern "C" fn() -> u64;
+        let llvm = Context::create();
+        let source = Input::from_string(program);
+        let iwell =
+            iw::CompilerCore::new(&llvm, "x86_64-pc-linux-gnu", &source, Default::default());
+        if iwell.compile() {
+            iwell.display_warnings();
+            let main: Option<JitFunction<MainFunc>> =
+                jit::get_runnable_function(&iwell, "main", false);
+            if let Some(main) = main {
+                return Ok(unsafe { main.call() });
+            } else {
+                return Err(vec![]);
+            }
+        } else {
+            return Err(iwell.diagnostics.as_ref().borrow().clone());
+        }
+    }
+
+    fn expect_jit_pass(program: &str) {
+        let result = run_jit_source(program);
+        assert!(result.is_ok() && result.unwrap() == 0);
+    }
+
+    fn expect_jit_fail(program: &str) {
+        let result = run_jit_source(program);
+        assert!(result.is_err());
+    }
+
+    include!(concat!(env!("OUT_DIR"), "/test_jitpass.rs"));
+    include!(concat!(env!("OUT_DIR"), "/test_jitfail.rs"));
+}
+
 #[cfg(test)]
 mod test {
     use inkwell::{context::Context, execution_engine::JitFunction};
