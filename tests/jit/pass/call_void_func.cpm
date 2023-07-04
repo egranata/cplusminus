@@ -1,0 +1,8 @@
+func foo() {
+    return;
+}
+
+func main() ret int64 {
+    foo();
+    return 0;
+}

@@ -225,56 +225,6 @@ mod test {
     }
 
     #[test]
-    fn test_main_return() {
-        assert_eq!(
-            0,
-            helper_run_main_exit(
-                "
-func main() ret int64 {
-    return 0;
-}
-"
-            )
-            .unwrap()
-        );
-    }
-
-    #[test]
-    fn test_call_void_func() {
-        assert_eq!(
-            0,
-            helper_run_main_exit(
-                "
-func foo() {
-    return;
-}
-
-func main() ret int64 {
-    foo();
-    return 0;
-}
-"
-            )
-            .unwrap()
-        );
-    }
-
-    #[test]
-    fn test_main_type_err() {
-        assert_ne!(
-            0,
-            helper_compile_errors(
-                "
-func main() ret int24 {
-    return 0;
-}
-"
-            )
-            .len()
-        );
-    }
-
-    #[test]
     fn test_valued_return_in_void() {
         assert_ne!(
             0,
@@ -334,21 +284,6 @@ func main() ret int64 {
     }
 
     #[test]
-    fn test_ret_uses_hint() {
-        assert_eq!(
-            0,
-            helper_run_main_exit(
-                "
-func main() ret int32 {
-    return 0;
-}
-"
-            )
-            .unwrap()
-        );
-    }
-
-    #[test]
     fn test_main_type_mismatch() {
         assert_ne!(
             0,
@@ -364,23 +299,6 @@ func main() ret int32 {
 "
             )
             .len()
-        );
-    }
-
-    #[test]
-    fn test_var_assign_uses_hint() {
-        assert_eq!(
-            6,
-            helper_run_main_exit(
-                "
-func main() ret int32 {
-    var a = 5 as int32;
-    a = 6;
-    return a;
-}
-"
-            )
-            .unwrap()
         );
     }
 

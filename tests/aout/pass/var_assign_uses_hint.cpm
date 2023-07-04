@@ -1,0 +1,5 @@
+func main() ret int32 {
+    var a = 5 as int32;
+    a = 6;
+    return a - 6;
+}
