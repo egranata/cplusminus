@@ -10,6 +10,6 @@ The language is new enough that tests and sample programs are the extent of the 
 
 However, C± does not aim to be a stable production-quality language and it is highly discouraged to use it as the foundation for software that anyone depends on.
 
-Sending patches is very welcome, provided that they don't break any tests, add tests whenever possible, and they fit in the overall architecture of the project.
+Sending patches is very welcome, provided that they don't break any tests, add tests whenever possible, and they fit in the overall architecture of the project. See CONTRIBUTING.md for more details.
 
 Above all, enjoy and be excellent to one another.
