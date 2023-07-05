@@ -40,12 +40,12 @@ impl<'a> VarInfo<'a> {
 }
 
 #[derive(Clone)]
-pub struct VarContext<'a> {
-    parent: Option<Rc<VarContext<'a>>>,
+pub struct ScopeObject<'a> {
+    parent: Option<Rc<ScopeObject<'a>>>,
     pub storage: RefCell<HashMap<String, VarInfo<'a>>>,
 }
 
-impl<'a> VarContext<'a> {
+impl<'a> ScopeObject<'a> {
     pub fn root() -> Rc<Self> {
         Rc::new(Self {
             parent: None,
@@ -53,7 +53,7 @@ impl<'a> VarContext<'a> {
         })
     }
 
-    pub fn child(parent: &Rc<VarContext<'a>>) -> Rc<Self> {
+    pub fn child(parent: &Rc<ScopeObject<'a>>) -> Rc<Self> {
         Rc::new(Self {
             parent: Some(parent.clone()),
             storage: RefCell::new(HashMap::new()),
@@ -80,4 +80,4 @@ impl<'a> VarContext<'a> {
     }
 }
 
-pub type LocalVariables<'a> = Rc<VarContext<'a>>;
+pub type Scope<'a> = Rc<ScopeObject<'a>>;

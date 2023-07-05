@@ -39,7 +39,7 @@ use crate::{
     iw::CompilerCore,
 };
 
-use super::{func::FunctionExitData, var::LocalVariables};
+use super::{func::FunctionExitData, var::Scope};
 
 pub struct ExpressionBuilder<'a, 'b> {
     iw: CompilerCore<'a>,
@@ -160,7 +160,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         &self,
         builder: &Builder<'a>,
         fd: &FunctionDefinition,
-        locals: &LocalVariables<'a>,
+        locals: &Scope<'a>,
         args: &[FunctionCallArgument<'a>],
         their_type: FunctionType<'a>,
     ) -> Option<Vec<BasicMetadataValueEnum<'a>>> {
@@ -242,7 +242,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         builder: &Builder<'a>,
         fd: &FunctionDefinition,
         node: &Expression,
-        locals: &LocalVariables<'a>,
+        locals: &Scope<'a>,
         type_hint: Option<BasicTypeEnum<'a>>,
     ) -> Option<BasicValueEnum<'a>> {
         self.do_build_expr(builder, fd, node, locals, type_hint)
@@ -256,7 +256,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
     fn alloc_value_type(
         &self,
         builder: &Builder<'a>,
-        locals: &LocalVariables<'a>,
+        locals: &Scope<'a>,
         ty: StructType<'a>,
         fd: &FunctionDefinition,
         node: &Expression,
@@ -310,7 +310,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
     fn alloc_ref_type(
         &self,
         builder: &Builder<'a>,
-        locals: &LocalVariables<'a>,
+        locals: &Scope<'a>,
         ty: StructType<'a>,
         fd: &FunctionDefinition,
         node: &Expression,
@@ -403,7 +403,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         fd: &FunctionDefinition,
         x: &Expression,
         y: &Expression,
-        locals: &LocalVariables<'a>,
+        locals: &Scope<'a>,
         type_hint: Option<BasicTypeEnum<'a>>,
     ) -> (Option<BasicValueEnum<'a>>, Option<BasicValueEnum<'a>>) {
         let mut th = type_hint;
@@ -420,7 +420,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         builder: &Builder<'a>,
         fd: &FunctionDefinition,
         node: &Expression,
-        locals: &LocalVariables<'a>,
+        locals: &Scope<'a>,
         type_hint: Option<BasicTypeEnum<'a>>,
     ) -> Option<BasicValueEnum<'a>> {
         use crate::ast::Expr::*;

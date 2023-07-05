@@ -24,7 +24,7 @@ use super::{
     expr::ExpressionBuilder,
     func::FunctionExitData,
     ty::TypeBuilder,
-    var::{LocalVariables, VarInfo},
+    var::{Scope, VarInfo},
 };
 
 pub struct LvalueBuilder<'a, 'b> {
@@ -48,7 +48,7 @@ impl<'a, 'b> LvalueBuilder<'a, 'b> {
         builder: &Builder<'a>,
         fd: &FunctionDefinition,
         node: &Lvalue,
-        locals: &LocalVariables<'a>,
+        locals: &Scope<'a>,
     ) -> Result<ResolvedLvalue<'a>, Error> {
         match node {
             Lvalue::Identifier(ident) => {

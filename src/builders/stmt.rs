@@ -21,7 +21,7 @@ use crate::{
     builders::{
         lvalue::LvalueBuilder,
         refcount::{insert_decref_if_refcounted, insert_incref_if_refcounted},
-        var::{VarContext, VarInfo},
+        var::{ScopeObject, VarInfo},
     },
     err::{CompilerError, CompilerWarning, Error, Warning},
     iw::CompilerCore,
@@ -31,7 +31,7 @@ use super::{
     expr::ExpressionBuilder,
     func::{is_block_terminated, FunctionExitData},
     ty::TypeBuilder,
-    var::LocalVariables,
+    var::Scope,
 };
 
 pub struct StatementBuilder<'a, 'b> {
@@ -58,7 +58,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
         builder: &Builder<'a>,
         fd: &FunctionDefinition,
         node: &IfCondition,
-        locals: &LocalVariables<'a>,
+        locals: &Scope<'a>,
         func: FunctionValue<'a>,
         after: BasicBlock<'a>,
     ) {
@@ -90,7 +90,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
         }
     }
 
-    fn warn_on_unwritten_locals(&self, vc: &VarContext) {
+    fn warn_on_unwritten_locals(&self, vc: &ScopeObject) {
         for vi in vc.storage.borrow().values() {
             if vi.rw && !*vi.written.borrow() {
                 self.iw.warning(CompilerWarning::new(
@@ -106,14 +106,14 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
         builder: &Builder<'a>,
         fd: &FunctionDefinition,
         node: &Statement,
-        locals: &LocalVariables<'a>,
+        locals: &Scope<'a>,
         func: FunctionValue<'a>,
     ) {
         use crate::ast::Stmt::*;
 
         match &node.payload {
             Block(block) => {
-                let block_locals = VarContext::child(locals);
+                let block_locals = ScopeObject::child(locals);
                 for node in block {
                     self.build_stmt(builder, fd, node, &block_locals, func);
                 }

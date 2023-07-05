@@ -32,7 +32,7 @@ use super::{
     refcount::insert_decref_if_refcounted,
     stmt::StatementBuilder,
     ty::TypeBuilder,
-    var::{LocalVariables, VarContext, VarInfo},
+    var::{Scope, ScopeObject, VarInfo},
 };
 
 pub struct FunctionBuilder<'a> {
@@ -172,8 +172,8 @@ impl<'a> FunctionBuilder<'a> {
         func: FunctionValue<'a>,
         builder: &Builder<'a>,
         fd: &FunctionDefinition,
-    ) -> LocalVariables<'a> {
-        let ret = VarContext::child(&self.iw.globals);
+    ) -> Scope<'a> {
+        let ret: Rc<ScopeObject<'_>> = ScopeObject::child(&self.iw.globals);
         for i in 0..func.get_params().len() {
             let param_name = &fd.decl.args[i].name;
             let param_rw = fd.decl.args[i].rw;
