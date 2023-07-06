@@ -655,7 +655,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 }
             }
             Alloc(ty, init) => {
-                if let Some(basic_type) = self.tb.llvm_type_by_descriptor(ty) {
+                if let Some(basic_type) = self.tb.llvm_type_by_descriptor(locals, ty) {
                     if let Some(struct_type) = self.tb.is_refcounted_basic_type(basic_type) {
                         return self.alloc_ref_type(builder, locals, struct_type, fd, node, init);
                     } else if let Some(struct_type) = self.tb.is_value_basic_type(basic_type) {
@@ -731,7 +731,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
             }
             Cast(e, t) => {
                 if let Some(expr) = self.build_expr(builder, fd, e.as_ref(), locals, type_hint) {
-                    if let Some(ty) = self.tb.llvm_type_by_descriptor(t) {
+                    if let Some(ty) = self.tb.llvm_type_by_descriptor(locals, t) {
                         if let Some(ret) = self.tb.build_cast(builder, expr, ty) {
                             Some(ret)
                         } else {
@@ -788,7 +788,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 .build_expr(builder, fd, e.as_ref(), locals, type_hint)
                 .map(|expr| BasicValueEnum::IntValue(self.tb.sizeof(expr.get_type()))),
             SizeofTy(ident) => {
-                return if let Some(ty) = self.tb.llvm_type_by_descriptor(ident) {
+                return if let Some(ty) = self.tb.llvm_type_by_descriptor(locals, ident) {
                     if let Some(struct_type) = self.tb.is_refcounted_basic_type(ty) {
                         Some(BasicValueEnum::IntValue(
                             self.tb.sizeof(BasicTypeEnum::StructType(struct_type)),

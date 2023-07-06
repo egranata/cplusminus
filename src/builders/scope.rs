@@ -14,7 +14,7 @@
 
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use inkwell::values::PointerValue;
+use inkwell::{types::BasicTypeEnum, values::PointerValue};
 
 use crate::{ast::Location, codegen::MutableOf};
 
@@ -101,18 +101,21 @@ impl<T: Clone> HierarchicalStorage<T> {
 #[derive(Clone)]
 pub struct ScopeObject<'a> {
     pub variables: Rc<HierarchicalStorage<VarInfo<'a>>>,
+    pub aliases: Rc<HierarchicalStorage<BasicTypeEnum<'a>>>,
 }
 
 impl<'a> ScopeObject<'a> {
     pub fn root() -> Rc<Self> {
         Rc::new(Self {
             variables: HierarchicalStorage::root(),
+            aliases: HierarchicalStorage::root(),
         })
     }
 
     pub fn child(parent: &Rc<ScopeObject<'a>>) -> Rc<Self> {
         Rc::new(Self {
             variables: HierarchicalStorage::child(&parent.variables),
+            aliases: HierarchicalStorage::child(&parent.aliases),
         })
     }
 
@@ -122,6 +125,14 @@ impl<'a> ScopeObject<'a> {
 
     pub fn insert_variable(&self, name: &str, val: VarInfo<'a>, overwrite: bool) -> bool {
         self.variables.insert(name, val, overwrite)
+    }
+
+    pub fn find_alias(&self, name: &str, recurse: bool) -> Option<BasicTypeEnum<'a>> {
+        self.aliases.find(name, recurse)
+    }
+
+    pub fn insert_alias(&self, name: &str, val: BasicTypeEnum<'a>, overwrite: bool) -> bool {
+        self.aliases.insert(name, val, overwrite)
     }
 }
 

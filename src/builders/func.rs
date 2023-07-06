@@ -79,7 +79,7 @@ impl<'a> FunctionBuilder<'a> {
     fn build_function_type(&self, fd: &FunctionDecl) -> Option<FunctionType<'a>> {
         let tb = TypeBuilder::new(self.iw.clone());
         let ret_type: Option<AnyTypeEnum> = if let Some(rt_decl) = &fd.ty {
-            tb.llvm_type_by_descriptor(rt_decl)
+            tb.llvm_type_by_descriptor(&self.iw.globals, rt_decl)
                 .map(TypeBuilder::any_type_from_basic)
         } else {
             Some(AnyTypeEnum::VoidType(self.iw.builtins.void))
@@ -100,7 +100,7 @@ impl<'a> FunctionBuilder<'a> {
 
         let mut arg_types: Vec<BasicTypeEnum> = vec![];
         for argt in &fd.args {
-            if let Some(argty) = tb.llvm_type_by_descriptor(&argt.ty) {
+            if let Some(argty) = tb.llvm_type_by_descriptor(&self.iw.globals, &argt.ty) {
                 arg_types.push(argty);
             } else {
                 self.iw.error(CompilerError::new(

@@ -176,7 +176,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
 
                 let value = if let Some(val) = &var.val {
                     let type_hint = if let Some(td) = var.ty.as_ref() {
-                        self.tb.llvm_type_by_descriptor(td)
+                        self.tb.llvm_type_by_descriptor(locals, td)
                     } else {
                         None
                     };
@@ -192,8 +192,9 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                     self.iw
                         .error(CompilerError::new(node.loc, Error::LetMustBeInitialized));
                     return;
-                } else if let Some(decl_ty) =
-                    self.tb.llvm_type_by_descriptor(var.ty.as_ref().unwrap())
+                } else if let Some(decl_ty) = self
+                    .tb
+                    .llvm_type_by_descriptor(locals, var.ty.as_ref().unwrap())
                 {
                     decl_ty.const_zero()
                 } else {
@@ -205,7 +206,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                 };
 
                 let decl_ty = if let Some(var_ty) = &var.ty {
-                    let maybe_type = self.tb.llvm_type_by_descriptor(var_ty);
+                    let maybe_type = self.tb.llvm_type_by_descriptor(locals, var_ty);
                     if let Some(t) = maybe_type {
                         t
                     } else {

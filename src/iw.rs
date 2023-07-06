@@ -113,7 +113,6 @@ pub struct CompilerCore<'a> {
     pub source: Input,
     pub options: CompilerOptions,
     pub funcs: MutableOf<HashMap<String, (FunctionDecl, FunctionValue<'a>)>>,
-    pub types: MutableOf<HashMap<String, BasicTypeEnum<'a>>>,
     pub structs: MutableOf<HashMap<String, Structure<'a>>>,
     pub diagnostics: MutableOf<Vec<CompilerDiagnostic>>,
     pub builtins: BuiltinTypes<'a>,
@@ -139,7 +138,6 @@ impl<'a> CompilerCore<'a> {
             source: src.clone(),
             options,
             funcs: Rc::new(RefCell::new(HashMap::new())),
-            types: Rc::new(RefCell::new(HashMap::new())),
             structs: Rc::new(RefCell::new(HashMap::new())),
             diagnostics: Rc::new(RefCell::new(Vec::new())),
             builtins: BuiltinTypes::new(context),
@@ -152,11 +150,14 @@ impl<'a> CompilerCore<'a> {
     fn fill_default_types(&self) {
         use BasicTypeEnum::*;
 
-        let mut types = self.types.borrow_mut();
-        types.insert(String::from("byte"), IntType(self.builtins.byte));
-        types.insert(String::from("int64"), IntType(self.builtins.int64));
-        types.insert(String::from("int32"), IntType(self.builtins.int32));
-        types.insert(String::from("bool"), IntType(self.builtins.bool));
+        self.globals
+            .insert_alias("byte", IntType(self.builtins.byte), true);
+        self.globals
+            .insert_alias("int32", IntType(self.builtins.int32), true);
+        self.globals
+            .insert_alias("int64", IntType(self.builtins.int64), true);
+        self.globals
+            .insert_alias("bool", IntType(self.builtins.bool), true);
     }
 
     fn fill_globals(m: &Module<'a>, c: &'a Context) {
@@ -323,7 +324,7 @@ impl<'a> CompilerCore<'a> {
                         }
                         crate::ast::TopLevelDecl::Alias(ad) => {
                             let ty = TypeBuilder::new(self.clone());
-                            if ty.alias(&ad.name, &ad.ty).is_none() {
+                            if ty.alias(&self.globals, &ad.name, &ad.ty).is_none() {
                                 self.error(CompilerError::new(ad.loc, Error::InvalidExpression));
                             }
                         }
@@ -364,8 +365,8 @@ impl<'a> CompilerCore<'a> {
                                 ));
                             } else {
                                 let tb = TypeBuilder::new(self.clone());
-                                if let Some(var_type) =
-                                    tb.llvm_type_by_descriptor(vd.ty.as_ref().unwrap())
+                                if let Some(var_type) = tb
+                                    .llvm_type_by_descriptor(&self.globals, vd.ty.as_ref().unwrap())
                                 {
                                     let global = self.module.add_global(
                                         var_type,

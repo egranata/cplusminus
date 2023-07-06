@@ -35,7 +35,7 @@ use crate::{
     mangler::mangle_special_method,
 };
 
-use super::{func::FunctionBuilder, refcount::build_dealloc};
+use super::{func::FunctionBuilder, refcount::build_dealloc, scope::Scope};
 
 pub struct TypeBuilder<'a> {
     iw: CompilerCore<'a>,
@@ -48,9 +48,14 @@ impl<'a> TypeBuilder<'a> {
 }
 
 impl<'a> TypeBuilder<'a> {
-    pub fn alias(&self, name: &str, ty: &TypeDescriptor) -> Option<BasicTypeEnum<'a>> {
-        if let Some(ty) = self.llvm_type_by_descriptor(ty) {
-            self.iw.types.borrow_mut().insert(name.to_string(), ty);
+    pub fn alias(
+        &self,
+        scope: &Scope<'a>,
+        name: &str,
+        ty: &TypeDescriptor,
+    ) -> Option<BasicTypeEnum<'a>> {
+        if let Some(ty) = self.llvm_type_by_descriptor(scope, ty) {
+            scope.insert_alias(name, ty, true);
             Some(ty)
         } else {
             None
@@ -113,30 +118,36 @@ impl<'a> TypeBuilder<'a> {
         }
     }
 
-    pub fn llvm_type_by_descriptor(&self, td: &TypeDescriptor) -> Option<BasicTypeEnum<'a>> {
+    pub fn llvm_type_by_descriptor(
+        &self,
+        scope: &Scope<'a>,
+        td: &TypeDescriptor,
+    ) -> Option<BasicTypeEnum<'a>> {
         match td {
             TypeDescriptor::Name(name) => {
-                if let Some(ty) = self.iw.types.borrow().get(name) {
-                    return Some(*ty);
+                if let Some(ty) = scope.find_alias(name, true) {
+                    return Some(ty);
                 }
 
                 return self.iw.structs.borrow().get(name).map(|ty| ty.var_ty);
             }
             TypeDescriptor::Pointer(ptr) => {
-                return self.llvm_type_by_descriptor(ptr.as_ref()).map(|pointee| {
-                    BasicTypeEnum::PointerType(pointee.ptr_type(Default::default()))
-                });
+                return self
+                    .llvm_type_by_descriptor(scope, ptr.as_ref())
+                    .map(|pointee| {
+                        BasicTypeEnum::PointerType(pointee.ptr_type(Default::default()))
+                    });
             }
             TypeDescriptor::Array(ty, sz) => {
                 return self
-                    .llvm_type_by_descriptor(ty.as_ref())
+                    .llvm_type_by_descriptor(scope, ty.as_ref())
                     .map(|el_ty| BasicTypeEnum::ArrayType(el_ty.array_type(*sz as u32)));
             }
             TypeDescriptor::Function(args, ret, is_var_args) => {
-                if let Some(ret) = self.llvm_type_by_descriptor(ret.as_ref()) {
+                if let Some(ret) = self.llvm_type_by_descriptor(scope, ret.as_ref()) {
                     let map_args: Vec<Option<BasicTypeEnum>> = args
                         .iter()
-                        .map(|td| self.llvm_type_by_descriptor(td))
+                        .map(|td| self.llvm_type_by_descriptor(scope, td))
                         .collect();
                     if map_args.iter().any(|at| at.is_none()) {
                         return None;
@@ -340,7 +351,7 @@ impl<'a> TypeBuilder<'a> {
         let mut fields: Vec<BasicTypeEnum> = vec![];
 
         for fd in &sd_fields {
-            if let Some(field_ty) = self.llvm_type_by_descriptor(&fd.ty) {
+            if let Some(field_ty) = self.llvm_type_by_descriptor(&self.iw.globals, &fd.ty) {
                 if is_val && field_ty == BasicTypeEnum::StructType(st_ty) {
                     self.iw.error(CompilerError::new(
                         fd.loc,
