@@ -267,6 +267,7 @@ pub enum Stmt {
     While(WhileStmt),
     Decref(Box<Expression>),
     Assert(Box<Expression>),
+    TypeAlias(TypeAliasDecl),
 }
 
 #[derive(Clone, Debug)]

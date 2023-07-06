@@ -253,8 +253,13 @@ peg::parser! {
         rule assertstmt() -> Statement =
         start:position!() "assert" _ c:top_level_expr() _ end:position!() { Statement { loc:Location{start,end}, payload:Stmt::Assert(Box::new(c)) } }
 
+        rule typealiasstmt() -> Statement =
+        decl:typealias() {
+            Statement { loc:decl.loc, payload:Stmt::TypeAlias(decl) }
+        }
+
         rule top_level_statement() -> Statement =
-        _ v:(var_decl_stmt() / assignment() / ifstmt() / whilestmt() / ret() / decrefstmt() / assertstmt() / block() / expr_stmt()) _ ";" {v}
+        _ v:(var_decl_stmt() / assignment() / typealiasstmt() / ifstmt() / whilestmt() / ret() / decrefstmt() / assertstmt() / block() / expr_stmt()) _ ";" {v}
 
         rule block() -> Statement =
         start:position!() "{" _ s:top_level_statement()* _ "}" end:position!() { Statement { loc:Location{start,end}, payload:Stmt::Block(s) } }
@@ -285,9 +290,13 @@ peg::parser! {
             TopLevelDeclaration::function(def.decl.loc, def)
         }
 
-        rule typealias() -> TopLevelDeclaration =
-        _ start:position!() "type" _ name:ident() _ "=" _ ty:typename() _ ";" _ end:position!() _ {
-            let decl = TypeAliasDecl {loc:Location{start,end}, name, ty};
+        rule typealias() -> TypeAliasDecl =
+        _ start:position!() "type" _ name:ident() _ "=" _ ty:typename() _ end:position!() _ {
+            TypeAliasDecl {loc:Location{start,end}, name, ty}
+        }
+
+        rule typealias_tld() -> TopLevelDeclaration =
+        decl:typealias() _ ";" _ {
             TopLevelDeclaration::typealias(decl.loc,decl)
         }
 
@@ -310,6 +319,6 @@ peg::parser! {
         top_level_expr()**","
 
         pub rule source_file() -> Vec<TopLevelDeclaration> =
-        (struct_decl() / function() / extern_function() / typealias() / implementation() / var_decl_toplevel())* / expected!("function or structure")
+        (struct_decl() / function() / extern_function() / typealias_tld() / implementation() / var_decl_toplevel())* / expected!("function or structure")
     }
 }

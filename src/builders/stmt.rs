@@ -112,6 +112,14 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
         use crate::ast::Stmt::*;
 
         match &node.payload {
+            TypeAlias(tld) => {
+                if self.tb.alias(locals, &tld.name, &tld.ty).is_none() {
+                    self.iw.error(CompilerError::new(
+                        tld.loc,
+                        Error::TypeNotFound(tld.ty.clone()),
+                    ));
+                }
+            }
             Block(block) => {
                 let block_locals = ScopeObject::child(locals);
                 for node in block {
