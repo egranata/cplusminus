@@ -30,9 +30,9 @@ use crate::{
 
 use super::{
     refcount::insert_decref_if_refcounted,
+    scope::{Scope, ScopeObject, VarInfo},
     stmt::StatementBuilder,
     ty::TypeBuilder,
-    var::{Scope, ScopeObject, VarInfo},
 };
 
 pub struct FunctionBuilder<'a> {
@@ -181,7 +181,7 @@ impl<'a> FunctionBuilder<'a> {
             let param_type = param_value.get_type();
             let alloca = builder.build_alloca(param_type, param_name);
             builder.build_store(alloca, param_value);
-            ret.insert(
+            ret.insert_variable(
                 param_name,
                 VarInfo::new(fd.decl.loc, param_name.clone(), alloca, param_rw),
                 false,

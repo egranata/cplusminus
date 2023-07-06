@@ -39,7 +39,7 @@ use crate::{
     iw::CompilerCore,
 };
 
-use super::{func::FunctionExitData, var::Scope};
+use super::{func::FunctionExitData, scope::Scope};
 
 pub struct ExpressionBuilder<'a, 'b> {
     iw: CompilerCore<'a>,

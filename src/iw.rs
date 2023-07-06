@@ -30,8 +30,8 @@ use crate::{
     builders::{
         func::FunctionBuilder,
         refcount::Refcounting,
+        scope::{Scope, ScopeObject, VarInfo},
         ty::TypeBuilder,
-        var::{Scope, ScopeObject, VarInfo},
     },
     err::{CompilerDiagnostic, CompilerError, CompilerWarning, Error},
     parser::cpm::source_file,
@@ -379,7 +379,7 @@ impl<'a> CompilerCore<'a> {
                                         global.as_pointer_value(),
                                         true,
                                     );
-                                    self.globals.insert(&vd.name, vi, true);
+                                    self.globals.insert_variable(&vd.name, vi, true);
                                 } else {
                                     self.error(CompilerError::new(
                                         tld.loc,

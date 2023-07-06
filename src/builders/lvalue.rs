@@ -23,8 +23,8 @@ use crate::{
 use super::{
     expr::ExpressionBuilder,
     func::FunctionExitData,
+    scope::{Scope, VarInfo},
     ty::TypeBuilder,
-    var::{Scope, VarInfo},
 };
 
 pub struct LvalueBuilder<'a, 'b> {
@@ -52,7 +52,7 @@ impl<'a, 'b> LvalueBuilder<'a, 'b> {
     ) -> Result<ResolvedLvalue<'a>, Error> {
         match node {
             Lvalue::Identifier(ident) => {
-                if let Some(vi) = locals.find(ident, true) {
+                if let Some(vi) = locals.find_variable(ident, true) {
                     return Ok(ResolvedLvalue {
                         ptr: vi.alloca,
                         rw: vi.rw,

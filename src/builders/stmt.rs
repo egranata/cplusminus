@@ -21,7 +21,7 @@ use crate::{
     builders::{
         lvalue::LvalueBuilder,
         refcount::{insert_decref_if_refcounted, insert_incref_if_refcounted},
-        var::{ScopeObject, VarInfo},
+        scope::{ScopeObject, VarInfo},
     },
     err::{CompilerError, CompilerWarning, Error, Warning},
     iw::CompilerCore,
@@ -30,8 +30,8 @@ use crate::{
 use super::{
     expr::ExpressionBuilder,
     func::{is_block_terminated, FunctionExitData},
+    scope::Scope,
     ty::TypeBuilder,
-    var::Scope,
 };
 
 pub struct StatementBuilder<'a, 'b> {
@@ -91,14 +91,14 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
     }
 
     fn warn_on_unwritten_locals(&self, vc: &ScopeObject) {
-        for vi in vc.storage.borrow().values() {
+        vc.variables.values(|vi| {
             if vi.rw && !*vi.written.borrow() {
                 self.iw.warning(CompilerWarning::new(
                     vi.loc,
                     Warning::MutableValueNeverWrittenTo(vi.name.clone()),
                 ));
             }
-        }
+        });
     }
 
     pub fn build_stmt(
@@ -233,7 +233,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                 builder.build_store(alloca, value);
                 insert_incref_if_refcounted(&self.iw, builder, value);
                 self.exit.decref_on_exit(alloca);
-                locals.insert(
+                locals.insert_variable(
                     &var.name,
                     VarInfo::new(node.loc, var.name.clone(), alloca, var.rw),
                     true,

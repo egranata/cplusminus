@@ -16,6 +16,6 @@ pub mod expr;
 pub mod func;
 pub mod lvalue;
 pub mod refcount;
+pub mod scope;
 pub mod stmt;
 pub mod ty;
-pub mod var;
