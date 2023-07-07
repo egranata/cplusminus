@@ -262,7 +262,7 @@ peg::parser! {
         }
 
         rule top_level_statement() -> Statement =
-        _ v:(var_decl_stmt() / assignment() / typealiasstmt() / ifstmt() / whilestmt() / ret() / decrefstmt() / assertstmt() / block() / expr_stmt()) _ ";" {v}
+        _ v:(var_decl_stmt() / assignment() / typealiasstmt() / function_def_stmt() / ifstmt() / whilestmt() / ret() / decrefstmt() / assertstmt() / block() / expr_stmt()) _ ";" {v}
 
         rule block() -> Statement =
         start:position!() "{" _ s:top_level_statement()* _ "}" end:position!() { Statement { loc:Location{start,end}, payload:Stmt::Block(s) } }
@@ -283,6 +283,11 @@ peg::parser! {
         _ start:position!() "func" _ name:ident() "(" _ args:func_arg()**"," _ ")" _ ty:function_ret()? decl_end:position!() _ body:block() end:position!() _ {
             let decl = FunctionDecl { loc:Location{start,end:decl_end}, name,args,vararg:false,ty };
             FunctionDefinition { decl,body }
+        }
+
+        rule function_def_stmt() -> Statement =
+        decl:inner_function_def() {
+            Statement { loc:decl.decl.loc, payload:Stmt::Function(Box::new(decl)) }
         }
 
         rule method_def() -> MethodDecl = fd:inner_function_def() {

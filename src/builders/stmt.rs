@@ -19,6 +19,7 @@ use inkwell::{
 use crate::{
     ast::{FunctionDefinition, IfCondition, Statement},
     builders::{
+        func::{FunctionBuilder, FunctionBuilderOptions},
         lvalue::LvalueBuilder,
         refcount::{insert_decref_if_refcounted, insert_incref_if_refcounted},
         scope::{ScopeObject, VarInfo},
@@ -118,6 +119,18 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                         tld.loc,
                         Error::TypeNotFound(tld.ty.clone()),
                     ));
+                }
+            }
+            Function(tld) => {
+                let fb = FunctionBuilder::new(self.iw.clone());
+                let opts = FunctionBuilderOptions::default()
+                    .extrn(false)
+                    .global(false)
+                    .mangle(true)
+                    .commit();
+                if fb.compile(locals, tld.as_ref(), opts).is_none() {
+                    self.iw
+                        .error(CompilerError::new(tld.decl.loc, Error::InvalidExpression));
                 }
             }
             Block(block) => {

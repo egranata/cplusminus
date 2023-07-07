@@ -48,8 +48,8 @@ pub fn mangle_method_name(fd: &FunctionDefinition, self_decl: &ProperStructDecl)
     )
 }
 
-pub fn mangle_function_name(fd: &FunctionDecl, extrn: bool) -> String {
-    if extrn || fd.name.starts_with('@') || fd.name == "main" {
+pub fn mangle_function_name(fd: &FunctionDecl) -> String {
+    if fd.name.starts_with('@') {
         fd.name.to_string()
     } else {
         format!("@_{}{}", fd.name.len(), fd.name)

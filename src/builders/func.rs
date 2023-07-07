@@ -35,6 +35,34 @@ use super::{
     ty::TypeBuilder,
 };
 
+#[derive(Clone, Copy, Debug, Default)]
+pub struct FunctionBuilderOptions {
+    extrn: bool,
+    global: bool,
+    want_mangle: bool,
+}
+
+impl FunctionBuilderOptions {
+    pub fn global(&mut self, g: bool) -> &mut Self {
+        self.global = g;
+        self
+    }
+
+    pub fn extrn(&mut self, e: bool) -> &mut Self {
+        self.extrn = e;
+        self
+    }
+
+    pub fn mangle(&mut self, m: bool) -> &mut Self {
+        self.want_mangle = m;
+        self
+    }
+
+    pub fn commit(&mut self) -> Self {
+        *self
+    }
+}
+
 pub struct FunctionBuilder<'a> {
     iw: CompilerCore<'a>,
 }
@@ -226,9 +254,13 @@ impl<'a> FunctionBuilder<'a> {
         &self,
         scope: &Scope<'a>,
         fd: &FunctionDecl,
-        extrn: bool,
+        opts: FunctionBuilderOptions,
     ) -> Option<FunctionValue<'a>> {
-        let llvm_func_name = mangle_function_name(fd, extrn);
+        let llvm_func_name = if opts.extrn || !opts.want_mangle {
+            fd.name.clone()
+        } else {
+            mangle_function_name(fd)
+        };
         if !self.check_arg_names_unique(&fd.args) {
             None
         } else if let Some(func_ty) = self.build_function_type(fd) {
@@ -262,8 +294,9 @@ impl<'a> FunctionBuilder<'a> {
         &self,
         scope: &Scope<'a>,
         func: &FunctionDefinition,
+        opts: FunctionBuilderOptions,
     ) -> Option<FunctionValue<'a>> {
-        self.declare(scope, &func.decl, false)?;
+        self.declare(scope, &func.decl, opts)?;
         self.build(scope, func)
     }
 
@@ -275,11 +308,11 @@ impl<'a> FunctionBuilder<'a> {
         &self,
         scope: &Scope<'a>,
         func: &FunctionDecl,
-        extrn: bool,
+        opts: FunctionBuilderOptions,
     ) -> Option<FunctionValue<'a>> {
-        let ret = self.declare_function(scope, func, extrn);
+        let ret = self.declare_function(scope, func, opts);
 
-        if extrn {
+        if opts.extrn {
             for arg in &func.args {
                 if arg.explicit_rw {
                     self.iw.warning(CompilerWarning::new(
@@ -324,6 +357,12 @@ impl<'a> FunctionBuilder<'a> {
             body: fd.body.clone(),
         };
 
-        self.compile(scope, &new_def)
+        let opts = FunctionBuilderOptions::default()
+            .extrn(false)
+            .global(true)
+            .mangle(false)
+            .commit();
+
+        self.compile(scope, &new_def, opts)
     }
 }

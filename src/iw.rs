@@ -26,7 +26,7 @@ use std::{cell::RefCell, collections::HashMap, path::Path, process::Command, rc:
 use crate::{
     ast::{Location, ProperStructDecl, RawStructDecl, TopLevelDecl, TopLevelDeclaration},
     builders::{
-        func::FunctionBuilder,
+        func::{FunctionBuilder, FunctionBuilderOptions},
         refcount::Refcounting,
         scope::{Scope, ScopeObject, VarInfo},
         ty::TypeBuilder,
@@ -299,11 +299,21 @@ impl<'a> CompilerCore<'a> {
                     match &tld.payload {
                         crate::ast::TopLevelDecl::Function(fd) => {
                             let fb = FunctionBuilder::new(self.clone());
-                            fb.declare(&self.globals, &fd.decl, false);
+                            let opts = FunctionBuilderOptions::default()
+                                .extrn(false)
+                                .global(true)
+                                .mangle(false)
+                                .commit();
+                            fb.declare(&self.globals, &fd.decl, opts);
                         }
                         crate::ast::TopLevelDecl::ExternFunction(fd) => {
                             let fb = FunctionBuilder::new(self.clone());
-                            fb.declare(&self.globals, fd, true);
+                            let opts = FunctionBuilderOptions::default()
+                                .extrn(true)
+                                .global(true)
+                                .mangle(false)
+                                .commit();
+                            fb.declare(&self.globals, fd, opts);
                         }
                         crate::ast::TopLevelDecl::Structure(sd) => {
                             let ty = TypeBuilder::new(self.clone());

@@ -35,7 +35,11 @@ use crate::{
     mangler::mangle_special_method,
 };
 
-use super::{func::FunctionBuilder, refcount::build_dealloc, scope::Scope};
+use super::{
+    func::{FunctionBuilder, FunctionBuilderOptions},
+    refcount::build_dealloc,
+    scope::Scope,
+};
 
 pub struct TypeBuilder<'a> {
     iw: CompilerCore<'a>,
@@ -254,7 +258,12 @@ impl<'a> TypeBuilder<'a> {
         };
 
         let fb = FunctionBuilder::new(self.iw.clone());
-        fb.compile(scope, &func_def)
+        let opts = FunctionBuilderOptions::default()
+            .extrn(false)
+            .global(true)
+            .mangle(false)
+            .commit();
+        fb.compile(scope, &func_def, opts)
     }
 
     fn build_usr_dealloc(
@@ -288,7 +297,12 @@ impl<'a> TypeBuilder<'a> {
         };
 
         let fb = FunctionBuilder::new(self.iw.clone());
-        fb.compile(scope, &func_def)
+        let opts = FunctionBuilderOptions::default()
+            .extrn(false)
+            .global(true)
+            .mangle(false)
+            .commit();
+        fb.compile(scope, &func_def, opts)
     }
 
     pub fn build_structure(&self, scope: &Scope<'a>, sd: &ProperStructDecl) -> Option<StructType> {

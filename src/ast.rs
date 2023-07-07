@@ -270,6 +270,7 @@ pub enum Stmt {
     Decref(Box<Expression>),
     Assert(Box<Expression>),
     TypeAlias(TypeAliasDecl),
+    Function(Box<FunctionDefinition>),
 }
 
 #[derive(Clone, Debug)]
