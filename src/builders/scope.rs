@@ -40,28 +40,29 @@ impl<'a> VarInfo<'a> {
 }
 
 #[derive(Clone)]
-pub struct HierarchicalStorage<T: Clone> {
-    parent: Option<Rc<HierarchicalStorage<T>>>,
-    pub storage: MutableOf<HashMap<String, T>>,
+pub enum HierarchicalStorage<T: Clone> {
+    Root(MutableOf<HashMap<String, T>>),
+    Child(Rc<HierarchicalStorage<T>>, MutableOf<HashMap<String, T>>),
 }
 
 impl<T: Clone> HierarchicalStorage<T> {
     pub fn root() -> Rc<Self> {
-        Rc::new(Self {
-            parent: None,
-            storage: Default::default(),
-        })
+        Rc::new(Self::Root(Default::default()))
     }
 
     pub fn child(parent: &Rc<HierarchicalStorage<T>>) -> Rc<Self> {
-        Rc::new(Self {
-            parent: Some(parent.clone()),
-            storage: Default::default(),
-        })
+        Rc::new(Self::Child(parent.clone(), Default::default()))
+    }
+
+    fn storage(&self) -> &MutableOf<HashMap<String, T>> {
+        match self {
+            HierarchicalStorage::Root(storage) => storage,
+            HierarchicalStorage::Child(_, storage) => storage,
+        }
     }
 
     pub fn keys(&self) -> Vec<String> {
-        let borrow = self.storage.borrow();
+        let borrow = self.storage().borrow();
         let borrow_keys: Vec<&String> = borrow.keys().collect();
         let mut new_keys: Vec<String> = vec![];
         borrow_keys
@@ -74,25 +75,30 @@ impl<T: Clone> HierarchicalStorage<T> {
     where
         F: FnMut(&T),
     {
-        let borrow = self.storage.borrow();
+        let borrow = self.storage().borrow();
         borrow.values().for_each(f);
     }
 
     pub fn find(&self, name: &str, recurse: bool) -> Option<T> {
-        if let Some(pv) = self.storage.borrow().get(name) {
-            Some(pv.clone())
-        } else if recurse && self.parent.is_some() {
-            self.parent.as_ref().unwrap().find(name, true)
-        } else {
-            None
+        match self {
+            HierarchicalStorage::Root(storage) => storage.borrow().get(name).cloned(),
+            HierarchicalStorage::Child(parent, storage) => {
+                return if let Some(pv) = storage.borrow().get(name) {
+                    Some(pv.clone())
+                } else if recurse {
+                    parent.find(name, recurse)
+                } else {
+                    None
+                }
+            }
         }
     }
 
     pub fn insert(&self, name: &str, val: T, overwrite: bool) -> bool {
-        if !overwrite && self.storage.borrow().get(name).is_some() {
+        if !overwrite && self.find(name, false).is_some() {
             false
         } else {
-            self.storage.borrow_mut().insert(name.to_string(), val);
+            self.storage().borrow_mut().insert(name.to_string(), val);
             true
         }
     }
