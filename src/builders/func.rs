@@ -30,7 +30,7 @@ use crate::{
 
 use super::{
     refcount::insert_decref_if_refcounted,
-    scope::{Scope, ScopeObject, VarInfo},
+    scope::{Scope, ScopeObject, StoredFunction, VarInfo},
     stmt::StatementBuilder,
     ty::TypeBuilder,
 };
@@ -222,13 +222,19 @@ impl<'a> FunctionBuilder<'a> {
         seen_args.len() == args.len()
     }
 
-    fn declare_function(&self, fd: &FunctionDecl, extrn: bool) -> Option<FunctionValue<'a>> {
+    fn declare_function(
+        &self,
+        scope: &Scope<'a>,
+        fd: &FunctionDecl,
+        extrn: bool,
+    ) -> Option<FunctionValue<'a>> {
         let llvm_func_name = mangle_function_name(fd, extrn);
         if !self.check_arg_names_unique(&fd.args) {
             None
         } else if let Some(func_ty) = self.build_function_type(fd) {
             let func = self.iw.module.add_function(&llvm_func_name, func_ty, None);
-            self.iw.add_function(fd, func);
+            let sf: StoredFunction = (fd.clone(), func);
+            scope.insert_function(&fd.name, sf, true);
             Some(func)
         } else {
             self.iw
@@ -237,8 +243,12 @@ impl<'a> FunctionBuilder<'a> {
         }
     }
 
-    fn build_function(&self, fd: &FunctionDefinition) -> Option<FunctionValue<'a>> {
-        if let Some(func) = self.iw.funcs.borrow().get(&fd.decl.name) {
+    fn build_function(
+        &self,
+        scope: &Scope<'a>,
+        fd: &FunctionDefinition,
+    ) -> Option<FunctionValue<'a>> {
+        if let Some(func) = scope.find_function(&fd.decl.name, true) {
             self.build_body(func.1, fd);
             Some(func.1)
         } else {
@@ -248,17 +258,26 @@ impl<'a> FunctionBuilder<'a> {
         }
     }
 
-    pub fn compile(&self, func: &FunctionDefinition) -> Option<FunctionValue<'a>> {
-        self.declare(&func.decl, false)?;
-        self.build(func)
+    pub fn compile(
+        &self,
+        scope: &Scope<'a>,
+        func: &FunctionDefinition,
+    ) -> Option<FunctionValue<'a>> {
+        self.declare(scope, &func.decl, false)?;
+        self.build(scope, func)
     }
 
-    pub fn build(&self, func: &FunctionDefinition) -> Option<FunctionValue<'a>> {
-        self.build_function(func)
+    pub fn build(&self, scope: &Scope<'a>, func: &FunctionDefinition) -> Option<FunctionValue<'a>> {
+        self.build_function(scope, func)
     }
 
-    pub fn declare(&self, func: &FunctionDecl, extrn: bool) -> Option<FunctionValue<'a>> {
-        let ret = self.declare_function(func, extrn);
+    pub fn declare(
+        &self,
+        scope: &Scope<'a>,
+        func: &FunctionDecl,
+        extrn: bool,
+    ) -> Option<FunctionValue<'a>> {
+        let ret = self.declare_function(scope, func, extrn);
 
         if extrn {
             for arg in &func.args {
@@ -276,6 +295,7 @@ impl<'a> FunctionBuilder<'a> {
 
     pub fn build_method(
         &self,
+        scope: &Scope<'a>,
         fd: &FunctionDefinition,
         self_decl: &ProperStructDecl,
     ) -> Option<FunctionValue<'a>> {
@@ -304,6 +324,6 @@ impl<'a> FunctionBuilder<'a> {
             body: fd.body.clone(),
         };
 
-        self.compile(&new_def)
+        self.compile(scope, &new_def)
     }
 }

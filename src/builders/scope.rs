@@ -14,9 +14,15 @@
 
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use inkwell::{types::BasicTypeEnum, values::PointerValue};
+use inkwell::{
+    types::BasicTypeEnum,
+    values::{FunctionValue, PointerValue},
+};
 
-use crate::{ast::Location, codegen::MutableOf};
+use crate::{
+    ast::{FunctionDecl, Location},
+    codegen::MutableOf,
+};
 
 #[derive(Clone)]
 pub struct VarInfo<'a> {
@@ -104,10 +110,13 @@ impl<T: Clone> HierarchicalStorage<T> {
     }
 }
 
+pub type StoredFunction<'a> = (FunctionDecl, FunctionValue<'a>);
+
 #[derive(Clone)]
 pub struct ScopeObject<'a> {
     pub variables: Rc<HierarchicalStorage<VarInfo<'a>>>,
     pub aliases: Rc<HierarchicalStorage<BasicTypeEnum<'a>>>,
+    pub functions: Rc<HierarchicalStorage<StoredFunction<'a>>>,
 }
 
 impl<'a> ScopeObject<'a> {
@@ -115,6 +124,7 @@ impl<'a> ScopeObject<'a> {
         Rc::new(Self {
             variables: HierarchicalStorage::root(),
             aliases: HierarchicalStorage::root(),
+            functions: HierarchicalStorage::root(),
         })
     }
 
@@ -122,6 +132,7 @@ impl<'a> ScopeObject<'a> {
         Rc::new(Self {
             variables: HierarchicalStorage::child(&parent.variables),
             aliases: HierarchicalStorage::child(&parent.aliases),
+            functions: HierarchicalStorage::child(&parent.functions),
         })
     }
 
@@ -139,6 +150,14 @@ impl<'a> ScopeObject<'a> {
 
     pub fn insert_alias(&self, name: &str, val: BasicTypeEnum<'a>, overwrite: bool) -> bool {
         self.aliases.insert(name, val, overwrite)
+    }
+
+    pub fn find_function(&self, name: &str, recurse: bool) -> Option<StoredFunction<'a>> {
+        self.functions.find(name, recurse)
+    }
+
+    pub fn insert_function(&self, name: &str, val: StoredFunction<'a>, overwrite: bool) -> bool {
+        self.functions.insert(name, val, overwrite)
     }
 }
 

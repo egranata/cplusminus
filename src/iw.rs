@@ -24,9 +24,7 @@ use peg::{error::ParseError, str::LineCol};
 use std::{cell::RefCell, collections::HashMap, path::Path, process::Command, rc::Rc};
 
 use crate::{
-    ast::{
-        FunctionDecl, Location, ProperStructDecl, RawStructDecl, TopLevelDecl, TopLevelDeclaration,
-    },
+    ast::{Location, ProperStructDecl, RawStructDecl, TopLevelDecl, TopLevelDeclaration},
     builders::{
         func::FunctionBuilder,
         refcount::Refcounting,
@@ -112,7 +110,6 @@ pub struct CompilerCore<'a> {
     pub module: Rc<Module<'a>>,
     pub source: Input,
     pub options: CompilerOptions,
-    pub funcs: MutableOf<HashMap<String, (FunctionDecl, FunctionValue<'a>)>>,
     pub structs: MutableOf<HashMap<String, Structure<'a>>>,
     pub diagnostics: MutableOf<Vec<CompilerDiagnostic>>,
     pub builtins: BuiltinTypes<'a>,
@@ -137,7 +134,6 @@ impl<'a> CompilerCore<'a> {
             module,
             source: src.clone(),
             options,
-            funcs: Rc::new(RefCell::new(HashMap::new())),
             structs: Rc::new(RefCell::new(HashMap::new())),
             diagnostics: Rc::new(RefCell::new(Vec::new())),
             builtins: BuiltinTypes::new(context),
@@ -303,16 +299,16 @@ impl<'a> CompilerCore<'a> {
                     match &tld.payload {
                         crate::ast::TopLevelDecl::Function(fd) => {
                             let fb = FunctionBuilder::new(self.clone());
-                            fb.declare(&fd.decl, false);
+                            fb.declare(&self.globals, &fd.decl, false);
                         }
                         crate::ast::TopLevelDecl::ExternFunction(fd) => {
                             let fb = FunctionBuilder::new(self.clone());
-                            fb.declare(fd, true);
+                            fb.declare(&self.globals, fd, true);
                         }
                         crate::ast::TopLevelDecl::Structure(sd) => {
                             let ty = TypeBuilder::new(self.clone());
                             if let Some(psd) = self.fixup_struct_decl(sd) {
-                                if ty.build_structure(&psd).is_none() {
+                                if ty.build_structure(&self.globals, &psd).is_none() {
                                     self.error(CompilerError::new(
                                         sd.loc,
                                         Error::InvalidExpression,
@@ -331,7 +327,7 @@ impl<'a> CompilerCore<'a> {
                         crate::ast::TopLevelDecl::Implementation(id) => {
                             let ty = TypeBuilder::new(self.clone());
                             if let Some(struct_info) = self.structs.borrow().get(&id.name) {
-                                ty.build_impl(struct_info, id);
+                                ty.build_impl(&self.globals, struct_info, id);
                             } else {
                                 self.error(CompilerError::new(
                                     id.loc,
@@ -396,7 +392,7 @@ impl<'a> CompilerCore<'a> {
                     match &tld.payload {
                         crate::ast::TopLevelDecl::Function(fd) => {
                             let fb = FunctionBuilder::new(self.clone());
-                            fb.build(fd);
+                            fb.build(&self.globals, fd);
                         }
                         crate::ast::TopLevelDecl::ExternFunction(..) => {}
                         crate::ast::TopLevelDecl::Structure(..) => {}
@@ -532,12 +528,6 @@ impl<'a> CompilerCore<'a> {
             Some("obj") => self.dump_to_obj(path),
             _ => self.dump_to_binary(path),
         }
-    }
-
-    pub fn add_function(&self, fd: &FunctionDecl, fv: FunctionValue<'a>) {
-        self.funcs
-            .borrow_mut()
-            .insert(fd.name.clone(), (fd.clone(), fv));
     }
 
     pub fn add_struct(&self, sd: &Structure<'a>) {

@@ -563,7 +563,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 }
             }
             FunctionCall(id, args) => {
-                if let Some((_, fv)) = self.iw.funcs.as_ref().borrow().get(id) {
+                if let Some((_, fv)) = locals.find_function(id, true) {
                     let f_args: Vec<FunctionCallArgument> = args
                         .iter()
                         .map(|arg| FunctionCallArgument::Expr(arg.clone()))
@@ -571,7 +571,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     if let Some(args) =
                         self.build_function_call_args(builder, fd, locals, &f_args, fv.get_type())
                     {
-                        let info = FunctionCallData::from_function(*fv, args);
+                        let info = FunctionCallData::from_function(fv, args);
                         return self.build_function_call(node, builder, &info);
                     } else {
                         self.iw.error(CompilerError::new(

@@ -68,7 +68,7 @@ impl<'a, 'b> LvalueBuilder<'a, 'b> {
                     });
                 }
 
-                if let Some(fv) = self.iw.funcs.borrow().get(ident) {
+                if let Some(fv) = locals.find_function(ident, true) {
                     return Ok(ResolvedLvalue {
                         ptr: fv.1.as_global_value().as_pointer_value(),
                         rw: false,

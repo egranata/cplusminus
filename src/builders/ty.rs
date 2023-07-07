@@ -224,7 +224,12 @@ impl<'a> TypeBuilder<'a> {
         }
     }
 
-    fn build_init(&self, this_ty: StructType<'a>, init: &InitDecl) -> Option<FunctionValue<'a>> {
+    fn build_init(
+        &self,
+        scope: &Scope<'a>,
+        this_ty: StructType<'a>,
+        init: &InitDecl,
+    ) -> Option<FunctionValue<'a>> {
         let ty = TypeDescriptor::Name(this_ty.get_name().unwrap().to_str().unwrap().to_owned());
         let mut real_args = vec![FunctionArgument {
             loc: init.loc,
@@ -249,11 +254,12 @@ impl<'a> TypeBuilder<'a> {
         };
 
         let fb = FunctionBuilder::new(self.iw.clone());
-        fb.compile(&func_def)
+        fb.compile(scope, &func_def)
     }
 
     fn build_usr_dealloc(
         &self,
+        scope: &Scope<'a>,
         this_ty: StructType<'a>,
         dealloc: &DeallocDecl,
     ) -> Option<FunctionValue<'a>> {
@@ -282,10 +288,10 @@ impl<'a> TypeBuilder<'a> {
         };
 
         let fb = FunctionBuilder::new(self.iw.clone());
-        fb.compile(&func_def)
+        fb.compile(scope, &func_def)
     }
 
-    pub fn build_structure(&self, sd: &ProperStructDecl) -> Option<StructType> {
+    pub fn build_structure(&self, scope: &Scope<'a>, sd: &ProperStructDecl) -> Option<StructType> {
         let ms = sd.ms;
         let is_rc = sd.ms == MemoryStrategy::ByReference;
         let is_val = sd.ms == MemoryStrategy::ByValue;
@@ -388,7 +394,7 @@ impl<'a> TypeBuilder<'a> {
         }
 
         if let Some(init) = &sd.init {
-            if let Some(init_f) = self.build_init(st_ty, init) {
+            if let Some(init_f) = self.build_init(scope, st_ty, init) {
                 cdg_st.init.set(init_f).unwrap();
             } else {
                 self.iw
@@ -398,7 +404,7 @@ impl<'a> TypeBuilder<'a> {
         }
 
         if let Some(dealloc) = &sd.dealloc {
-            if let Some(dealloc_f) = self.build_usr_dealloc(st_ty, dealloc) {
+            if let Some(dealloc_f) = self.build_usr_dealloc(scope, st_ty, dealloc) {
                 cdg_st.usr_dealloc.set(dealloc_f).unwrap();
             } else {
                 self.iw
@@ -495,12 +501,12 @@ impl<'a> TypeBuilder<'a> {
         None
     }
 
-    pub fn build_impl(&self, sd: &Structure<'a>, id: &ImplDecl) {
+    pub fn build_impl(&self, scope: &Scope<'a>, sd: &Structure<'a>, id: &ImplDecl) {
         sd.implementations.borrow_mut().push(id.clone());
 
         let fb = FunctionBuilder::new(self.iw.clone());
         for method in &id.methods {
-            if let Some(func) = fb.build_method(&method.imp, &sd.decl) {
+            if let Some(func) = fb.build_method(scope, &method.imp, &sd.decl) {
                 let new_method = Method {
                     decl: method.clone(),
                     func,
