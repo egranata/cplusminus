@@ -204,6 +204,8 @@ pub enum Expr {
     And(Box<Expression>, Box<Expression>),
     Or(Box<Expression>, Box<Expression>),
     XOr(Box<Expression>, Box<Expression>),
+    Increment(Lvalue),
+    Decrement(Lvalue),
     FunctionCall(String, Vec<Expression>),
     MethodCall(MethodCall),
     PointerFunctionCall(Box<Expression>, Vec<Expression>),

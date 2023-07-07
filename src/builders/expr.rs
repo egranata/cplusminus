@@ -814,6 +814,80 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     }
                 };
             }
+            Increment(lv) => {
+                let rlv = self.lvb.build_lvalue(builder, fd, lv, locals);
+                return match rlv {
+                    Ok(pv) => {
+                        if !pv.rw {
+                            let name = format!("{lv}");
+                            self.iw.error(CompilerError::new(
+                                node.loc,
+                                Error::ReadOnlyIdentifier(name),
+                            ));
+                            return None;
+                        }
+                        let ptr = pv.ptr;
+                        let pointee = ptr.get_type().get_element_type();
+                        if pointee.is_int_type() && pointee.into_int_type().get_bit_width() != 1 {
+                            let load = builder.build_load(ptr, "").into_int_value();
+                            let add = builder.build_int_add(
+                                load,
+                                self.iw.builtins.one(load.get_type()),
+                                "",
+                            );
+                            builder.build_store(ptr, add);
+                            Some(PointerValue(pv.ptr))
+                        } else {
+                            self.iw.error(CompilerError::new(
+                                node.loc,
+                                Error::UnexpectedType(Some("expected integer".to_owned())),
+                            ));
+                            None
+                        }
+                    }
+                    Err(err) => {
+                        self.iw.error(CompilerError::new(node.loc, err));
+                        None
+                    }
+                };
+            }
+            Decrement(lv) => {
+                let rlv = self.lvb.build_lvalue(builder, fd, lv, locals);
+                return match rlv {
+                    Ok(pv) => {
+                        if !pv.rw {
+                            let name = format!("{lv}");
+                            self.iw.error(CompilerError::new(
+                                node.loc,
+                                Error::ReadOnlyIdentifier(name),
+                            ));
+                            return None;
+                        }
+                        let ptr = pv.ptr;
+                        let pointee = ptr.get_type().get_element_type();
+                        if pointee.is_int_type() && pointee.into_int_type().get_bit_width() != 1 {
+                            let load = builder.build_load(ptr, "").into_int_value();
+                            let add = builder.build_int_sub(
+                                load,
+                                self.iw.builtins.one(load.get_type()),
+                                "",
+                            );
+                            builder.build_store(ptr, add);
+                            Some(PointerValue(pv.ptr))
+                        } else {
+                            self.iw.error(CompilerError::new(
+                                node.loc,
+                                Error::UnexpectedType(Some("expected integer".to_owned())),
+                            ));
+                            None
+                        }
+                    }
+                    Err(err) => {
+                        self.iw.error(CompilerError::new(node.loc, err));
+                        None
+                    }
+                };
+            }
             Deref(e) => {
                 if let Some(ev) = self.build_expr(builder, fd, e.as_ref(), locals, type_hint) {
                     if self.tb.is_refcounted_basic_type(ev.get_type()).is_some() {

@@ -148,6 +148,9 @@ peg::parser! {
             "&" lv:lvalue() _ { Expr::AddressOf(lv) }
             "*" e:expr() { Expr::Deref(Box::new(e)) }
             --
+            "inc" _ lv:lvalue() { Expr::Increment(lv) }
+            "dec" _ lv:lvalue() { Expr::Decrement(lv) }
+            --
             n:number() { Expr::ConstInt(n) }
             s:strlit() { Expr::ConstString(s) }
             lv:lvalue() { Expr::Rvalue(lv) }
