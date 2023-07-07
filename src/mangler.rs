@@ -14,7 +14,7 @@
 
 use inkwell::types::StructType;
 
-use crate::ast::{FunctionDefinition, ProperStructDecl};
+use crate::ast::{FunctionDecl, FunctionDefinition, ProperStructDecl};
 
 pub enum SpecialMemberFunction {
     Initializer,
@@ -24,17 +24,34 @@ pub enum SpecialMemberFunction {
 
 pub fn mangle_special_method(self_decl: StructType<'_>, func: SpecialMemberFunction) -> String {
     let type_name = self_decl.get_name().unwrap().to_str().unwrap();
+    let func_name = match func {
+        SpecialMemberFunction::Initializer => "init",
+        SpecialMemberFunction::UserDeallocator => "drop",
+        SpecialMemberFunction::BuiltinDeallocator => "dealloc",
+    };
     format!(
-        "__{}__@{}",
+        "@__{}{}_{}{}",
+        type_name.len(),
         type_name,
-        match func {
-            SpecialMemberFunction::Initializer => "init",
-            SpecialMemberFunction::UserDeallocator => "drop",
-            SpecialMemberFunction::BuiltinDeallocator => "dealloc",
-        }
+        func_name.len(),
+        func_name
     )
 }
 
 pub fn mangle_method_name(fd: &FunctionDefinition, self_decl: &ProperStructDecl) -> String {
-    format!("__{}_@_{}", self_decl.name, fd.decl.name)
+    format!(
+        "@__{}{}__{}{}",
+        self_decl.name.len(),
+        self_decl.name,
+        fd.decl.name.len(),
+        fd.decl.name
+    )
+}
+
+pub fn mangle_function_name(fd: &FunctionDecl, extrn: bool) -> String {
+    if extrn || fd.name.starts_with('@') || fd.name == "main" {
+        fd.name.to_string()
+    } else {
+        format!("@_{}{}", fd.name.len(), fd.name)
+    }
 }

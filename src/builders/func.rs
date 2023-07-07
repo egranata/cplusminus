@@ -25,7 +25,7 @@ use crate::{
     ast::{FunctionArgument, FunctionDecl, FunctionDefinition, ProperStructDecl, TypeDescriptor},
     err::{CompilerError, CompilerWarning, Error, Warning},
     iw::CompilerCore,
-    mangler::mangle_method_name,
+    mangler::{mangle_function_name, mangle_method_name},
 };
 
 use super::{
@@ -222,11 +222,11 @@ impl<'a> FunctionBuilder<'a> {
         seen_args.len() == args.len()
     }
 
-    fn declare_function(&self, fd: &FunctionDecl) -> Option<FunctionValue<'a>> {
+    fn declare_function(&self, fd: &FunctionDecl, extrn: bool) -> Option<FunctionValue<'a>> {
+        let llvm_func_name = mangle_function_name(fd, extrn);
         if !self.check_arg_names_unique(&fd.args) {
             None
         } else if let Some(func_ty) = self.build_function_type(fd) {
-            let llvm_func_name = fd.name.clone();
             let func = self.iw.module.add_function(&llvm_func_name, func_ty, None);
             self.iw.add_function(fd, func);
             Some(func)
@@ -258,7 +258,7 @@ impl<'a> FunctionBuilder<'a> {
     }
 
     pub fn declare(&self, func: &FunctionDecl, extrn: bool) -> Option<FunctionValue<'a>> {
-        let ret = self.declare_function(func);
+        let ret = self.declare_function(func, extrn);
 
         if extrn {
             for arg in &func.args {
@@ -274,11 +274,11 @@ impl<'a> FunctionBuilder<'a> {
         ret
     }
 
-    pub fn as_method(
+    pub fn build_method(
         &self,
         fd: &FunctionDefinition,
         self_decl: &ProperStructDecl,
-    ) -> FunctionDefinition {
+    ) -> Option<FunctionValue<'a>> {
         let fqn = mangle_method_name(fd, self_decl);
         let self_tyd = TypeDescriptor::Name(self_decl.name.clone());
         let self_arg = FunctionArgument {
@@ -299,9 +299,11 @@ impl<'a> FunctionBuilder<'a> {
             ty: fd.decl.ty.clone(),
         };
 
-        FunctionDefinition {
+        let new_def = FunctionDefinition {
             decl: new_decl,
             body: fd.body.clone(),
-        }
+        };
+
+        self.compile(&new_def)
     }
 }

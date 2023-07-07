@@ -500,14 +500,16 @@ impl<'a> TypeBuilder<'a> {
 
         let fb = FunctionBuilder::new(self.iw.clone());
         for method in &id.methods {
-            let uf = fb.as_method(&method.imp, &sd.decl);
-            fb.declare(&uf.decl, false);
-            let func = fb.build(&uf).unwrap();
-            let new_method = Method {
-                decl: method.clone(),
-                func,
-            };
-            sd.methods.borrow_mut().push(new_method);
+            if let Some(func) = fb.build_method(&method.imp, &sd.decl) {
+                let new_method = Method {
+                    decl: method.clone(),
+                    func,
+                };
+                sd.methods.borrow_mut().push(new_method);
+            } else {
+                self.iw
+                    .error(CompilerError::new(method.loc, Error::InvalidExpression));
+            }
         }
     }
 
