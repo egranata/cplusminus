@@ -208,7 +208,6 @@ pub enum Expr {
     Decrement(Lvalue),
     FunctionCall(String, Vec<Expression>),
     MethodCall(MethodCall),
-    PointerFunctionCall(Box<Expression>, Vec<Expression>),
     Alloc(TypeDescriptor, Option<AllocInitializer>),
     Incref(Box<Expression>),
     Getref(Box<Expression>),

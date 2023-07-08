@@ -12,18 +12,30 @@
 (* See the License for the specific language governing permissions and *)
 (* limitations under the License. *)
 
-type math = fn(int64) ret int64;
+type test_f = fn(int64, int64, int64) ret int64;
 
-func give_me_math() ret math {
-    func double(x: int64) ret int64 {
-        return x + x;
+func max3(a: int64, b: int64, c: int64) ret int64 {
+    func max2(a: int64, b: int64) ret int64 {
+        if (a>b) {
+            return a;
+        } else {
+            return b;
+        };
     };
-    return double;
+
+    return max2(max2(a,b),c);
+}
+
+func get_comparison() ret test_f {
+    return max3;
 }
 
 func main() ret int64 {
-    let n = 3;
-    let m = 6;
-    let f = give_me_math();
-    return m - f(n);
+    let x = 3;
+    let y = 4;
+    let z = 2;
+
+    let f = get_comparison();
+
+    return y - f(x,y,z);
 }

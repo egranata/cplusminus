@@ -58,7 +58,6 @@ struct FunctionCallData<'a> {
     dest_src: Either<FunctionValue<'a>, PointerValue<'a>>,
     argc: usize,
     vararg: bool,
-    args: Vec<BasicMetadataValueEnum<'a>>,
 }
 
 impl<'a> Clone for FunctionCallData<'a> {
@@ -73,23 +72,28 @@ impl<'a> Clone for FunctionCallData<'a> {
             dest_src: self.dest_src,
             argc: self.argc,
             vararg: self.vararg,
-            args: self.args.clone(),
         }
     }
 }
 
 impl<'a> FunctionCallData<'a> {
-    fn from_function(f: FunctionValue<'a>, args: Vec<BasicMetadataValueEnum<'a>>) -> Self {
+    fn from_function(f: FunctionValue<'a>) -> Self {
         Self {
             dest: CallableValue::from(f),
             dest_src: Either::Left(f),
             argc: f.count_params() as usize,
             vararg: f.get_type().is_var_arg(),
-            args: args.clone(),
         }
     }
 
-    fn from_pointer(p: PointerValue<'a>, args: Vec<BasicMetadataValueEnum<'a>>) -> Option<Self> {
+    fn their_type(&self) -> FunctionType<'a> {
+        match self.dest_src {
+            Either::Left(fv) => fv.get_type(),
+            Either::Right(fp) => fp.get_type().get_element_type().into_function_type(),
+        }
+    }
+
+    fn from_pointer(p: PointerValue<'a>) -> Option<Self> {
         if let Ok(dest) = CallableValue::try_from(p) {
             let argc = p
                 .get_type()
@@ -106,15 +110,14 @@ impl<'a> FunctionCallData<'a> {
                 dest_src: Either::Right(p),
                 argc,
                 vararg,
-                args: args.clone(),
             })
         } else {
             None
         }
     }
 
-    fn check_arg_size_match(&self) -> bool {
-        self.args.len() == self.argc || self.vararg
+    fn check_arg_size_match(&self, args: &[BasicMetadataValueEnum]) -> bool {
+        args.len() == self.argc || self.vararg
     }
 }
 
@@ -133,17 +136,18 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         node: &Expression,
         builder: &Builder<'a>,
         info: &FunctionCallData<'a>,
+        args: &[BasicMetadataValueEnum<'a>],
     ) -> Option<BasicValueEnum<'a>> {
-        if !info.check_arg_size_match() {
+        if !info.check_arg_size_match(args) {
             self.iw.error(CompilerError::new(
                 node.loc,
-                Error::ArgCountMismatch(info.argc, info.args.len()),
+                Error::ArgCountMismatch(info.argc, args.len()),
             ));
             return None;
         }
 
         if let Some(obj) = builder
-            .build_call(info.clone().dest, &info.args, "")
+            .build_call(info.clone().dest, args, "")
             .try_as_basic_value()
             .left()
         {
@@ -527,62 +531,48 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     None
                 };
             }
-            PointerFunctionCall(expr, args) => {
-                if let Some(PointerValue(pv)) =
-                    self.build_expr(builder, fd, expr.as_ref(), locals, type_hint)
-                {
-                    if !pv.get_type().get_element_type().is_function_type() {
-                        self.iw.error(CompilerError::new(
-                            node.loc,
-                            Error::UnexpectedType(Some("function pointer expected".to_owned())),
-                        ));
-                        return None;
-                    }
-                    let their_type = pv.get_type().get_element_type().into_function_type();
-                    let f_args: Vec<FunctionCallArgument> = args
-                        .iter()
-                        .map(|arg| FunctionCallArgument::Expr(arg.clone()))
-                        .collect();
-                    if let Some(args) =
-                        self.build_function_call_args(builder, fd, locals, &f_args, their_type)
-                    {
-                        if let Some(info) = FunctionCallData::from_pointer(pv, args) {
-                            return self.build_function_call(node, builder, &info);
-                        } else {
-                            self.iw.error(CompilerError::new(
-                                node.loc,
-                                Error::UnexpectedType(Some("function pointer expected".to_owned())),
-                            ));
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            }
             FunctionCall(id, args) => {
-                if let Some((_, fv)) = locals.find_function(id, true) {
-                    let f_args: Vec<FunctionCallArgument> = args
-                        .iter()
-                        .map(|arg| FunctionCallArgument::Expr(arg.clone()))
-                        .collect();
-                    if let Some(args) =
-                        self.build_function_call_args(builder, fd, locals, &f_args, fv.get_type())
-                    {
-                        let info = FunctionCallData::from_function(fv, args);
-                        return self.build_function_call(node, builder, &info);
-                    } else {
-                        self.iw.error(CompilerError::new(
-                            node.loc,
-                            Error::IdentifierNotFound(id.clone()),
-                        ));
-                        None
-                    }
+                let mut fv: Option<FunctionCallData<'a>> = None;
+                if let Some((_, fbyname)) = locals.find_function(id, true) {
+                    fv = Some(FunctionCallData::from_function(fbyname));
                 } else {
-                    None
+                    let candidate_expr = Expression {
+                        loc: node.loc,
+                        payload: Expr::Rvalue(crate::ast::Lvalue::Identifier(id.clone())),
+                    };
+                    if let Some(PointerValue(value)) =
+                        self.build_expr(builder, fd, &candidate_expr, locals, type_hint)
+                    {
+                        if value.get_type().get_element_type().is_function_type() {
+                            fv = FunctionCallData::from_pointer(value);
+                        }
+                    }
                 }
+
+                if fv.is_none() {
+                    self.iw.error(CompilerError::new(
+                        node.loc,
+                        Error::IdentifierNotFound(id.clone()),
+                    ));
+                    return None;
+                }
+                let fv = fv.unwrap();
+
+                let f_args: Vec<FunctionCallArgument> = args
+                    .iter()
+                    .map(|arg| FunctionCallArgument::Expr(arg.clone()))
+                    .collect();
+                return if let Some(args) =
+                    self.build_function_call_args(builder, fd, locals, &f_args, fv.their_type())
+                {
+                    self.build_function_call(node, builder, &fv, &args)
+                } else {
+                    self.iw.error(CompilerError::new(
+                        node.loc,
+                        Error::UnexpectedType(Some("callable function expected".to_owned())),
+                    ));
+                    None
+                };
             }
             MethodCall(mc) => {
                 if let Some(this) =
@@ -645,8 +635,8 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                         method_func.get_type(),
                     ) {
                         args.insert(0, this_arg.unwrap());
-                        let info = FunctionCallData::from_function(method_func, args);
-                        self.build_function_call(node, builder, &info)
+                        let info = FunctionCallData::from_function(method_func);
+                        self.build_function_call(node, builder, &info, &args)
                     } else {
                         None
                     };
@@ -720,8 +710,15 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 let rlv = self.lvb.build_lvalue(builder, fd, lv, locals);
                 return match rlv {
                     Ok(pv) => {
+                        // there is no usable way to "load" a function, so if we detect that
+                        // the lvalue is a ptr-to-func, just return it directly because
+                        // most likely that's what was meant
                         let name = format!("load_{}", String::from(lv));
-                        Some(builder.build_load(pv.ptr, &name))
+                        if pv.ptr.get_type().get_element_type().is_function_type() {
+                            Some(PointerValue(pv.ptr))
+                        } else {
+                            Some(builder.build_load(pv.ptr, &name))
+                        }
                     }
                     Err(err) => {
                         self.iw.error(CompilerError::new(node.loc, err));

@@ -144,7 +144,6 @@ peg::parser! {
                 Expr::MethodCall(mc)
             }
             i:ident() _ "(" a:func_call_args() ")" { Expr::FunctionCall(i,a) }
-            "(" _ "*" e:expr() ")" _ "(" a:func_call_args() ")" { Expr::PointerFunctionCall(Box::new(e),a) }
             "&" lv:lvalue() _ { Expr::AddressOf(lv) }
             "*" e:expr() { Expr::Deref(Box::new(e)) }
             --

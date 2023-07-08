@@ -1844,10 +1844,10 @@ func double(x: int64) ret int64 {
 
 func main() ret int64 {
     var n = 5;
-    var fp = &inc;
-    n = (*fp)(n);
-    fp = &double;
-    n = (*fp)(n);
+    var fp = inc;
+    n = fp(n);
+    fp = double;
+    n = fp(n);
     return n;
 }
 "
@@ -1873,13 +1873,13 @@ func double(x: int64) ret int64 {
 type fp = fn(int64) ret int64;
 
 func try(n: int64, f: fp, g: fp) ret int64 {
-    return (*g)((*f)(n));
+    return g(f(n));
 }
 
 func main() ret int64 {
     var x = 5;
-    let a = try(x, &inc, &double);
-    let b = try(x, &double, &inc);
+    let a = try(x, inc, double);
+    let b = try(x, double, inc);
     return a + b;
 }
 "
