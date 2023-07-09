@@ -38,22 +38,36 @@ fn is_valid_ident_next(x: char) -> bool {
             || unic_emoji_char::is_emoji(x))
 }
 
+fn parse_number(x: &str) -> Result<i64, std::num::ParseIntError> {
+    return if let Some(x) = x.strip_prefix("0x") {
+        i64::from_str_radix(x, 16)
+    } else if let Some(x) = x.strip_prefix("0b") {
+        i64::from_str_radix(x, 2)
+    } else if let Some(x) = x.strip_prefix("0o") {
+        i64::from_str_radix(x, 8)
+    } else {
+        x.parse::<i64>()
+    };
+}
+
 peg::parser! {
     pub grammar cpm() for str {
-        rule decimal_integer() -> i64
-        = n:$(['0'..='9']+) {? n.parse().or(Err("u32")) };
 
-        rule hex_integer() -> i64 =
-        "x" n:$(['0'..='9' | 'A'..='F' | 'a'..='f']+) { i64::from_str_radix(n, 16).unwrap() }
+        rule integer_prefix() -> String =
+        p:$("0" ['b' | 'x' | 'o']) { String::from(p) }
+        rule integer_digit() -> char =
+        c:['0'..='9' | 'A'..='F' | 'a'..='f'] { c }
 
-        rule octal_integer() -> i64 =
-        "o" n:$(['0'..='7']+) { i64::from_str_radix(n, 8).unwrap() }
+        rule integer_number() -> Result<i64,std::num::ParseIntError> =
+        p:integer_prefix()? d:integer_digit()+ {
+            let digits = d.iter().collect::<String>();
+            let prefix = p.unwrap_or(String::new());
+            let full_number = &[prefix,digits].join("");
+            parse_number(full_number)
+        }
 
-        rule binary_integer() -> i64 =
-        "b" n:$(['0'..='1']+) { i64::from_str_radix(n, 2).unwrap() }
-
-        rule number() -> i64 =
-        (decimal_integer() / hex_integer() / octal_integer() / binary_integer()) / expected!("number");
+        rule number() -> i64
+        = n:integer_number() {? n.or(Err("u64")) };
 
         rule strlit() -> String
         = "\"" s:$((!"\"" [_])*) "\"" { escape_string(s) }

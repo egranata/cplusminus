@@ -532,8 +532,8 @@ func main() ret int64 {
             helper_run_main_exit(
                 "
 func main() ret int64 {
-    let n = b100110;
-    let m = b011101;
+    let n = 0b100110;
+    let m = 0b011101;
     return (n && m);
 }
 "
@@ -568,8 +568,8 @@ func main() ret int64 {
             helper_run_main_exit(
                 "
 func main() ret int64 {
-    let n = b100110;
-    let m = b011100;
+    let n = 0b100110;
+    let m = 0b011100;
     return (n || m);
 }
 "
@@ -604,8 +604,8 @@ func main() ret int64 {
             helper_run_main_exit(
                 "
 func main() ret int64 {
-    let n = b100110;
-    let m = b011100;
+    let n = 0b100110;
+    let m = 0b011100;
     return (n ^^ m);
 }
 "
@@ -1460,7 +1460,7 @@ func main() ret int64 {
             helper_run_main_exit(
                 "
 func main() ret int32 {
-    return xAb12;
+    return 0xAb12;
 }
 "
             )
@@ -1475,7 +1475,7 @@ func main() ret int32 {
             helper_run_main_exit(
                 "
 func main() ret int32 {
-    return o67312;
+    return 0o67312;
 }
 "
             )
@@ -1490,7 +1490,7 @@ func main() ret int32 {
             helper_run_main_exit(
                 "
 func main() ret int32 {
-    return b100101010111011001;
+    return 0b100101010111011001;
 }
 "
             )
@@ -1505,7 +1505,7 @@ func main() ret int32 {
             helper_run_main_exit(
                 "
 func main() ret int32 {
-    let n: int32 = xAb12 as int32;
+    let n: int32 = 0xAb12 as int32;
     return n;
 }
 "
