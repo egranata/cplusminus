@@ -129,6 +129,9 @@ peg::parser! {
             "sizeof" __() "expr" __() e:expr() _ { Expr::SizeofVar(Box::new(e)) }
             "sizeof" __() "type" __() ty:typename() _ { Expr::SizeofTy(ty) }
             --
+            x:(@) _ "<<" _ y:@ { Expr::ShiftLeft(Box::new(x), Box::new(y)) }
+            x:(@) _ ">>" _ y:@ { Expr::ShiftRight(Box::new(x), Box::new(y)) }
+            --
             x:(@) _ "+" _ y:@ { Expr::Addition(Box::new(x), Box::new(y)) }
             x:(@) _ "||" _ y:@ { Expr::Or(Box::new(x), Box::new(y)) }
             x:(@) _ "^^" _ y:@ { Expr::XOr(Box::new(x), Box::new(y)) }

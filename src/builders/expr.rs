@@ -226,8 +226,8 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
             Expr::Addition(..) => builder.build_int_add(x, y, ""),
             Expr::Subtraction(..) => builder.build_int_sub(x, y, ""),
             Expr::Multiplication(..) => builder.build_int_mul(x, y, ""),
-            Expr::Division(..) => builder.build_int_unsigned_div(x, y, ""),
-            Expr::Modulo(..) => builder.build_int_unsigned_rem(x, y, ""),
+            Expr::Division(..) => builder.build_int_signed_div(x, y, ""),
+            Expr::Modulo(..) => builder.build_int_signed_rem(x, y, ""),
             Expr::Equality(..) => builder.build_int_compare(IntPredicate::EQ, x, y, ""),
             Expr::NotEqual(..) => builder.build_int_compare(IntPredicate::NE, x, y, ""),
             Expr::GreaterThan(..) => builder.build_int_compare(IntPredicate::SGT, x, y, ""),
@@ -237,6 +237,8 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
             Expr::And(..) => builder.build_and(x, y, ""),
             Expr::Or(..) => builder.build_or(x, y, ""),
             Expr::XOr(..) => builder.build_xor(x, y, ""),
+            Expr::ShiftLeft(..) => builder.build_left_shift(x, y, ""),
+            Expr::ShiftRight(..) => builder.build_right_shift(x, y, true, ""),
             _ => panic!(""),
         }))
     }
@@ -483,6 +485,18 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 };
             }
             And(x, y) | Or(x, y) | XOr(x, y) => {
+                let (bx, by) =
+                    self.get_binop_args(builder, fd, x.as_ref(), y.as_ref(), locals, type_hint);
+
+                return if let (Some(IntValue(ix)), Some(IntValue(iy))) = (bx, by) {
+                    self.build_int_bin_op(builder, ix, iy, &node.payload)
+                } else {
+                    self.iw
+                        .error(CompilerError::new(node.loc, Error::UnexpectedType(None)));
+                    None
+                };
+            }
+            ShiftLeft(x, y) | ShiftRight(x, y) => {
                 let (bx, by) =
                     self.get_binop_args(builder, fd, x.as_ref(), y.as_ref(), locals, type_hint);
 
