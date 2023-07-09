@@ -89,6 +89,8 @@ peg::parser! {
 
         rule _() = (comment() / [' ' | '\t' | '\r' | '\n'])*
 
+        rule __() = [' ' | '\t' | '\r' | '\n']+
+
         rule array_expr() -> Expr =
         "[" _ es:top_level_expr()**"," _ "]" { Expr::Array(es) }
 
@@ -111,7 +113,7 @@ peg::parser! {
 
             ae:array_expr() { ae }
             --
-            x:(@) _ "as" _ ty:typename() { Expr::Cast(Box::new(x), ty) }
+            x:(@) __() "as" __() ty:typename() { Expr::Cast(Box::new(x), ty) }
             x:(@) _ "==" _ y:@ { Expr::Equality(Box::new(x), Box::new(y)) }
             x:(@) _ "!=" _ y:@ { Expr::NotEqual(Box::new(x), Box::new(y)) }
             x:(@) _ ">" _ y:@ { Expr::GreaterThan(Box::new(x), Box::new(y)) }
@@ -119,13 +121,13 @@ peg::parser! {
             x:(@) _ ">=" _ y:@ { Expr::GreaterEqual(Box::new(x), Box::new(y)) }
             x:(@) _ "<=" _ y:@ { Expr::LessEqual(Box::new(x), Box::new(y)) }
             --
-            "alloc" _ ty:typename() _ init:alloc_init_expr()? {
+            "alloc" __() ty:typename() _ init:alloc_init_expr()? {
                 Expr::Alloc(ty, init)
             }
-            "incref" _ e:expr() _ { Expr::Incref(Box::new(e)) }
-            "getref" _ e:expr() _ { Expr::Getref(Box::new(e)) }
-            "sizeof" _ "expr" _ e:expr() _ { Expr::SizeofVar(Box::new(e)) }
-            "sizeof" _ "type" _ ty:typename() _ { Expr::SizeofTy(ty) }
+            "incref" __() e:expr() _ { Expr::Incref(Box::new(e)) }
+            "getref" __() e:expr() _ { Expr::Getref(Box::new(e)) }
+            "sizeof" __() "expr" __() e:expr() _ { Expr::SizeofVar(Box::new(e)) }
+            "sizeof" __() "type" __() ty:typename() _ { Expr::SizeofTy(ty) }
             --
             x:(@) _ "+" _ y:@ { Expr::Addition(Box::new(x), Box::new(y)) }
             x:(@) _ "||" _ y:@ { Expr::Or(Box::new(x), Box::new(y)) }
@@ -147,8 +149,8 @@ peg::parser! {
             "&" lv:lvalue() _ { Expr::AddressOf(lv) }
             "*" e:expr() { Expr::Deref(Box::new(e)) }
             --
-            "inc" _ lv:lvalue() { Expr::Increment(lv) }
-            "dec" _ lv:lvalue() { Expr::Decrement(lv) }
+            "inc" __() lv:lvalue() { Expr::Increment(lv) }
+            "dec" __() lv:lvalue() { Expr::Decrement(lv) }
             --
             n:number() { Expr::ConstInt(n) }
             s:strlit() { Expr::ConstString(s) }
@@ -170,7 +172,7 @@ peg::parser! {
         _ "=" _ e:top_level_expr() _ { e }
 
         rule var_decl_body() -> VarDecl =
-        rw:var_decl_rw_ro() _ i:ident() _ ty:type_decl()? _ e:eq_assignment()? {
+        rw:var_decl_rw_ro() __() i:ident() _ ty:type_decl()? _ e:eq_assignment()? {
             VarDecl{name:i,ty,val:e,rw}
         }
 
@@ -179,8 +181,11 @@ peg::parser! {
             Statement { loc:Location{start,end}, payload:Stmt::VarDecl(vd) }
         }
 
+        rule ret_payload() -> Expression =
+        __() e:top_level_expr() { e }
+
         rule ret() -> Statement =
-        start:position!() "return" _ e:top_level_expr()? end:position!() { Statement { loc:Location{start,end}, payload:Stmt::Return(e) } }
+        start:position!() "return" e:ret_payload()? end:position!() { Statement { loc:Location{start,end}, payload:Stmt::Return(e) } }
 
         #[cache_left_rec]
         rule lvalue() -> Lvalue =
@@ -224,10 +229,10 @@ peg::parser! {
         rule struct_entry() -> StructEntryDecl = field_decl() / init_decl() / dealloc_decl();
 
         rule ref_val_decl() -> bool =
-        _ s:$("ref" / "val") _ { s == "ref" }
+        _ s:$("ref" / "val") __() { s == "ref" }
 
         rule struct_decl() -> TopLevelDeclaration =
-        _ start:position!() rd:ref_val_decl()? "type" _ n:ident() _ "{" _ f:(struct_entry()**",") _ "}" end:position!() _ {
+        _ start:position!() rd:ref_val_decl()? "type" __() n:ident() _ "{" _ f:(struct_entry()**",") _ "}" end:position!() _ {
             let ms = if rd.unwrap_or(true) { crate::codegen::structure::MemoryStrategy::ByReference } else { crate::codegen::structure::MemoryStrategy::ByValue };
             let sd = RawStructDecl { loc:Location{start,end}, name:n, ms, entries:f };
             TopLevelDeclaration::structure(sd.loc, sd)
@@ -250,10 +255,10 @@ peg::parser! {
         }
 
         rule decrefstmt() -> Statement =
-        start:position!() "decref" _ c:top_level_expr() _ end:position!() { Statement { loc:Location{start,end}, payload:Stmt::Decref(Box::new(c)) } }
+        start:position!() "decref" __() c:top_level_expr() _ end:position!() { Statement { loc:Location{start,end}, payload:Stmt::Decref(Box::new(c)) } }
 
         rule assertstmt() -> Statement =
-        start:position!() "assert" _ c:top_level_expr() _ end:position!() { Statement { loc:Location{start,end}, payload:Stmt::Assert(Box::new(c)) } }
+        start:position!() "assert" __() c:top_level_expr() _ end:position!() { Statement { loc:Location{start,end}, payload:Stmt::Assert(Box::new(c)) } }
 
         rule typealiasstmt() -> Statement =
         decl:typealias() {
@@ -273,13 +278,13 @@ peg::parser! {
         _ "ret" _ ty:typename() _ { ty }
 
         rule extern_function() -> TopLevelDeclaration =
-        _ start:position!() "extern" _ v:("vararg")? _ "func" _ name:ident() "(" _ args:func_arg()**"," _ ")" _ ty:function_ret()? _ ";" _ end:position!() _ {
+        _ start:position!() "extern" __() v:("vararg")? "func" __() name:ident() "(" _ args:func_arg()**"," _ ")" _ ty:function_ret()? _ ";" _ end:position!() _ {
             let decl = FunctionDecl { loc:Location{start,end}, name,args,vararg:v.is_some(),ty };
             TopLevelDeclaration::extern_function(decl.loc, decl)
         }
 
         rule inner_function_def() -> FunctionDefinition =
-        _ start:position!() "func" _ name:ident() "(" _ args:func_arg()**"," _ ")" _ ty:function_ret()? decl_end:position!() _ body:block() end:position!() _ {
+        _ start:position!() "func" __() name:ident() "(" _ args:func_arg()**"," _ ")" _ ty:function_ret()? decl_end:position!() _ body:block() end:position!() _ {
             let decl = FunctionDecl { loc:Location{start,end:decl_end}, name,args,vararg:false,ty };
             FunctionDefinition { decl,body }
         }
@@ -298,7 +303,7 @@ peg::parser! {
         }
 
         rule typealias() -> TypeAliasDecl =
-        _ start:position!() "type" _ name:ident() _ "=" _ ty:typename() _ end:position!() _ {
+        _ start:position!() "type" __() name:ident() _ "=" _ ty:typename() _ end:position!() _ {
             TypeAliasDecl {loc:Location{start,end}, name, ty}
         }
 
@@ -308,7 +313,7 @@ peg::parser! {
         }
 
         rule impl_def() -> ImplDecl =
-        _ start:position!() "impl" _ name:ident() _ "{" _ methods:method_def()* _ "}" _ end:position!() _ {
+        _ start:position!() "impl" __() name:ident() _ "{" _ methods:method_def()* _ "}" _ end:position!() _ {
             ImplDecl { loc:Location{start,end}, name, methods }
         }
 
