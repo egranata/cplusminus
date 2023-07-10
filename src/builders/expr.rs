@@ -17,12 +17,12 @@ use std::cmp::max;
 use either::Either;
 use inkwell::{
     builder::Builder,
-    types::{BasicTypeEnum, FunctionType, IntType, StructType},
+    types::{BasicTypeEnum, FloatType, FunctionType, IntType, StructType},
     values::{
-        BasicMetadataValueEnum, BasicValueEnum, CallableValue, FunctionValue, IntValue,
+        BasicMetadataValueEnum, BasicValueEnum, CallableValue, FloatValue, FunctionValue, IntValue,
         PointerValue,
     },
-    IntPredicate,
+    FloatPredicate, IntPredicate,
 };
 
 use crate::{
@@ -192,6 +192,30 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         Some(aargs)
     }
 
+    fn widen_flt_if_needed(
+        &self,
+        builder: &Builder<'a>,
+        x: FloatValue<'a>,
+        y: FloatValue<'a>,
+    ) -> (FloatValue<'a>, FloatValue<'a>) {
+        let x_type = x.get_type();
+        let y_type = y.get_type();
+        if x_type == y_type {
+            // both 32 or both 64
+            (x, y)
+        } else if x_type == self.iw.builtins.float64 {
+            // then y must be float32
+            assert!(y_type == self.iw.builtins.float32);
+            let y = builder.build_float_ext(y, x_type, "");
+            (x, y)
+        } else {
+            // then x must be float32
+            assert!(x_type == self.iw.builtins.float32);
+            let x = builder.build_float_ext(x, y_type, "");
+            (x, y)
+        }
+    }
+
     fn widen_int_if_needed(
         &self,
         builder: &Builder<'a>,
@@ -243,6 +267,43 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         }))
     }
 
+    fn build_flt_bin_op(
+        &self,
+        builder: &Builder<'a>,
+        x: FloatValue<'a>,
+        y: FloatValue<'a>,
+        op: &Expr,
+    ) -> Option<BasicValueEnum<'a>> {
+        use BasicValueEnum::{FloatValue, IntValue};
+        let (x, y) = self.widen_flt_if_needed(builder, x, y);
+        Some(match op {
+            Expr::Addition(..) => FloatValue(builder.build_float_add(x, y, "")),
+            Expr::Subtraction(..) => FloatValue(builder.build_float_sub(x, y, "")),
+            Expr::Multiplication(..) => FloatValue(builder.build_float_mul(x, y, "")),
+            Expr::Division(..) => FloatValue(builder.build_float_div(x, y, "")),
+            Expr::Modulo(..) => FloatValue(builder.build_float_rem(x, y, "")),
+            Expr::Equality(..) => {
+                IntValue(builder.build_float_compare(FloatPredicate::OEQ, x, y, ""))
+            }
+            Expr::NotEqual(..) => {
+                IntValue(builder.build_float_compare(FloatPredicate::ONE, x, y, ""))
+            }
+            Expr::GreaterThan(..) => {
+                IntValue(builder.build_float_compare(FloatPredicate::OGT, x, y, ""))
+            }
+            Expr::LessThan(..) => {
+                IntValue(builder.build_float_compare(FloatPredicate::OLT, x, y, ""))
+            }
+            Expr::GreaterEqual(..) => {
+                IntValue(builder.build_float_compare(FloatPredicate::OGE, x, y, ""))
+            }
+            Expr::LessEqual(..) => {
+                IntValue(builder.build_float_compare(FloatPredicate::OLE, x, y, ""))
+            }
+            _ => panic!(""),
+        })
+    }
+
     pub fn build_expr(
         &self,
         builder: &Builder<'a>,
@@ -257,6 +318,11 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
     fn resolve_const_int(&self, n: i64, th: Option<IntType<'a>>) -> IntValue<'a> {
         let ty = th.unwrap_or(self.iw.builtins.int64);
         self.iw.builtins.n(n as u64, ty)
+    }
+
+    fn resolve_const_float(&self, n: f64, th: Option<FloatType<'a>>) -> FloatValue<'a> {
+        let ty = th.unwrap_or(self.iw.builtins.float64);
+        self.iw.builtins.flt_n(n, ty)
     }
 
     fn alloc_value_type(
@@ -430,19 +496,35 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         type_hint: Option<BasicTypeEnum<'a>>,
     ) -> Option<BasicValueEnum<'a>> {
         use crate::ast::Expr::*;
-        use BasicValueEnum::{IntValue, PointerValue};
+        use BasicValueEnum::{FloatValue, IntValue, PointerValue};
 
         match &node.payload {
-            ConstInt(n) => {
-                let th: Option<IntType> = if let Some(type_hint) = type_hint {
-                    match type_hint {
-                        BasicTypeEnum::IntType(it) => Some(it),
-                        _ => None,
+            ConstantNumber(cnum) => {
+                use crate::ast::Number::*;
+                return match cnum {
+                    Integer(n) => {
+                        let th: Option<IntType> = if let Some(type_hint) = type_hint {
+                            match type_hint {
+                                BasicTypeEnum::IntType(it) => Some(it),
+                                _ => None,
+                            }
+                        } else {
+                            None
+                        };
+                        Some(IntValue(self.resolve_const_int(*n, th)))
                     }
-                } else {
-                    None
+                    FloatingPoint(f) => {
+                        let th: Option<FloatType> = if let Some(type_hint) = type_hint {
+                            match type_hint {
+                                BasicTypeEnum::FloatType(ft) => Some(ft),
+                                _ => None,
+                            }
+                        } else {
+                            None
+                        };
+                        Some(FloatValue(self.resolve_const_float(*f, th)))
+                    }
                 };
-                Some(IntValue(self.resolve_const_int(*n, th)))
             }
             ConstString(s) => {
                 let gv = builder.build_global_string_ptr(s, "");
@@ -454,6 +536,10 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
 
                 if let (Some(IntValue(ix)), Some(IntValue(iy))) = (bx, by) {
                     return self.build_int_bin_op(builder, ix, iy, &node.payload);
+                }
+
+                if let (Some(FloatValue(ix)), Some(FloatValue(iy))) = (bx, by) {
+                    return self.build_flt_bin_op(builder, ix, iy, &node.payload);
                 }
 
                 if let (Some(PointerValue(px)), Some(IntValue(iy))) = (bx, by) {
@@ -476,13 +562,17 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 let (bx, by) =
                     self.get_binop_args(builder, fd, x.as_ref(), y.as_ref(), locals, type_hint);
 
-                return if let (Some(IntValue(ix)), Some(IntValue(iy))) = (bx, by) {
-                    self.build_int_bin_op(builder, ix, iy, &node.payload)
-                } else {
-                    self.iw
-                        .error(CompilerError::new(node.loc, Error::UnexpectedType(None)));
-                    None
-                };
+                if let (Some(IntValue(ix)), Some(IntValue(iy))) = (bx, by) {
+                    return self.build_int_bin_op(builder, ix, iy, &node.payload);
+                }
+
+                if let (Some(FloatValue(ix)), Some(FloatValue(iy))) = (bx, by) {
+                    return self.build_flt_bin_op(builder, ix, iy, &node.payload);
+                }
+
+                self.iw
+                    .error(CompilerError::new(node.loc, Error::UnexpectedType(None)));
+                None
             }
             And(x, y) | Or(x, y) | XOr(x, y) => {
                 let (bx, by) =
@@ -512,6 +602,8 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 let bx = self.build_expr(builder, fd, x.as_ref(), locals, type_hint);
                 if let Some(IntValue(x)) = bx {
                     Some(IntValue(builder.build_int_neg(x, "")))
+                } else if let Some(FloatValue(x)) = bx {
+                    Some(FloatValue(builder.build_float_neg(x, "")))
                 } else {
                     self.iw
                         .error(CompilerError::new(node.loc, Error::UnexpectedType(None)));
@@ -537,13 +629,17 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 let (bx, by) =
                     self.get_binop_args(builder, fd, x.as_ref(), y.as_ref(), locals, type_hint);
 
-                return if let (Some(IntValue(ix)), Some(IntValue(iy))) = (bx, by) {
-                    self.build_int_bin_op(builder, ix, iy, &node.payload)
-                } else {
-                    self.iw
-                        .error(CompilerError::new(node.loc, Error::UnexpectedType(None)));
-                    None
-                };
+                if let (Some(IntValue(ix)), Some(IntValue(iy))) = (bx, by) {
+                    return self.build_int_bin_op(builder, ix, iy, &node.payload);
+                }
+
+                if let (Some(FloatValue(ix)), Some(FloatValue(iy))) = (bx, by) {
+                    return self.build_flt_bin_op(builder, ix, iy, &node.payload);
+                }
+
+                self.iw
+                    .error(CompilerError::new(node.loc, Error::UnexpectedType(None)));
+                None
             }
             FunctionCall(id, args) => {
                 let mut fv: Option<FunctionCallData<'a>> = None;

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::num::ParseFloatError;
+
 use crate::ast::*;
 use peg;
 
@@ -38,7 +40,7 @@ fn is_valid_ident_next(x: char) -> bool {
             || unic_emoji_char::is_emoji(x))
 }
 
-fn parse_number(x: &str) -> Result<i64, std::num::ParseIntError> {
+fn parse_integer(x: &str) -> Result<i64, std::num::ParseIntError> {
     return if let Some(x) = x.strip_prefix("0x") {
         i64::from_str_radix(x, 16)
     } else if let Some(x) = x.strip_prefix("0b") {
@@ -50,24 +52,41 @@ fn parse_number(x: &str) -> Result<i64, std::num::ParseIntError> {
     };
 }
 
+fn parse_double(x: &str) -> Result<f64, ParseFloatError> {
+    x.parse::<f64>()
+}
+
 peg::parser! {
     pub grammar cpm() for str {
-
         rule integer_prefix() -> String =
         p:$("0" ['b' | 'x' | 'o']) { String::from(p) }
         rule integer_digit() -> char =
         c:['0'..='9' | 'A'..='F' | 'a'..='f'] { c }
-
-        rule integer_number() -> Result<i64,std::num::ParseIntError> =
+        rule maybe_integer_number() -> Result<i64,std::num::ParseIntError> =
         p:integer_prefix()? d:integer_digit()+ {
             let digits = d.iter().collect::<String>();
             let prefix = p.unwrap_or(String::new());
             let full_number = &[prefix,digits].join("");
-            parse_number(full_number)
+            parse_integer(full_number)
         }
 
-        rule number() -> i64
-        = n:integer_number() {? n.or(Err("u64")) };
+        rule floating_digit() -> char =
+        c:['0'..='9'] { c }
+        rule floating_digits() -> String =
+        s:$(floating_digit()+) {String::from(s)}
+        rule maybe_floating_number() -> Result<f64,ParseFloatError> =
+        i:floating_digits() "." f:floating_digits() { parse_double(&format!("{i}.{f}")) }
+
+        // done this way so the parser can backtrack in case of
+        // a parse error and try alternative routes
+        rule integer_number() -> i64
+        = n:maybe_integer_number() {? n.or(Err("i64")) };
+        rule floating_number() -> f64
+        = n:maybe_floating_number() {? n.or(Err("f64")) };
+
+        rule number() -> Number
+        = f:floating_number() { Number::FloatingPoint(f) } /
+          i:integer_number() { Number::Integer(i) }
 
         rule strlit() -> String
         = "\"" s:$((!"\"" [_])*) "\"" { escape_string(s) }
@@ -80,7 +99,7 @@ peg::parser! {
         rule typename_ptr() -> TypeDescriptor =
         "*" t:typename() { TypeDescriptor::Pointer(Box::new(t)) }
         rule typename_arr() -> TypeDescriptor =
-        "[" n:number() "]" t:typename() { TypeDescriptor::Array(Box::new(t),n as usize) }
+        "[" n:integer_number() "]" t:typename() { TypeDescriptor::Array(Box::new(t),n as usize) }
         rule typename_func() -> TypeDescriptor =
         "fn" _ "(" _ at:typename()**"," _ ")" _ "ret" _ rt:typename() { TypeDescriptor::Function(at, Box::new(rt), false) }
 
@@ -166,7 +185,7 @@ peg::parser! {
             "&" lv:lvalue() _ { Expr::AddressOf(lv) }
             "*" e:expr() { Expr::Deref(Box::new(e)) }
             --
-            n:number() { Expr::ConstInt(n) }
+            n:number() { Expr::ConstantNumber(n) }
             s:strlit() { Expr::ConstString(s) }
             lv:lvalue() { Expr::Rvalue(lv) }
             "(" _ e:expr() _ ")" { e.payload }

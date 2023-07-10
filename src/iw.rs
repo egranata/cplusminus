@@ -17,8 +17,8 @@ use inkwell::{
     module::{Linkage, Module},
     passes::{PassManager, PassManagerBuilder},
     targets::{Target, TargetTriple},
-    types::{BasicTypeEnum, IntType, VoidType},
-    values::{BasicValueEnum, FunctionValue, IntValue},
+    types::{BasicTypeEnum, FloatType, IntType, VoidType},
+    values::{BasicValueEnum, FloatValue, FunctionValue, IntValue},
 };
 use peg::{error::ParseError, str::LineCol};
 use std::{cell::RefCell, collections::HashMap, path::Path, process::Command, rc::Rc};
@@ -76,6 +76,8 @@ pub struct BuiltinTypes<'a> {
     pub byte: IntType<'a>,
     pub int32: IntType<'a>,
     pub int64: IntType<'a>,
+    pub float32: FloatType<'a>,
+    pub float64: FloatType<'a>,
     pub void: VoidType<'a>,
 }
 
@@ -86,6 +88,8 @@ impl<'a> BuiltinTypes<'a> {
             byte: c.i8_type(),
             int32: c.i32_type(),
             int64: c.i64_type(),
+            float32: c.f32_type(),
+            float64: c.f64_type(),
             void: c.void_type(),
         }
     }
@@ -100,6 +104,18 @@ impl<'a> BuiltinTypes<'a> {
 
     pub fn n(&self, val: u64, i: IntType<'a>) -> IntValue<'a> {
         i.const_int(val, false)
+    }
+
+    pub fn flt_zero(&self, i: FloatType<'a>) -> FloatValue<'a> {
+        i.const_zero()
+    }
+
+    pub fn flt_one(&self, i: FloatType<'a>) -> FloatValue<'a> {
+        self.flt_n(1.0, i)
+    }
+
+    pub fn flt_n(&self, val: f64, i: FloatType<'a>) -> FloatValue<'a> {
+        i.const_float(val)
     }
 }
 
@@ -152,6 +168,10 @@ impl<'a> CompilerCore<'a> {
             .insert_alias("int32", IntType(self.builtins.int32), true);
         self.globals
             .insert_alias("int64", IntType(self.builtins.int64), true);
+        self.globals
+            .insert_alias("float64", FloatType(self.builtins.float64), true);
+        self.globals
+            .insert_alias("float32", FloatType(self.builtins.float32), true);
         self.globals
             .insert_alias("bool", IntType(self.builtins.bool), true);
     }

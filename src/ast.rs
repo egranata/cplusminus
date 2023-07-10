@@ -188,9 +188,15 @@ pub enum AllocInitializer {
     ByInit(Vec<Expression>),
 }
 
+#[derive(Clone, Debug, Copy)]
+pub enum Number {
+    Integer(i64),
+    FloatingPoint(f64),
+}
+
 #[derive(Clone, Debug)]
 pub enum Expr {
-    ConstInt(i64),
+    ConstantNumber(Number),
     ConstString(String),
     Addition(Box<Expression>, Box<Expression>),
     Subtraction(Box<Expression>, Box<Expression>),
@@ -234,7 +240,15 @@ impl Expr {
     }
 
     pub fn as_int_const(&self) -> Option<i64> {
-        if let Expr::ConstInt(n) = &self {
+        if let Expr::ConstantNumber(Number::Integer(n)) = &self {
+            Some(*n)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_float_const(&self) -> Option<f64> {
+        if let Expr::ConstantNumber(Number::FloatingPoint(n)) = &self {
             Some(*n)
         } else {
             None
