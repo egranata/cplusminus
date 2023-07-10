@@ -80,9 +80,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
             } else {
                 self.iw.error(CompilerError::new(
                     node.cond.loc,
-                    Error::UnexpectedType(Some(
-                        "only boolean values can be used in conditionals".to_owned(),
-                    )),
+                    Error::UnexpectedType(Some("boolean".to_owned())),
                 ));
             }
         } else {
@@ -142,8 +140,9 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
             }
             Return(expr) => {
                 if expr.is_some() != func.get_type().get_return_type().is_some() {
-                    let msg =
-                        String::from("this function returns void (maybe forgot a ret clause?)");
+                    let msg = String::from(
+                        "no return value for void function (maybe forgot a ret clause?)",
+                    );
                     self.iw.error(CompilerError::new(
                         node.loc,
                         Error::UnexpectedType(Some(msg)),
@@ -167,7 +166,10 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                             builder.build_store(self.exit.ret_alloca.unwrap(), value);
                             builder.build_unconditional_branch(self.exit.exit_block);
                         } else {
-                            let msg = format!("this function returns {}, which is not the type of this expression", fd.decl.ty.as_ref().unwrap());
+                            let msg = format!(
+                                "{}, which is not the type of this expression",
+                                fd.decl.ty.as_ref().unwrap()
+                            );
                             self.iw.error(CompilerError::new(
                                 node.loc,
                                 Error::UnexpectedType(Some(msg)),
@@ -354,9 +356,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                     if !self.tb.is_boolean(ec.get_type()) {
                         return self.iw.error(CompilerError::new(
                             wh.cond.loc,
-                            Error::UnexpectedType(Some(
-                                "only boolean values can be used in conditionals".to_owned(),
-                            )),
+                            Error::UnexpectedType(Some("boolean".to_owned())),
                         ));
                     }
                     builder.build_conditional_branch(ec.into_int_value(), bb_body, bb_after);
@@ -404,9 +404,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                     } else {
                         self.iw.error(CompilerError::new(
                             expr.loc,
-                            Error::UnexpectedType(Some(
-                                "only boolean values can be used in conditionals".to_owned(),
-                            )),
+                            Error::UnexpectedType(Some("boolean".to_owned())),
                         ));
                     }
                 } else {

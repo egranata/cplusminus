@@ -58,7 +58,7 @@ impl Display for Error {
             }
             Error::UnexpectedType(opt) => {
                 if let Some(opt) = opt {
-                    write!(f, "type mismatch in expression: {opt}")
+                    write!(f, "type mismatch in expression: expected {opt}")
                 } else {
                     write!(f, "type mismatch in expression")
                 }

@@ -106,7 +106,7 @@ impl<'a, 'b> LvalueBuilder<'a, 'b> {
                     pv.mark_written();
                     Ok(pv)
                 } else {
-                    Err(Error::UnexpectedType(Some("expected integer".to_owned())))
+                    Err(Error::UnexpectedType(Some("integer".to_owned())))
                 }
             }
             Lvalue::Decrement(base_lv) => {
@@ -129,7 +129,7 @@ impl<'a, 'b> LvalueBuilder<'a, 'b> {
                     pv.mark_written();
                     Ok(pv)
                 } else {
-                    Err(Error::UnexpectedType(Some("expected integer".to_owned())))
+                    Err(Error::UnexpectedType(Some("integer".to_owned())))
                 }
             }
             Lvalue::Dotted(base, field_name) => {
@@ -198,13 +198,11 @@ impl<'a, 'b> LvalueBuilder<'a, 'b> {
                         let is_ptr = base_obj.ptr.get_type().get_element_type().is_pointer_type();
                         if !(is_arr || is_ptr) {
                             return Err(Error::UnexpectedType(Some(
-                                "base object not an array or pointer".to_owned(),
+                                "array or pointer base".to_owned(),
                             )));
                         }
                         if !idx_obj.get_type().is_int_type() {
-                            return Err(Error::UnexpectedType(Some(
-                                "index not an integer".to_owned(),
-                            )));
+                            return Err(Error::UnexpectedType(Some("integer index".to_owned())));
                         }
                         let idx0 = self.iw.builtins.zero(self.iw.builtins.int32);
                         let ptr: PointerValue = unsafe {

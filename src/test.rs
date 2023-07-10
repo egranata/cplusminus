@@ -1777,11 +1777,11 @@ func foo(n: *int64) ret int64 {
 
 func main() ret int64 {
     var a = [123,2];
-    foo(&a);
+    foo(&a[0]);
     a[1] = 1;
-    foo(&a);
+    foo(&a[0]);
     a[1] = 6;
-    foo(&a);
+    foo(&a[0]);
     return a[0];
 }
 "

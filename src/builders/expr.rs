@@ -178,14 +178,29 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
             match arg {
                 FunctionCallArgument::Expr(expr) => {
                     if let Some(aarg) = self.build_expr(builder, fd, expr, locals, type_hint) {
-                        aargs.push(BasicMetadataValueEnum::from(aarg));
+                        let aarg_type = aarg.get_type();
+                        let compat = type_hint.map_or(true, |ft| ft == aarg_type);
+                        if compat {
+                            aargs.push(BasicMetadataValueEnum::from(aarg));
+                        } else {
+                            // safe because compat is always true when no type hint is available
+                            let exp_type = TypeBuilder::descriptor_by_llvm_type(type_hint.unwrap());
+                            self.iw.error(CompilerError::new(
+                                expr.loc,
+                                Error::UnexpectedType(exp_type.map(|t| format!("{t}"))),
+                            ));
+                            return None;
+                        }
                     } else {
                         self.iw
                             .error(CompilerError::new(expr.loc, Error::InvalidExpression));
                         return None;
                     }
                 }
-                FunctionCallArgument::Value(val) => aargs.push(*val),
+                FunctionCallArgument::Value(val) => {
+                    println!("this argument is a value");
+                    aargs.push(*val)
+                }
             }
         }
 
@@ -679,7 +694,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 } else {
                     self.iw.error(CompilerError::new(
                         node.loc,
-                        Error::UnexpectedType(Some("callable function expected".to_owned())),
+                        Error::UnexpectedType(Some("callable function".to_owned())),
                     ));
                     None
                 };
@@ -731,20 +746,20 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     }
 
                     let method_func = method_decl.unwrap().func;
-                    let f_args: Vec<FunctionCallArgument> = mc
+                    let mut f_args: Vec<FunctionCallArgument> = mc
                         .args
                         .iter()
                         .map(|arg| FunctionCallArgument::Expr(arg.clone()))
                         .collect();
+                    f_args.insert(0, FunctionCallArgument::Value(this_arg.unwrap()));
 
-                    return if let Some(mut args) = self.build_function_call_args(
+                    return if let Some(args) = self.build_function_call_args(
                         builder,
                         fd,
                         locals,
                         &f_args,
                         method_func.get_type(),
                     ) {
-                        args.insert(0, this_arg.unwrap());
                         let info = FunctionCallData::from_function(method_func);
                         self.build_function_call(node, builder, &info, &args)
                     } else {
@@ -864,9 +879,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                         } else if eval.get_type() != eval_exprs[0].get_type() {
                             self.iw.error(CompilerError::new(
                                 expr.loc,
-                                Error::UnexpectedType(Some(
-                                    "not all entries are of the same type".to_owned(),
-                                )),
+                                Error::UnexpectedType(Some("uniform typed entries".to_owned())),
                             ));
                             return None;
                         } else {
@@ -926,7 +939,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     if self.tb.is_refcounted_basic_type(ev.get_type()).is_some() {
                         self.iw.error(CompilerError::new(
                             e.loc,
-                            Error::UnexpectedType(Some("type is not a pointer".to_owned())),
+                            Error::UnexpectedType(Some("refcounted type".to_owned())),
                         ));
                         None
                     } else if let PointerValue(pv) = ev {
@@ -934,14 +947,14 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     } else {
                         self.iw.error(CompilerError::new(
                             e.loc,
-                            Error::UnexpectedType(Some("type is not a pointer".to_owned())),
+                            Error::UnexpectedType(Some("refcounted type".to_owned())),
                         ));
                         return None;
                     }
                 } else {
                     self.iw.error(CompilerError::new(
                         e.loc,
-                        Error::UnexpectedType(Some("type is not a pointer".to_owned())),
+                        Error::UnexpectedType(Some("refcounted type".to_owned())),
                     ));
                     None
                 }

@@ -101,10 +101,20 @@ impl<'a> TypeBuilder<'a> {
                 }
                 None
             }
-            BasicTypeEnum::FloatType(_) => None,
             BasicTypeEnum::IntType(it) => {
                 let n = format!("int{}", it.get_bit_width());
                 Some(TypeDescriptor::Name(n))
+            }
+            BasicTypeEnum::FloatType(ft) => {
+                let is_f64 = ft.get_context().f64_type() == ft;
+                if is_f64 {
+                    return Some(TypeDescriptor::Name(String::from("float64")));
+                }
+                let is_f32 = ft.get_context().f32_type() == ft;
+                if is_f32 {
+                    return Some(TypeDescriptor::Name(String::from("float32")));
+                }
+                None
             }
             BasicTypeEnum::PointerType(pt) => {
                 if let Ok(pointee) = BasicTypeEnum::try_from(pt.get_element_type()) {
