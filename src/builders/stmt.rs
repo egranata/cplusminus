@@ -303,9 +303,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                                 insert_decref_if_refcounted(&self.iw, builder, old_value);
                                 insert_incref_if_refcounted(&self.iw, builder, new_value);
                                 builder.build_store(pv.ptr, new_value);
-                                if let Some(var) = pv.var {
-                                    *var.written.borrow_mut() = true;
-                                }
+                                pv.mark_written();
                             } else {
                                 self.iw.error(CompilerError::new(
                                     node.loc,

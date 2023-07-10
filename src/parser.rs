@@ -166,9 +166,6 @@ peg::parser! {
             "&" lv:lvalue() _ { Expr::AddressOf(lv) }
             "*" e:expr() { Expr::Deref(Box::new(e)) }
             --
-            "inc" __() lv:lvalue() { Expr::Increment(lv) }
-            "dec" __() lv:lvalue() { Expr::Decrement(lv) }
-            --
             n:number() { Expr::ConstInt(n) }
             s:strlit() { Expr::ConstString(s) }
             lv:lvalue() { Expr::Rvalue(lv) }
@@ -208,6 +205,8 @@ peg::parser! {
         rule lvalue() -> Lvalue =
         b:lvalue() "[" e:top_level_expr() "]" { Lvalue::Indexed(Box::new(b), Box::new(e)) } /
         b:lvalue() "." i:ident() { Lvalue::Dotted(Box::new(b), i) } /
+        "inc" __() lv:lvalue() { Lvalue::Increment(Box::new(lv)) } /
+        "dec" __() lv:lvalue() { Lvalue::Decrement(Box::new(lv)) } /
         i:ident() { Lvalue::Identifier(i) }
 
         rule assignment() -> Statement =

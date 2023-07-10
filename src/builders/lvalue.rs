@@ -38,6 +38,14 @@ pub struct ResolvedLvalue<'a> {
     pub var: Option<VarInfo<'a>>,
 }
 
+impl<'a> ResolvedLvalue<'a> {
+    pub fn mark_written(&self) {
+        if let Some(vi) = &self.var {
+            *vi.written.borrow_mut() = true
+        }
+    }
+}
+
 impl<'a, 'b> LvalueBuilder<'a, 'b> {
     pub fn new(iw: CompilerCore<'a>, exit: &'b FunctionExitData<'a>) -> Self {
         Self { iw, exit }
@@ -77,6 +85,52 @@ impl<'a, 'b> LvalueBuilder<'a, 'b> {
                 }
 
                 Err(Error::IdentifierNotFound(ident.clone()))
+            }
+            Lvalue::Increment(base_lv) => {
+                let base = self.build_lvalue(builder, fd, base_lv.as_ref(), locals);
+                if let Err(err) = &base {
+                    return Err(err.clone());
+                }
+                let pv = base.unwrap();
+                if !pv.rw {
+                    let name = format!("{base_lv}");
+                    return Err(Error::ReadOnlyIdentifier(name));
+                }
+                let ptr = pv.ptr;
+                let pointee = ptr.get_type().get_element_type();
+                if pointee.is_int_type() && pointee.into_int_type().get_bit_width() != 1 {
+                    let load = builder.build_load(ptr, "").into_int_value();
+                    let add =
+                        builder.build_int_add(load, self.iw.builtins.one(load.get_type()), "");
+                    builder.build_store(ptr, add);
+                    pv.mark_written();
+                    Ok(pv)
+                } else {
+                    Err(Error::UnexpectedType(Some("expected integer".to_owned())))
+                }
+            }
+            Lvalue::Decrement(base_lv) => {
+                let base = self.build_lvalue(builder, fd, base_lv.as_ref(), locals);
+                if let Err(err) = &base {
+                    return Err(err.clone());
+                }
+                let pv = base.unwrap();
+                if !pv.rw {
+                    let name = format!("{base_lv}");
+                    return Err(Error::ReadOnlyIdentifier(name));
+                }
+                let ptr = pv.ptr;
+                let pointee = ptr.get_type().get_element_type();
+                if pointee.is_int_type() && pointee.into_int_type().get_bit_width() != 1 {
+                    let load = builder.build_load(ptr, "").into_int_value();
+                    let add =
+                        builder.build_int_sub(load, self.iw.builtins.one(load.get_type()), "");
+                    builder.build_store(ptr, add);
+                    pv.mark_written();
+                    Ok(pv)
+                } else {
+                    Err(Error::UnexpectedType(Some("expected integer".to_owned())))
+                }
             }
             Lvalue::Dotted(base, field_name) => {
                 let tb = TypeBuilder::new(self.iw.clone());

@@ -149,6 +149,8 @@ pub enum Lvalue {
     Identifier(String),
     Dotted(Box<Lvalue>, String),
     Indexed(Box<Lvalue>, Box<Expression>),
+    Increment(Box<Lvalue>),
+    Decrement(Box<Lvalue>),
 }
 
 impl Display for Lvalue {
@@ -157,6 +159,8 @@ impl Display for Lvalue {
             Lvalue::Identifier(id) => write!(f, "{id}"),
             Lvalue::Dotted(parent, id) => write!(f, "{parent}.{id}"),
             Lvalue::Indexed(parent, _) => write!(f, "{parent}[todo]"),
+            Lvalue::Increment(parent) => write!(f, "inc {parent}"),
+            Lvalue::Decrement(parent) => write!(f, "dec {parent}"),
         }
     }
 }
@@ -206,8 +210,6 @@ pub enum Expr {
     And(Box<Expression>, Box<Expression>),
     Or(Box<Expression>, Box<Expression>),
     XOr(Box<Expression>, Box<Expression>),
-    Increment(Lvalue),
-    Decrement(Lvalue),
     FunctionCall(String, Vec<Expression>),
     MethodCall(MethodCall),
     Alloc(TypeDescriptor, Option<AllocInitializer>),
