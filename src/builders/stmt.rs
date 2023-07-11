@@ -341,6 +341,35 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                     builder.position_at_end(bb_after);
                 }
             }
+            DoWhile(wh) => {
+                // written this way to be as similar as possible to while{}
+                let bb_enter = self.iw.context.append_basic_block(func, "enter");
+                let bb_check = self.iw.context.append_basic_block(func, "check");
+                let bb_after = self.iw.context.append_basic_block(func, "after");
+                builder.build_unconditional_branch(bb_enter);
+                builder.position_at_end(bb_check);
+                if let Some(ec) = self
+                    .eb
+                    .build_expr(builder, fd, wh.cond.as_ref(), locals, None)
+                {
+                    if !self.tb.is_boolean(ec.get_type()) {
+                        return self.iw.error(CompilerError::new(
+                            wh.cond.loc,
+                            Error::UnexpectedType(Some("boolean".to_owned())),
+                        ));
+                    }
+                    builder.build_conditional_branch(ec.into_int_value(), bb_enter, bb_after);
+                    builder.position_at_end(bb_enter);
+                    self.build_stmt(builder, fd, wh.body.as_ref(), locals, func);
+                    if !is_block_terminated(builder.get_insert_block()) {
+                        builder.build_unconditional_branch(bb_check);
+                    }
+                    builder.position_at_end(bb_after);
+                } else {
+                    self.iw
+                        .error(CompilerError::new(wh.cond.loc, Error::InvalidExpression))
+                }
+            }
             While(wh) => {
                 let bb_check = self.iw.context.append_basic_block(func, "check");
                 let bb_body = self.iw.context.append_basic_block(func, "do");

@@ -276,6 +276,12 @@ pub struct WhileStmt {
 }
 
 #[derive(Clone, Debug)]
+pub struct DoWhileStmt {
+    pub body: Box<Statement>,
+    pub cond: Box<Expression>,
+}
+
+#[derive(Clone, Debug)]
 pub enum Stmt {
     VarDecl(VarDecl),
     Return(Option<Expression>),
@@ -284,6 +290,7 @@ pub enum Stmt {
     Block(Vec<Statement>),
     Expression(Box<Expression>),
     While(WhileStmt),
+    DoWhile(DoWhileStmt),
     Decref(Box<Expression>),
     Assert(Box<Expression>),
     TypeAlias(TypeAliasDecl),

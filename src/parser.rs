@@ -289,6 +289,15 @@ peg::parser! {
             Statement { loc:Location{start,end}, payload:Stmt::While(wh) }
         }
 
+        rule dowhilestmt() -> Statement =
+        start:position!() "do" _ blk:block() _ "while" _ "(" c:top_level_expr() _ ")" end:position!()  {
+            let wh = DoWhileStmt {
+                body: Box::new(blk),
+                cond: Box::new(c),
+            };
+            Statement { loc:Location{start,end}, payload:Stmt::DoWhile(wh) }
+        }
+
         rule decrefstmt() -> Statement =
         start:position!() "decref" __() c:top_level_expr() _ end:position!() { Statement { loc:Location{start,end}, payload:Stmt::Decref(Box::new(c)) } }
 
@@ -301,7 +310,7 @@ peg::parser! {
         }
 
         rule top_level_statement() -> Statement =
-        _ v:(var_decl_stmt() / assignment() / typealiasstmt() / function_def_stmt() / ifstmt() / whilestmt() / ret() / decrefstmt() / assertstmt() / block() / expr_stmt()) _ ";" {v}
+        _ v:(var_decl_stmt() / assignment() / typealiasstmt() / function_def_stmt() / ifstmt() / whilestmt() / dowhilestmt() / ret() / decrefstmt() / assertstmt() / block() / expr_stmt()) _ ";" {v}
 
         rule block() -> Statement =
         start:position!() "{" _ s:top_level_statement()* _ "}" end:position!() { Statement { loc:Location{start,end}, payload:Stmt::Block(s) } }
