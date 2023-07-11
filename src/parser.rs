@@ -322,7 +322,7 @@ peg::parser! {
         _ "ret" _ ty:typename() _ { ty }
 
         rule extern_function() -> TopLevelDeclaration =
-        _ start:position!() "extern" __() v:("vararg")? "func" __() name:ident() "(" _ args:func_arg()**"," _ ")" _ ty:function_ret()? _ ";" _ end:position!() _ {
+        _ start:position!() "extern" __() v:("vararg" __)? "func" __() name:ident() "(" _ args:func_arg()**"," _ ")" _ ty:function_ret()? _ ";" _ end:position!() _ {
             let decl = FunctionDecl { loc:Location{start,end}, name,args,vararg:v.is_some(),ty };
             TopLevelDeclaration::extern_function(decl.loc, decl)
         }

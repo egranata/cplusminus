@@ -197,10 +197,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                         return None;
                     }
                 }
-                FunctionCallArgument::Value(val) => {
-                    println!("this argument is a value");
-                    aargs.push(*val)
-                }
+                FunctionCallArgument::Value(val) => aargs.push(*val),
             }
         }
 
