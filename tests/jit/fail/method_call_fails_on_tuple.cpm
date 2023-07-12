@@ -12,18 +12,10 @@
 (* See the License for the specific language governing permissions and *)
 (* limitations under the License. *)
 
-func f_abs(f: float32) ret float32 {
-    return f;
-}
-
-func i_abs(f: int32) ret int32 {
-    return f;
-}
+type T = {int64};
 
 func main() ret int64 {
-    let pi = 3.1415;
-    let pi = f_abs(pi);
-    let three = 3;
-    let three = i_abs(three);
+    let t: T = {123};
+    t->foo();
     return 0;
 }

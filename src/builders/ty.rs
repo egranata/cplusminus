@@ -66,6 +66,23 @@ impl<'a> TypeBuilder<'a> {
         }
     }
 
+    pub fn is_tuple_type(st: StructType) -> bool {
+        st.get_name().is_none()
+    }
+
+    pub fn is_valtype_with_refcount_field(&self, st: StructType<'a>) -> bool {
+        if self.is_value_type(st) || TypeBuilder::is_tuple_type(st) {
+            for fd in st.get_field_types() {
+                if self.is_refcounted_basic_type(fd).is_some() {
+                    return true;
+                }
+            }
+            false
+        } else {
+            false
+        }
+    }
+
     pub fn any_type_from_basic(ty: BasicTypeEnum) -> AnyTypeEnum {
         match ty {
             BasicTypeEnum::ArrayType(at) => AnyTypeEnum::ArrayType(at),
@@ -125,8 +142,22 @@ impl<'a> TypeBuilder<'a> {
                 None
             }
             BasicTypeEnum::StructType(st) => {
-                let n = st.get_name().unwrap().to_str().unwrap().to_owned();
-                Some(TypeDescriptor::Name(n))
+                if let Some(n) = st.get_name() {
+                    let n = n.to_str().unwrap().to_owned();
+                    Some(TypeDescriptor::Name(n))
+                } else {
+                    let fts: Vec<Option<TypeDescriptor>> = st
+                        .get_field_types()
+                        .iter()
+                        .map(|bt| TypeBuilder::descriptor_by_llvm_type(*bt))
+                        .collect();
+                    if fts.iter().any(|td| td.is_none()) {
+                        return None;
+                    }
+                    let fts: Vec<TypeDescriptor> =
+                        fts.iter().map(|ft| ft.clone().unwrap()).collect();
+                    Some(TypeDescriptor::Tuple(fts))
+                }
             }
             BasicTypeEnum::VectorType(_) => None,
         }
@@ -177,6 +208,18 @@ impl<'a> TypeBuilder<'a> {
                 } else {
                     None
                 }
+            }
+            TypeDescriptor::Tuple(at) => {
+                let eltys: Vec<Option<BasicTypeEnum<'a>>> = at
+                    .iter()
+                    .map(|td| self.llvm_type_by_descriptor(scope, td))
+                    .collect();
+                if eltys.iter().any(|at| at.is_none()) {
+                    return None;
+                }
+                let eltys: Vec<BasicTypeEnum<'a>> = eltys.iter().map(|x| x.unwrap()).collect();
+                let raw_struct = self.iw.context.struct_type(&eltys, false);
+                Some(BasicTypeEnum::StructType(raw_struct))
             }
         }
     }
@@ -441,8 +484,12 @@ impl<'a> TypeBuilder<'a> {
     }
 
     pub fn struct_by_name(&self, st: StructType) -> Option<Structure<'a>> {
-        let name = st.get_name().unwrap().to_str().unwrap();
-        return self.iw.structs.borrow().get(name).cloned();
+        if TypeBuilder::is_tuple_type(st) {
+            None
+        } else {
+            let name = st.get_name().unwrap().to_str().unwrap();
+            self.iw.structs.borrow().get(name).cloned()
+        }
     }
 
     fn is_refcounted_type(&self, sty: StructType<'a>) -> bool {

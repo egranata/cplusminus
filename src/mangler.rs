@@ -14,7 +14,10 @@
 
 use inkwell::types::StructType;
 
-use crate::ast::{FunctionDecl, FunctionDefinition, ProperStructDecl};
+use crate::{
+    ast::{FunctionDecl, FunctionDefinition, ProperStructDecl},
+    builders::ty::TypeBuilder,
+};
 
 pub enum SpecialMemberFunction {
     Initializer,
@@ -23,6 +26,8 @@ pub enum SpecialMemberFunction {
 }
 
 pub fn mangle_special_method(self_decl: StructType<'_>, func: SpecialMemberFunction) -> String {
+    assert!(!TypeBuilder::is_tuple_type(self_decl));
+
     let type_name = self_decl.get_name().unwrap().to_str().unwrap();
     let func_name = match func {
         SpecialMemberFunction::Initializer => "init",

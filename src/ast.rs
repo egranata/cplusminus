@@ -28,6 +28,22 @@ pub enum TypeDescriptor {
     Pointer(Box<TypeDescriptor>),
     Array(Box<TypeDescriptor>, usize),
     Function(Vec<TypeDescriptor>, Box<TypeDescriptor>, bool),
+    Tuple(Vec<TypeDescriptor>),
+}
+
+fn join_commad_list<T: Display>(l: &[T]) -> String {
+    let mut out = String::from("");
+    let mut first = true;
+    for item in l {
+        if first {
+            out = format!("{item}");
+            first = false;
+        } else {
+            out = format!("{out},{item}");
+        }
+    }
+
+    out
 }
 
 impl Display for TypeDescriptor {
@@ -36,7 +52,18 @@ impl Display for TypeDescriptor {
             TypeDescriptor::Name(name) => write!(f, "{name}"),
             TypeDescriptor::Pointer(pte) => write!(f, "*{pte}"),
             TypeDescriptor::Array(ty, sz) => write!(f, "[{sz}]{ty}"),
-            TypeDescriptor::Function(..) => write!(f, "func todo"),
+            TypeDescriptor::Function(args, ret, vararg) => {
+                let s = join_commad_list(args);
+                write!(
+                    f,
+                    "{}fn({s}) ret {ret}",
+                    if *vararg { "vararg " } else { "" }
+                )
+            }
+            TypeDescriptor::Tuple(at) => {
+                let s = join_commad_list(at);
+                write!(f, "tuple({s})")
+            }
         }
     }
 }
@@ -227,6 +254,7 @@ pub enum Expr {
     SizeofVar(Box<Expression>),
     SizeofTy(TypeDescriptor),
     Deref(Box<Expression>),
+    Tuple(Vec<Expression>),
     AddressOf(Lvalue),
 }
 

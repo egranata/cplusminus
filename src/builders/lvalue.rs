@@ -196,10 +196,16 @@ impl<'a, 'b> LvalueBuilder<'a, 'b> {
                     (Ok(base_obj), Some(idx_obj)) => {
                         let is_arr = base_obj.ptr.get_type().get_element_type().is_array_type();
                         let is_ptr = base_obj.ptr.get_type().get_element_type().is_pointer_type();
-                        if !(is_arr || is_ptr) {
-                            return Err(Error::UnexpectedType(Some(
-                                "array or pointer base".to_owned(),
-                            )));
+                        let is_tuple = base_obj.ptr.get_type().get_element_type().is_struct_type()
+                            && TypeBuilder::is_tuple_type(
+                                base_obj
+                                    .ptr
+                                    .get_type()
+                                    .get_element_type()
+                                    .into_struct_type(),
+                            );
+                        if !(is_arr || is_ptr || is_tuple) {
+                            return Err(Error::UnexpectedType(Some("indexable base".to_owned())));
                         }
                         if !idx_obj.get_type().is_int_type() {
                             return Err(Error::UnexpectedType(Some("integer index".to_owned())));
@@ -210,6 +216,17 @@ impl<'a, 'b> LvalueBuilder<'a, 'b> {
                                 builder.build_in_bounds_gep(
                                     base_obj.ptr,
                                     &[idx0, idx_obj.into_int_value()],
+                                    "",
+                                )
+                            } else if is_tuple {
+                                builder.build_in_bounds_gep(
+                                    base_obj.ptr,
+                                    &[
+                                        idx0,
+                                        idx_obj
+                                            .into_int_value()
+                                            .const_cast(self.iw.builtins.int32, false),
+                                    ],
                                     "",
                                 )
                             } else {

@@ -346,8 +346,11 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         node: &Expression,
         init: &Option<AllocInitializer>,
     ) -> Option<BasicValueEnum<'a>> {
+        let struct_def = self.tb.struct_by_name(ty);
+        struct_def.as_ref()?;
+        let struct_def = struct_def.unwrap();
         let mut val = ty.const_zero();
-        let struct_def = self.tb.struct_by_name(ty).unwrap();
+
         match init {
             Some(ai) => match ai {
                 AllocInitializer::ByFieldList(init_list) => {
@@ -406,7 +409,10 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         let ret = builder.build_load(temp_pv, "");
         self.exit.decref_on_exit(temp_pv);
 
-        let struct_def = self.tb.struct_by_name(ty).unwrap();
+        let struct_def = self.tb.struct_by_name(ty);
+        struct_def.as_ref()?;
+        let struct_def = struct_def.unwrap();
+
         match init {
             Some(ai) => match ai {
                 AllocInitializer::ByFieldList(init_list) => {
@@ -736,6 +742,12 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                                 return None;
                             }
                         }
+                    } else {
+                        self.iw.error(CompilerError::new(
+                            mc.this.loc,
+                            Error::UnexpectedType(Some("value or refcounted type".to_owned())),
+                        ));
+                        return None;
                     }
 
                     if !matched {
@@ -900,6 +912,40 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 }
 
                 return Some(BasicValueEnum::ArrayValue(arr));
+            }
+            Tuple(exprs) => {
+                let mut eval_exprs: Vec<BasicValueEnum> = vec![];
+                let mut eval_types: Vec<BasicTypeEnum> = vec![];
+                for expr in exprs {
+                    if let Some(eval) = self.build_expr(builder, fd, expr, locals, type_hint) {
+                        eval_exprs.push(eval);
+                        eval_types.push(eval.get_type());
+                    } else {
+                        return None;
+                    }
+                }
+
+                let tuple_struct_type = self.iw.context.struct_type(&eval_types, false);
+                let tuple_struct_alloca = builder.build_alloca(tuple_struct_type, "");
+                let mut tuple_struct_value = builder
+                    .build_load(tuple_struct_alloca, "")
+                    .into_struct_value();
+                for (idx, val) in eval_exprs.iter().enumerate() {
+                    tuple_struct_value = builder
+                        .build_insert_value(tuple_struct_value, *val, idx as u32, "")
+                        .unwrap()
+                        .into_struct_value();
+                }
+
+                if self.tb.is_valtype_with_refcount_field(tuple_struct_type) {
+                    self.iw.error(CompilerError::new(
+                        node.loc,
+                        Error::RefTypeInValTypeForbidden,
+                    ));
+                    return None;
+                }
+
+                return Some(BasicValueEnum::StructValue(tuple_struct_value));
             }
             SizeofVar(e) => self
                 .build_expr(builder, fd, e.as_ref(), locals, type_hint)

@@ -24,7 +24,7 @@ fn escape_string(x: &str) -> String {
 }
 
 fn is_syntactically_magic(x: char) -> bool {
-    x == '[' || x == '*'
+    x == '[' || x == '*' || x == '{'
 }
 
 fn is_valid_ident_first(x: char) -> bool {
@@ -92,7 +92,7 @@ peg::parser! {
         = "\"" s:$((!"\"" [_])*) "\"" { escape_string(s) }
 
         rule ident() -> String =
-        s:$([c if is_valid_ident_first(c)] [c if is_valid_ident_next(c)]*) { s.to_owned() }
+        s:$([c if is_valid_ident_first(c)] [c if is_valid_ident_next(c)]*) {s.to_owned()}
 
         rule typename_ident() -> TypeDescriptor
         = i:ident() { TypeDescriptor::Name(i.clone()) }
@@ -102,10 +102,10 @@ peg::parser! {
         "[" n:integer_number() "]" t:typename() { TypeDescriptor::Array(Box::new(t),n as usize) }
         rule typename_func() -> TypeDescriptor =
         "fn" _ "(" _ at:typename()**"," _ ")" _ "ret" _ rt:typename() { TypeDescriptor::Function(at, Box::new(rt), false) }
-
+        rule typename_tuple() -> TypeDescriptor =
+        "{" _ at:typename()**"," _ "}" { TypeDescriptor::Tuple(at) }
         rule typename() -> TypeDescriptor =
-        _ t:(typename_func() / typename_ident() / typename_ptr() / typename_arr()) _ {t} / expected!("name of a type")
-
+        _ t:(typename_func() / typename_tuple() / typename_ident() / typename_ptr() / typename_arr()) _ {t} / expected!("name of a type")
 
         rule comment_start() -> ()
         = "(*"
@@ -181,7 +181,10 @@ peg::parser! {
                 let mc = MethodCall{ this:Box::new(this), name, args };
                 Expr::MethodCall(mc)
             }
+            --
+            "{" a:func_call_args() "}" { Expr::Tuple(a) }
             i:ident() _ "(" a:func_call_args() ")" { Expr::FunctionCall(i,a) }
+            --
             "&" lv:lvalue() _ { Expr::AddressOf(lv) }
             "*" e:expr() { Expr::Deref(Box::new(e)) }
             --
