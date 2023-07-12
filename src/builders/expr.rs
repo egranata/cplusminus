@@ -914,10 +914,27 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 return Some(BasicValueEnum::ArrayValue(arr));
             }
             Tuple(exprs) => {
+                // this seems tidier than a match + if combination, but clippy disagrees
+                #[allow(clippy::unnecessary_unwrap)]
+                let type_hints: Vec<BasicTypeEnum> = if type_hint.is_some()
+                    && type_hint.unwrap().is_struct_type()
+                    && type_hint
+                        .unwrap()
+                        .into_struct_type()
+                        .get_field_types()
+                        .len()
+                        == exprs.len()
+                {
+                    // jackpot - we can use the type_hint to construct each element of the tuple!
+                    type_hint.unwrap().into_struct_type().get_field_types()
+                } else {
+                    vec![]
+                };
                 let mut eval_exprs: Vec<BasicValueEnum> = vec![];
                 let mut eval_types: Vec<BasicTypeEnum> = vec![];
-                for expr in exprs {
-                    if let Some(eval) = self.build_expr(builder, fd, expr, locals, type_hint) {
+                for expr in exprs.iter().enumerate() {
+                    let type_hint = type_hints.get(expr.0).copied();
+                    if let Some(eval) = self.build_expr(builder, fd, expr.1, locals, type_hint) {
                         eval_exprs.push(eval);
                         eval_types.push(eval.get_type());
                     } else {
