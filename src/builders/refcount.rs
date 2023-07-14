@@ -15,7 +15,7 @@
 use inkwell::{
     builder::Builder,
     context::Context,
-    module::Module,
+    module::{Linkage, Module},
     types::{BasicMetadataTypeEnum, BasicTypeEnum, StructType},
     values::{
         BasicMetadataValueEnum, BasicValueEnum, CallableValue, FunctionValue, IntValue,
@@ -76,7 +76,7 @@ fn build_incref_api<'a>(
     let arg_ty = BasicMetadataTypeEnum::PointerType(__refcount_t.ptr_type(Default::default()));
     let incref_t = void.fn_type(&[arg_ty], false);
 
-    let incref_f = m.add_function("__incref_f", incref_t, Default::default());
+    let incref_f = m.add_function("__incref_f", incref_t, Some(Linkage::Internal));
     let builder = c.create_builder();
 
     let entry = c.append_basic_block(incref_f, "entry");
@@ -146,7 +146,7 @@ fn build_getref_api<'a>(
     let arg_ty = BasicMetadataTypeEnum::PointerType(__refcount_t.ptr_type(Default::default()));
     let incref_t = int64.fn_type(&[arg_ty], false);
 
-    let incref_f = m.add_function("__getref_f", incref_t, Default::default());
+    let incref_f = m.add_function("__getref_f", incref_t, Some(Linkage::Internal));
     let builder = c.create_builder();
 
     let entry = c.append_basic_block(incref_f, "entry");
@@ -215,7 +215,7 @@ fn build_decref_api<'a>(
     let arg_ty = BasicMetadataTypeEnum::PointerType(__refcount_t.ptr_type(Default::default()));
     let decref_t = void.fn_type(&[arg_ty], false);
 
-    let decref_f = m.add_function("__decref_f", decref_t, Default::default());
+    let decref_f = m.add_function("__decref_f", decref_t, Some(Linkage::Internal));
     let builder = c.create_builder();
 
     let one = int64.const_int(1, false);

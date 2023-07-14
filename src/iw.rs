@@ -18,7 +18,7 @@ use inkwell::{
     passes::{PassManager, PassManagerBuilder},
     targets::{Target, TargetTriple},
     types::{BasicTypeEnum, FloatType, IntType, VoidType},
-    values::{BasicValueEnum, FloatValue, FunctionValue, IntValue},
+    values::{BasicValueEnum, FloatValue, FunctionValue, GlobalValue, IntValue},
 };
 use peg::{error::ParseError, str::LineCol};
 use std::{cell::RefCell, collections::HashMap, path::Path, process::Command, rc::Rc};
@@ -176,6 +176,18 @@ impl<'a> CompilerCore<'a> {
             .insert_alias("bool", IntType(self.builtins.bool), true);
     }
 
+    fn make_global(
+        m: &Module<'a>,
+        name: &str,
+        val: BasicValueEnum<'a>,
+        lnk: Linkage,
+    ) -> GlobalValue<'a> {
+        let global = m.add_global(val.get_type(), Default::default(), name);
+        global.set_initializer(&val);
+        global.set_linkage(lnk);
+        global
+    }
+
     fn fill_globals(m: &Module<'a>, c: &'a Context) {
         let bt = c.bool_type();
         let i64 = c.i64_type();
@@ -183,15 +195,11 @@ impl<'a> CompilerCore<'a> {
 
         let itstrue = BasicValueEnum::IntValue(bt.const_int(1, false));
         let itsfalse = BasicValueEnum::IntValue(bt.const_int(0, false));
+        let itszero = BasicValueEnum::IntValue(i64.const_zero());
 
-        m.add_global(bt, Default::default(), "true")
-            .set_initializer(&itstrue);
-        m.add_global(bt, Default::default(), "false")
-            .set_initializer(&itsfalse);
-
-        let freed_objects = BasicValueEnum::IntValue(i64.const_int(0, false));
-        m.add_global(i64, Default::default(), "g_FreedObjects")
-            .set_initializer(&freed_objects);
+        CompilerCore::make_global(m, "true", itstrue, Linkage::Internal);
+        CompilerCore::make_global(m, "false", itsfalse, Linkage::Internal);
+        CompilerCore::make_global(m, "g_FreedObjects", itszero, Linkage::Internal);
 
         let trap_type = void.fn_type(&[], false);
         m.add_function("llvm.trap", trap_type, Some(Linkage::Internal));
