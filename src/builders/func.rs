@@ -30,7 +30,7 @@ use crate::{
 
 use super::{
     refcount::insert_decref_if_refcounted,
-    scope::{Scope, ScopeObject, StoredFunction, VarInfo},
+    scope::{Scope, ScopeObject, VarInfo},
     stmt::StatementBuilder,
     ty::TypeBuilder,
 };
@@ -265,8 +265,7 @@ impl<'a> FunctionBuilder<'a> {
             None
         } else if let Some(func_ty) = self.build_function_type(fd) {
             let func = self.iw.module.add_function(&llvm_func_name, func_ty, None);
-            let sf: StoredFunction = (fd.clone(), func);
-            scope.insert_function(&fd.name, sf, true);
+            scope.insert_function(&fd.name, func, true);
             Some(func)
         } else {
             self.iw
@@ -281,8 +280,8 @@ impl<'a> FunctionBuilder<'a> {
         fd: &FunctionDefinition,
     ) -> Option<FunctionValue<'a>> {
         if let Some(func) = scope.find_function(&fd.decl.name, true) {
-            self.build_body(func.1, fd);
-            Some(func.1)
+            self.build_body(func, fd);
+            Some(func)
         } else {
             self.iw
                 .error(CompilerError::new(fd.decl.loc, Error::UnexpectedType(None)));

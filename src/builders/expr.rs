@@ -661,7 +661,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
             }
             FunctionCall(id, args) => {
                 let mut fv: Option<FunctionCallData<'a>> = None;
-                if let Some((_, fbyname)) = locals.find_function(id, true) {
+                if let Some(fbyname) = locals.find_function(id, true) {
                     fv = Some(FunctionCallData::from_function(fbyname));
                 } else {
                     let candidate_expr = Expression {

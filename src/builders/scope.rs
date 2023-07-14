@@ -19,10 +19,7 @@ use inkwell::{
     values::{FunctionValue, PointerValue},
 };
 
-use crate::{
-    ast::{FunctionDecl, Location},
-    codegen::MutableOf,
-};
+use crate::{ast::Location, codegen::MutableOf};
 
 #[derive(Clone)]
 pub struct VarInfo<'a> {
@@ -110,13 +107,11 @@ impl<T: Clone> HierarchicalStorage<T> {
     }
 }
 
-pub type StoredFunction<'a> = (FunctionDecl, FunctionValue<'a>);
-
 #[derive(Clone)]
 pub struct ScopeObject<'a> {
     pub variables: Rc<HierarchicalStorage<VarInfo<'a>>>,
     pub aliases: Rc<HierarchicalStorage<BasicTypeEnum<'a>>>,
-    pub functions: Rc<HierarchicalStorage<StoredFunction<'a>>>,
+    pub functions: Rc<HierarchicalStorage<FunctionValue<'a>>>,
 }
 
 impl<'a> ScopeObject<'a> {
@@ -152,11 +147,11 @@ impl<'a> ScopeObject<'a> {
         self.aliases.insert(name, val, overwrite)
     }
 
-    pub fn find_function(&self, name: &str, recurse: bool) -> Option<StoredFunction<'a>> {
+    pub fn find_function(&self, name: &str, recurse: bool) -> Option<FunctionValue<'a>> {
         self.functions.find(name, recurse)
     }
 
-    pub fn insert_function(&self, name: &str, val: StoredFunction<'a>, overwrite: bool) -> bool {
+    pub fn insert_function(&self, name: &str, val: FunctionValue<'a>, overwrite: bool) -> bool {
         self.functions.insert(name, val, overwrite)
     }
 }
