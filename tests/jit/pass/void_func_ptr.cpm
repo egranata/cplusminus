@@ -1,0 +1,22 @@
+var counter: int64;
+
+func foo(x: int64) {
+    counter = counter + x;
+}
+
+func bar() {
+    inc counter;
+}
+
+type fp0 = fn();
+type fp1 = fn(int64);
+
+func main() ret int64 {
+    let a: fp0 = bar;
+    let b: fp1 = foo;
+
+    a();
+    b(3);
+
+    return counter - 4;
+}

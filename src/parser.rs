@@ -101,7 +101,7 @@ peg::parser! {
         rule typename_arr() -> TypeDescriptor =
         "[" n:integer_number() "]" t:typename() { TypeDescriptor::Array(Box::new(t),n as usize) }
         rule typename_func() -> TypeDescriptor =
-        "fn" _ "(" _ at:typename()**"," _ ")" _ "ret" _ rt:typename() { TypeDescriptor::Function(at, Box::new(rt), false) }
+        "fn" _ "(" _ at:typename()**"," _ ")" _ rt:function_ret()? { TypeDescriptor::Function(at, rt.map(Box::new), false) }
         rule typename_tuple() -> TypeDescriptor =
         "{" _ at:typename()**"," _ "}" { TypeDescriptor::Tuple(at) }
         rule typename() -> TypeDescriptor =

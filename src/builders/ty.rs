@@ -134,12 +134,19 @@ impl<'a> TypeBuilder<'a> {
                 None
             }
             BasicTypeEnum::PointerType(pt) => {
-                if let Ok(pointee) = BasicTypeEnum::try_from(pt.get_element_type()) {
-                    if let Some(td) = TypeBuilder::descriptor_by_llvm_type(pointee) {
-                        return Some(TypeDescriptor::Pointer(Box::new(td)));
-                    }
+                let pointee = pt.get_element_type();
+                match pointee {
+                    AnyTypeEnum::ArrayType(_)
+                    | AnyTypeEnum::FloatType(_)
+                    | AnyTypeEnum::IntType(_)
+                    | AnyTypeEnum::PointerType(_)
+                    | AnyTypeEnum::StructType(_)
+                    | AnyTypeEnum::VectorType(_) => TypeBuilder::descriptor_by_llvm_type(
+                        BasicTypeEnum::try_from(pointee).unwrap(),
+                    ),
+                    AnyTypeEnum::FunctionType(ft) => TypeBuilder::descriptor_for_function_type(ft),
+                    AnyTypeEnum::VoidType(_) => panic!("unexpected void type"),
                 }
-                None
             }
             BasicTypeEnum::StructType(st) => {
                 if let Some(n) = st.get_name() {
@@ -188,27 +195,9 @@ impl<'a> TypeBuilder<'a> {
                     .llvm_type_by_descriptor(scope, ty.as_ref())
                     .map(|el_ty| BasicTypeEnum::ArrayType(el_ty.array_type(*sz as u32)));
             }
-            TypeDescriptor::Function(args, ret, is_var_args) => {
-                if let Some(ret) = self.llvm_type_by_descriptor(scope, ret.as_ref()) {
-                    let map_args: Vec<Option<BasicTypeEnum>> = args
-                        .iter()
-                        .map(|td| self.llvm_type_by_descriptor(scope, td))
-                        .collect();
-                    if map_args.iter().any(|at| at.is_none()) {
-                        return None;
-                    }
-                    let param_types: Vec<BasicMetadataTypeEnum> = map_args
-                        .iter()
-                        .map(|at| BasicMetadataTypeEnum::try_from(at.unwrap()).unwrap())
-                        .collect();
-                    return Some(BasicTypeEnum::PointerType(
-                        ret.fn_type(&param_types, *is_var_args)
-                            .ptr_type(Default::default()),
-                    ));
-                } else {
-                    None
-                }
-            }
+            TypeDescriptor::Function(..) => self
+                .function_type_for_descriptor(scope, td)
+                .map(|ft| BasicTypeEnum::PointerType(ft.ptr_type(Default::default()))),
             TypeDescriptor::Tuple(at) => {
                 let eltys: Vec<Option<BasicTypeEnum<'a>>> = at
                     .iter()
@@ -244,6 +233,55 @@ impl<'a> TypeBuilder<'a> {
             BasicTypeEnum::PointerType(pt) => pt.size_of(),
             BasicTypeEnum::StructType(st) => st.size_of().unwrap(),
             BasicTypeEnum::VectorType(vt) => vt.size_of().unwrap(),
+        }
+    }
+
+    pub fn descriptor_for_function_type(ty: FunctionType) -> Option<TypeDescriptor> {
+        let return_type = if ty.get_return_type().is_none() {
+            None
+        } else {
+            TypeBuilder::descriptor_by_llvm_type(ty.get_return_type().unwrap()).map(Box::new)
+        };
+        let arg_types: Vec<Option<TypeDescriptor>> = ty
+            .get_param_types()
+            .iter()
+            .map(|at| TypeBuilder::descriptor_by_llvm_type(*at))
+            .collect();
+        if arg_types.iter().any(|at| at.is_none()) {
+            return None;
+        }
+        let arg_types: Vec<TypeDescriptor> = arg_types.iter().map(|x| x.clone().unwrap()).collect();
+        let vararg = ty.is_var_arg();
+
+        Some(TypeDescriptor::Function(arg_types, return_type, vararg))
+    }
+
+    pub fn function_type_for_descriptor(
+        &self,
+        scope: &Scope<'a>,
+        td: &TypeDescriptor,
+    ) -> Option<FunctionType<'a>> {
+        if let TypeDescriptor::Function(args, ret, is_var_args) = td {
+            let map_args: Vec<Option<BasicTypeEnum>> = args
+                .iter()
+                .map(|td| self.llvm_type_by_descriptor(scope, td))
+                .collect();
+            if map_args.iter().any(|at| at.is_none()) {
+                return None;
+            }
+            let param_types: Vec<BasicMetadataTypeEnum> = map_args
+                .iter()
+                .map(|at| BasicMetadataTypeEnum::try_from(at.unwrap()).unwrap())
+                .collect();
+
+            if ret.is_none() {
+                Some(self.iw.builtins.void.fn_type(&param_types, *is_var_args))
+            } else {
+                self.llvm_type_by_descriptor(scope, ret.as_ref().unwrap())
+                    .map(|ret| ret.fn_type(&param_types, *is_var_args))
+            }
+        } else {
+            None
         }
     }
 

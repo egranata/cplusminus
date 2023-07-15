@@ -27,7 +27,7 @@ pub enum TypeDescriptor {
     Name(String),
     Pointer(Box<TypeDescriptor>),
     Array(Box<TypeDescriptor>, usize),
-    Function(Vec<TypeDescriptor>, Box<TypeDescriptor>, bool),
+    Function(Vec<TypeDescriptor>, Option<Box<TypeDescriptor>>, bool),
     Tuple(Vec<TypeDescriptor>),
 }
 
@@ -56,8 +56,13 @@ impl Display for TypeDescriptor {
                 let s = join_commad_list(args);
                 write!(
                     f,
-                    "{}fn({s}) ret {ret}",
-                    if *vararg { "vararg " } else { "" }
+                    "{}fn({s}){}",
+                    if *vararg { "vararg " } else { "" },
+                    if let Some(ret) = ret {
+                        format!(" ret {ret}")
+                    } else {
+                        String::new()
+                    }
                 )
             }
             TypeDescriptor::Tuple(at) => {
