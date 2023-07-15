@@ -531,6 +531,22 @@ impl<'a> TypeBuilder<'a> {
         false
     }
 
+    pub fn is_val_or_ref_basic_type(&self, ty: BasicTypeEnum<'a>) -> Option<StructType<'a>> {
+        if let Some(st) = self.is_refcounted_basic_type(ty) {
+            Some(st)
+        } else {
+            self.is_value_basic_type(ty)
+        }
+    }
+
+    pub fn is_val_or_ref_any_type(&self, ty: AnyTypeEnum<'a>) -> Option<StructType<'a>> {
+        if let Some(st) = self.is_refcounted_any_type(ty) {
+            Some(st)
+        } else {
+            self.is_value_any_type(ty)
+        }
+    }
+
     pub fn is_refcounted_any_type(&self, ty: AnyTypeEnum<'a>) -> Option<StructType<'a>> {
         if let AnyTypeEnum::PointerType(pty) = ty {
             if let AnyTypeEnum::StructType(sty) = pty.get_element_type() {

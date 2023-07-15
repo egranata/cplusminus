@@ -363,16 +363,23 @@ impl<'a> CompilerCore<'a> {
                             }
                         }
                         crate::ast::TopLevelDecl::Implementation(id) => {
-                            let ty = TypeBuilder::new(self.clone());
-                            if let Some(struct_info) = self.structs.borrow().get(&id.name) {
-                                ty.build_impl(&self.globals, struct_info, id);
-                            } else {
-                                self.error(CompilerError::new(
-                                    id.loc,
-                                    Error::TypeNotFound(crate::ast::TypeDescriptor::Name(
-                                        id.name.clone(),
-                                    )),
-                                ));
+                            let tb = TypeBuilder::new(self.clone());
+                            if let Some(ty) = tb.llvm_type_by_descriptor(&self.globals, &id.of) {
+                                if let Some(sty) = tb.is_val_or_ref_basic_type(ty) {
+                                    if let Some(struct_info) = tb.struct_by_name(sty) {
+                                        tb.build_impl(&self.globals, &struct_info, id);
+                                    } else {
+                                        self.error(CompilerError::new(
+                                            id.loc,
+                                            Error::TypeNotFound(id.of.clone()),
+                                        ));
+                                    }
+                                } else {
+                                    self.error(CompilerError::new(
+                                        id.loc,
+                                        Error::UnexpectedType(Some("structure".to_owned())),
+                                    ));
+                                }
                             }
                         }
                         crate::ast::TopLevelDecl::Variable(vd) => {

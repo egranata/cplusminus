@@ -365,7 +365,8 @@ peg::parser! {
 
         rule impl_def() -> ImplDecl =
         _ start:position!() "impl" __() name:ident() _ "{" _ methods:method_def()* _ "}" _ end:position!() _ {
-            ImplDecl { loc:Location{start,end}, name, methods }
+            let td = TypeDescriptor::Name(name);
+            ImplDecl { loc:Location{start,end}, of: td, methods }
         }
 
         rule implementation() -> TopLevelDeclaration = id:impl_def() {

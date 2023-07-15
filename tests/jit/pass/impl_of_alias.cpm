@@ -1,0 +1,43 @@
+(* Copyright 2023 Enrico Granata *)
+(* *)
+(* Licensed under the Apache License, Version 2.0 (the "License"); *)
+(* you may not use this file except in compliance with the License. *)
+(* You may obtain a copy of the License at *)
+(*  *)
+(*     http://www.apache.org/licenses/LICENSE-2.0 *)
+(*  *)
+(* Unless required by applicable law or agreed to in writing, software *)
+(* distributed under the License is distributed on an "AS IS" BASIS, *)
+(* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. *)
+(* See the License for the specific language governing permissions and *)
+(* limitations under the License. *)
+
+type ugly_name {
+    n: int64,
+    init() {
+        self.n = 123;
+    }
+}
+
+type pretty_name = ugly_name;
+
+impl pretty_name {
+    func useful_stuff() {
+        inc self.n;
+    }
+}
+
+type even_prettier_name = pretty_name;
+
+impl even_prettier_name {
+    func get() ret int64 {
+        return self.n;
+    }
+}
+
+func main() ret int64 {
+    let f = alloc pretty_name();
+    f->useful_stuff();
+    let f = f->get();
+    return 124 - f;
+}

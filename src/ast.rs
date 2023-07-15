@@ -134,7 +134,7 @@ pub struct ProperStructDecl {
 #[derive(Clone, Debug)]
 pub struct ImplDecl {
     pub loc: Location,
-    pub name: String,
+    pub of: TypeDescriptor,
     pub methods: Vec<MethodDecl>,
 }
 
