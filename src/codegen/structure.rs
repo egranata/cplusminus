@@ -19,9 +19,9 @@ use inkwell::{
     values::FunctionValue,
 };
 
-use crate::ast::{FieldDecl, ImplDecl, MethodDecl, ProperStructDecl};
+use crate::ast::{FieldDecl, MethodDecl, ProperStructDecl};
 
-use super::{MutableOf, OnceOf};
+use super::MutableOf;
 
 #[derive(Clone, Debug)]
 pub struct Field<'a> {
@@ -61,12 +61,8 @@ pub struct Structure<'a> {
     pub str_ty: StructType<'a>,
     pub var_ty: BasicTypeEnum<'a>,
     pub ms: MemoryStrategy,
-    pub implementations: MutableOf<Vec<ImplDecl>>,
     pub fields: MutableOf<Vec<Field<'a>>>,
     pub methods: MutableOf<Vec<Method<'a>>>,
-    pub init: OnceOf<FunctionValue<'a>>,
-    pub usr_dealloc: OnceOf<FunctionValue<'a>>,
-    pub sys_dealloc: OnceOf<FunctionValue<'a>>,
 }
 
 impl<'a> Structure<'a> {

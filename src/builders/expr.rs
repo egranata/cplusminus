@@ -416,7 +416,11 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         match init {
             Some(ai) => match ai {
                 AllocInitializer::ByFieldList(init_list) => {
-                    if struct_def.init.get().is_some() {
+                    if self
+                        .tb
+                        .find_init_for_type(locals, struct_def.str_ty)
+                        .is_some()
+                    {
                         self.iw
                             .error(CompilerError::new(node.loc, Error::InitMustBeUsed));
                         return None;
@@ -448,7 +452,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     }
                 }
                 AllocInitializer::ByInit(args) => {
-                    if let Some(init_func) = struct_def.init.get() {
+                    if let Some(init_func) = self.tb.find_init_for_type(locals, struct_def.str_ty) {
                         let their_type = init_func.get_type();
                         let mut eval_args: Vec<FunctionCallArgument> =
                             vec![FunctionCallArgument::Value(
@@ -460,7 +464,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                         if let Some(call_args) = self
                             .build_function_call_args(builder, fd, locals, &eval_args, their_type)
                         {
-                            builder.build_call(*init_func, &call_args, "");
+                            builder.build_call(init_func, &call_args, "");
                         } else {
                             self.iw
                                 .error(CompilerError::new(node.loc, Error::InvalidExpression));
@@ -476,7 +480,11 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 }
             },
             None => {
-                if struct_def.init.get().is_some() {
+                if self
+                    .tb
+                    .find_init_for_type(locals, struct_def.str_ty)
+                    .is_some()
+                {
                     self.iw
                         .error(CompilerError::new(node.loc, Error::InitMustBeUsed));
                     return None;

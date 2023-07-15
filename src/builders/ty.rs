@@ -296,6 +296,16 @@ impl<'a> TypeBuilder<'a> {
         }
     }
 
+    pub fn find_init_for_type(
+        &self,
+        scope: &Scope<'a>,
+        this_ty: StructType<'a>,
+    ) -> Option<FunctionValue<'a>> {
+        let full_name =
+            mangle_special_method(this_ty, crate::mangler::SpecialMemberFunction::Initializer);
+        scope.find_function(&full_name, true)
+    }
+
     fn build_init(
         &self,
         scope: &Scope<'a>,
@@ -403,12 +413,8 @@ impl<'a> TypeBuilder<'a> {
             str_ty: st_ty,
             var_ty,
             ms,
-            implementations: Default::default(),
             fields: Default::default(),
             methods: Default::default(),
-            init: Default::default(),
-            usr_dealloc: Default::default(),
-            sys_dealloc: Default::default(),
         };
         self.iw.add_struct(&cdg_st);
 
@@ -473,16 +479,10 @@ impl<'a> TypeBuilder<'a> {
         }
 
         st_ty.set_body(&fields, false);
-
-        if is_rc {
-            let dealloc_f = build_dealloc(self, &self.iw, st_ty);
-            let _ = cdg_st.sys_dealloc.set(dealloc_f);
-        }
+        build_dealloc(self, &self.iw, st_ty);
 
         if let Some(init) = &sd.init {
-            if let Some(init_f) = self.build_init(scope, st_ty, init) {
-                cdg_st.init.set(init_f).unwrap();
-            } else {
+            if self.build_init(scope, st_ty, init).is_none() {
                 self.iw
                     .error(CompilerError::new(init.loc, Error::InvalidExpression));
                 return None;
@@ -490,9 +490,7 @@ impl<'a> TypeBuilder<'a> {
         }
 
         if let Some(dealloc) = &sd.dealloc {
-            if let Some(dealloc_f) = self.build_usr_dealloc(scope, st_ty, dealloc) {
-                cdg_st.usr_dealloc.set(dealloc_f).unwrap();
-            } else {
+            if self.build_usr_dealloc(scope, st_ty, dealloc).is_none() {
                 self.iw
                     .error(CompilerError::new(dealloc.loc, Error::InvalidExpression));
                 return None;
@@ -608,8 +606,6 @@ impl<'a> TypeBuilder<'a> {
     }
 
     pub fn build_impl(&self, scope: &Scope<'a>, sd: &Structure<'a>, id: &ImplDecl) {
-        sd.implementations.borrow_mut().push(id.clone());
-
         let fb = FunctionBuilder::new(self.iw.clone());
         for method in &id.methods {
             if let Some(func) = fb.build_method(scope, &method.imp, &sd.decl) {
