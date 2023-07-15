@@ -17,7 +17,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use inkwell::{
     basic_block::BasicBlock,
     builder::Builder,
-    types::{AnyTypeEnum, BasicTypeEnum, FunctionType},
+    types::FunctionType,
     values::{FunctionValue, InstructionValue, PointerValue},
 };
 
@@ -104,41 +104,13 @@ impl<'a> FunctionExitData<'a> {
 }
 
 impl<'a> FunctionBuilder<'a> {
-    fn build_function_type(&self, fd: &FunctionDecl) -> Option<FunctionType<'a>> {
+    fn build_function_type(
+        &self,
+        scope: &Scope<'a>,
+        fd: &FunctionDecl,
+    ) -> Option<FunctionType<'a>> {
         let tb = TypeBuilder::new(self.iw.clone());
-        let ret_type: Option<AnyTypeEnum> = if let Some(rt_decl) = &fd.ty {
-            tb.llvm_type_by_descriptor(&self.iw.globals, rt_decl)
-                .map(TypeBuilder::any_type_from_basic)
-        } else {
-            Some(AnyTypeEnum::VoidType(self.iw.builtins.void))
-        };
-
-        if ret_type.is_none() {
-            let td = if let Some(td) = &fd.ty {
-                td.clone()
-            } else {
-                TypeDescriptor::Name(String::from("void"))
-            };
-            self.iw
-                .error(CompilerError::new(fd.loc, Error::TypeNotFound(td)));
-            return None;
-        }
-
-        let ret_type = ret_type.unwrap();
-
-        let mut arg_types: Vec<BasicTypeEnum> = vec![];
-        for argt in &fd.args {
-            if let Some(argty) = tb.llvm_type_by_descriptor(&self.iw.globals, &argt.ty) {
-                arg_types.push(argty);
-            } else {
-                self.iw.error(CompilerError::new(
-                    fd.loc,
-                    Error::TypeNotFound(argt.ty.clone()),
-                ));
-                return None;
-            }
-        }
-        Some(tb.llvm_function_type(&arg_types, Some(ret_type), fd.vararg))
+        tb.function_type_for_descriptor(scope, &fd.ty)
     }
 
     fn decref_locals(&self, builder: &Builder<'a>, vc: &FunctionExitData<'a>) {
@@ -263,7 +235,7 @@ impl<'a> FunctionBuilder<'a> {
         };
         if !self.check_arg_names_unique(&fd.args) {
             None
-        } else if let Some(func_ty) = self.build_function_type(fd) {
+        } else if let Some(func_ty) = self.build_function_type(scope, fd) {
             let func = self.iw.module.add_function(&llvm_func_name, func_ty, None);
             scope.insert_function(&fd.name, func, true);
             Some(func)
@@ -342,13 +314,21 @@ impl<'a> FunctionBuilder<'a> {
         };
         let mut new_args = vec![self_arg];
         new_args.extend_from_slice(&fd.decl.args);
+        let new_arg_types: Vec<TypeDescriptor> =
+            new_args.iter().map(|arg| arg.ty.clone()).collect();
+        let ret_type = if let TypeDescriptor::Function(_, ret, _) = &fd.decl.ty {
+            ret
+        } else {
+            panic!("unable to infer return type")
+        };
+
+        let fn_type = TypeDescriptor::Function(new_arg_types, ret_type.clone(), false);
 
         let new_decl = FunctionDecl {
             loc: fd.decl.loc,
             name: fqn,
             args: new_args,
-            vararg: false,
-            ty: fd.decl.ty.clone(),
+            ty: fn_type,
         };
 
         let new_def = FunctionDefinition {

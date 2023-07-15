@@ -285,29 +285,6 @@ impl<'a> TypeBuilder<'a> {
         }
     }
 
-    pub fn llvm_function_type(
-        &self,
-        args: &[BasicTypeEnum<'a>],
-        ret: Option<AnyTypeEnum<'a>>,
-        va: bool,
-    ) -> FunctionType<'a> {
-        let args: Vec<BasicMetadataTypeEnum> = args.iter().map(|arg| (*arg).into()).collect();
-        if let Some(ret) = ret {
-            match ret {
-                AnyTypeEnum::ArrayType(at) => at.fn_type(&args, va),
-                AnyTypeEnum::FloatType(ft) => ft.fn_type(&args, va),
-                AnyTypeEnum::IntType(it) => it.fn_type(&args, va),
-                AnyTypeEnum::PointerType(pt) => pt.fn_type(&args, va),
-                AnyTypeEnum::StructType(st) => st.fn_type(&args, va),
-                AnyTypeEnum::VectorType(vt) => vt.fn_type(&args, va),
-                AnyTypeEnum::VoidType(vt) => vt.fn_type(&args, va),
-                _ => panic!("unexpected function type {}", ret),
-            }
-        } else {
-            self.iw.context.void_type().fn_type(&args, va)
-        }
-    }
-
     pub fn llvm_array_type(&self, el_ty: BasicTypeEnum<'a>, size: u32) -> ArrayType<'a> {
         match el_ty {
             BasicTypeEnum::ArrayType(at) => at.array_type(size),
@@ -337,13 +314,16 @@ impl<'a> TypeBuilder<'a> {
         let full_name =
             mangle_special_method(this_ty, crate::mangler::SpecialMemberFunction::Initializer);
 
+        let init_arg_types: Vec<TypeDescriptor> =
+            real_args.iter().map(|arg| arg.ty.clone()).collect();
+        let fn_type = TypeDescriptor::Function(init_arg_types, None, false);
+
         let func_def = FunctionDefinition {
             decl: FunctionDecl {
                 loc: init.loc,
                 name: full_name,
                 args: real_args,
-                vararg: false,
-                ty: None,
+                ty: fn_type,
             },
             body: init.body.clone(),
         };
@@ -367,7 +347,7 @@ impl<'a> TypeBuilder<'a> {
         let real_args = vec![FunctionArgument {
             loc: dealloc.loc,
             name: String::from("self"),
-            ty,
+            ty: ty.clone(),
             rw: false,
             explicit_rw: false,
         }];
@@ -376,13 +356,14 @@ impl<'a> TypeBuilder<'a> {
             crate::mangler::SpecialMemberFunction::UserDeallocator,
         );
 
+        let fn_type = TypeDescriptor::Function(vec![ty], None, false);
+
         let func_def = FunctionDefinition {
             decl: FunctionDecl {
                 loc: dealloc.loc,
                 name: full_name,
                 args: real_args,
-                vararg: false,
-                ty: None,
+                ty: fn_type,
             },
             body: dealloc.body.clone(),
         };

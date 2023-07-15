@@ -166,8 +166,7 @@ pub struct FunctionDecl {
     pub loc: Location,
     pub name: String,
     pub args: Vec<FunctionArgument>,
-    pub vararg: bool,
-    pub ty: Option<TypeDescriptor>,
+    pub ty: TypeDescriptor,
 }
 
 #[derive(Clone, Debug)]

@@ -166,10 +166,12 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                             builder.build_store(self.exit.ret_alloca.unwrap(), value);
                             builder.build_unconditional_branch(self.exit.exit_block);
                         } else {
-                            let msg = format!(
-                                "{}, which is not the type of this expression",
-                                fd.decl.ty.as_ref().unwrap()
-                            );
+                            let ret_type = TypeBuilder::descriptor_by_llvm_type(
+                                func.get_type().get_return_type().unwrap(),
+                            )
+                            .unwrap();
+                            let msg =
+                                format!("{ret_type}, which is not the type of this expression",);
                             self.iw.error(CompilerError::new(
                                 node.loc,
                                 Error::UnexpectedType(Some(msg)),
