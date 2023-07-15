@@ -114,16 +114,9 @@ impl<'a> FunctionBuilder<'a> {
     }
 
     fn decref_locals(&self, builder: &Builder<'a>, vc: &FunctionExitData<'a>) {
-        let tb = TypeBuilder::new(self.iw.clone());
-
         for vi in vc.need_decref.borrow().iter() {
-            if tb
-                .is_refcounted_any_type(vi.get_type().get_element_type())
-                .is_some()
-            {
-                let name = vi.get_name().to_str().unwrap();
-                insert_decref_if_refcounted(&self.iw, builder, builder.build_load(*vi, name));
-            }
+            let name = vi.get_name().to_str().unwrap_or("default");
+            insert_decref_if_refcounted(&self.iw, builder, builder.build_load(*vi, name));
         }
     }
 
