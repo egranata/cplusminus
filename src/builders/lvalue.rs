@@ -51,6 +51,23 @@ impl<'a, 'b> LvalueBuilder<'a, 'b> {
         Self { iw, exit }
     }
 
+    fn build_lvalue_inc_dec_op(
+        &self,
+        builder: &Builder<'a>,
+        op: &Lvalue,
+        ptr: PointerValue<'a>,
+    ) -> PointerValue<'a> {
+        let load = builder.build_load(ptr, "").into_int_value();
+        let one = self.iw.builtins.one(load.get_type());
+        let op = match op {
+            Lvalue::Increment(..) => builder.build_int_add(load, one, ""),
+            Lvalue::Decrement(..) => builder.build_int_sub(load, one, ""),
+            _ => panic!("not a valid op"),
+        };
+        builder.build_store(ptr, op);
+        ptr
+    }
+
     pub fn build_lvalue(
         &self,
         builder: &Builder<'a>,
@@ -86,7 +103,7 @@ impl<'a, 'b> LvalueBuilder<'a, 'b> {
 
                 Err(Error::IdentifierNotFound(ident.clone()))
             }
-            Lvalue::Increment(base_lv) => {
+            Lvalue::Increment(base_lv) | Lvalue::Decrement(base_lv) => {
                 let base = self.build_lvalue(builder, fd, base_lv.as_ref(), locals);
                 if let Err(err) = &base {
                     return Err(err.clone());
@@ -99,33 +116,7 @@ impl<'a, 'b> LvalueBuilder<'a, 'b> {
                 let ptr = pv.ptr;
                 let pointee = ptr.get_type().get_element_type();
                 if pointee.is_int_type() && !TypeBuilder::is_boolean_int(pointee.into_int_type()) {
-                    let load = builder.build_load(ptr, "").into_int_value();
-                    let add =
-                        builder.build_int_add(load, self.iw.builtins.one(load.get_type()), "");
-                    builder.build_store(ptr, add);
-                    pv.mark_written();
-                    Ok(pv)
-                } else {
-                    Err(Error::UnexpectedType(Some("integer".to_owned())))
-                }
-            }
-            Lvalue::Decrement(base_lv) => {
-                let base = self.build_lvalue(builder, fd, base_lv.as_ref(), locals);
-                if let Err(err) = &base {
-                    return Err(err.clone());
-                }
-                let pv = base.unwrap();
-                if !pv.rw {
-                    let name = format!("{base_lv}");
-                    return Err(Error::ReadOnlyIdentifier(name));
-                }
-                let ptr = pv.ptr;
-                let pointee = ptr.get_type().get_element_type();
-                if pointee.is_int_type() && !TypeBuilder::is_boolean_int(pointee.into_int_type()) {
-                    let load = builder.build_load(ptr, "").into_int_value();
-                    let add =
-                        builder.build_int_sub(load, self.iw.builtins.one(load.get_type()), "");
-                    builder.build_store(ptr, add);
+                    self.build_lvalue_inc_dec_op(builder, node, pv.ptr);
                     pv.mark_written();
                     Ok(pv)
                 } else {
