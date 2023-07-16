@@ -314,9 +314,11 @@ peg::parser! {
 
         rule break_stmt() -> Statement =
         start:position!() "break" _ end:position!() { Statement { loc:Location{start,end}, payload:Stmt::Break } }
+        rule continue_stmt() -> Statement =
+        start:position!() "continue" _ end:position!() { Statement { loc:Location{start,end}, payload:Stmt::Continue } }
 
         rule top_level_statement() -> Statement =
-        _ v:(var_decl_stmt() / assignment() / typealiasstmt() / function_def_stmt() / break_stmt() / ifstmt() / whilestmt() / dowhilestmt() / ret() / decrefstmt() / assertstmt() / block() / expr_stmt()) _ ";" {v}
+        _ v:(var_decl_stmt() / assignment() / typealiasstmt() / function_def_stmt() / break_stmt() / continue_stmt() / ifstmt() / whilestmt() / dowhilestmt() / ret() / decrefstmt() / assertstmt() / block() / expr_stmt()) _ ";" {v}
 
         rule block() -> Statement =
         start:position!() "{" _ s:top_level_statement()* _ "}" end:position!() { Statement { loc:Location{start,end}, payload:Stmt::Block(s) } }

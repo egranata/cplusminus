@@ -328,6 +328,7 @@ pub enum Stmt {
     TypeAlias(TypeAliasDecl),
     Function(Box<FunctionDefinition>),
     Break,
+    Continue,
 }
 
 #[derive(Clone, Debug)]

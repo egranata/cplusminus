@@ -43,6 +43,7 @@ pub enum Error {
     LetMustBeInitialized,
     RefTypeInValTypeForbidden,
     BreakOutsideOfLoop,
+    ContinueOutsideOfLoop,
 }
 
 impl Display for Error {
@@ -108,8 +109,8 @@ impl Display for Error {
                     "this type provides init, which must be called when allocating"
                 )
             }
-            Error::BreakOutsideOfLoop => {
-                write!(f, "break statement cannot be used outside of a loop")
+            Error::BreakOutsideOfLoop | Error::ContinueOutsideOfLoop => {
+                write!(f, "this statement cannot be used outside of a loop")
             }
         }
     }
