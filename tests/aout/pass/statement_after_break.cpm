@@ -13,12 +13,12 @@
 (* limitations under the License. *)
 
 func main() ret int64 {
-    var a = 0;
-    var b = 0;
+    var x = 0;
     do {
-        inc a;
-        continue;
-        inc b;
-    } while(a < 10);
-    return b;
+        inc x;
+        break;
+        inc x;
+    } while(true);
+    return x - 1;
 }
+

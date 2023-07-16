@@ -12,13 +12,13 @@
 (* See the License for the specific language governing permissions and *)
 (* limitations under the License. *)
 
+ref type foo {
+    x: byte
+}
+
 func main() ret int64 {
-    var a = 0;
-    var b = 0;
-    do {
-        inc a;
-        continue;
-        inc b;
-    } while(a < 10);
-    return b;
+    let x = 0;
+    return x;
+    var f = alloc foo{x: 12};
+    return 1;
 }

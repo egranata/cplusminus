@@ -18,7 +18,7 @@ use inkwell::{
     basic_block::BasicBlock,
     builder::Builder,
     types::FunctionType,
-    values::{FunctionValue, InstructionValue, PointerValue},
+    values::{AnyValue, FunctionValue, InstructionOpcode, InstructionValue, PointerValue},
 };
 
 use crate::{
@@ -101,6 +101,26 @@ impl<'a> FunctionExitData<'a> {
     pub fn decref_on_exit(&self, pv: PointerValue<'a>) {
         self.need_decref.borrow_mut().push(pv);
     }
+
+    pub fn undecref_on_exit(&self, pv: PointerValue<'a>) {
+        let mut ndr = self.need_decref.borrow_mut();
+        loop {
+            let mut any_deleted = false;
+            for i in 0..ndr.len() {
+                unsafe {
+                    let pvi = ndr.get_unchecked(i);
+                    if *pvi == pv {
+                        ndr.remove(i);
+                        any_deleted = true;
+                        break;
+                    }
+                }
+            }
+            if !any_deleted {
+                break;
+            };
+        }
+    }
 }
 
 impl<'a> FunctionBuilder<'a> {
@@ -155,6 +175,8 @@ impl<'a> FunctionBuilder<'a> {
         let sb = StatementBuilder::new(self.iw.clone(), &exit);
         sb.build_stmt(&builder, fd, &fd.body, &locals, func, None);
 
+        self.purge_unreachables(func, &exit);
+
         builder.position_at_end(exit_block);
         if let Some(ret_alloca) = ret_alloca {
             let ret_val = builder.build_load(ret_alloca, "ret");
@@ -202,6 +224,30 @@ impl<'a> FunctionBuilder<'a> {
             if !is_block_terminated(Some(bb)) {
                 builder.position_at_end(bb);
                 builder.build_unconditional_branch(exit_block);
+            }
+        }
+    }
+
+    fn purge_unreachables(&self, func: FunctionValue<'a>, vc: &FunctionExitData<'a>) {
+        for bb in func.get_basic_blocks() {
+            let mut found_terminal = false;
+            let mut instr: Option<InstructionValue<'a>> = bb.get_first_instruction();
+            loop {
+                if instr.is_none() {
+                    break;
+                };
+                let iv = instr.unwrap();
+                instr = iv.get_next_instruction();
+
+                if found_terminal {
+                    if iv.get_opcode() == InstructionOpcode::Alloca {
+                        let pv = iv.as_any_value_enum().into_pointer_value();
+                        vc.undecref_on_exit(pv);
+                    }
+                    iv.erase_from_basic_block();
+                } else if is_terminator_instruction(iv) {
+                    found_terminal = true;
+                }
             }
         }
     }
