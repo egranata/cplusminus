@@ -42,6 +42,7 @@ pub enum Error {
     UnresolvedVariableDeclaration,
     LetMustBeInitialized,
     RefTypeInValTypeForbidden,
+    BreakOutsideOfLoop,
 }
 
 impl Display for Error {
@@ -106,6 +107,9 @@ impl Display for Error {
                     f,
                     "this type provides init, which must be called when allocating"
                 )
+            }
+            Error::BreakOutsideOfLoop => {
+                write!(f, "break statement cannot be used outside of a loop")
             }
         }
     }

@@ -145,7 +145,7 @@ impl<'a> FunctionBuilder<'a> {
         };
 
         let sb = StatementBuilder::new(self.iw.clone(), &exit);
-        sb.build_stmt(&builder, fd, &fd.body, &locals, func);
+        sb.build_stmt(&builder, fd, &fd.body, &locals, func, None);
 
         builder.position_at_end(exit_block);
         if let Some(ret_alloca) = ret_alloca {

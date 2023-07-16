@@ -43,6 +43,8 @@ pub struct StatementBuilder<'a, 'b> {
     exit: &'b FunctionExitData<'a>,
 }
 
+type LoopExitTarget<'a> = Option<BasicBlock<'a>>;
+
 impl<'a, 'b> StatementBuilder<'a, 'b> {
     pub fn new(iw: CompilerCore<'a>, exit: &'b FunctionExitData<'a>) -> Self {
         Self {
@@ -54,6 +56,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn build_if_condition(
         &self,
         builder: &Builder<'a>,
@@ -62,6 +65,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
         locals: &Scope<'a>,
         func: FunctionValue<'a>,
         after: BasicBlock<'a>,
+        brek: LoopExitTarget,
     ) {
         let bb_then = self.iw.context.append_basic_block(func, "then");
         let bb_els = self.iw.context.append_basic_block(func, "els");
@@ -72,7 +76,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
             if self.tb.is_boolean(expr.get_type()) {
                 builder.build_conditional_branch(expr.into_int_value(), bb_then, bb_els);
                 builder.position_at_end(bb_then);
-                self.build_stmt(builder, fd, &node.body, locals, func);
+                self.build_stmt(builder, fd, &node.body, locals, func, brek);
                 if !is_block_terminated(builder.get_insert_block()) {
                     builder.build_unconditional_branch(after);
                 }
@@ -107,6 +111,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
         node: &Statement,
         locals: &Scope<'a>,
         func: FunctionValue<'a>,
+        brek: LoopExitTarget,
     ) {
         use crate::ast::Stmt::*;
 
@@ -134,9 +139,17 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
             Block(block) => {
                 let block_locals = ScopeObject::child(locals);
                 for node in block {
-                    self.build_stmt(builder, fd, node, &block_locals, func);
+                    self.build_stmt(builder, fd, node, &block_locals, func, brek);
                 }
                 self.warn_on_unwritten_locals(&block_locals);
+            }
+            Break => {
+                if let Some(bb) = brek {
+                    builder.build_unconditional_branch(bb);
+                } else {
+                    self.iw
+                        .error(CompilerError::new(node.loc, Error::BreakOutsideOfLoop));
+                }
             }
             Return(expr) => {
                 if expr.is_some() != func.get_type().get_return_type().is_some() {
@@ -328,12 +341,12 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
             }
             If(stmt) => {
                 let bb_after = self.iw.context.append_basic_block(func, "after");
-                self.build_if_condition(builder, fd, &stmt.base, locals, func, bb_after);
+                self.build_if_condition(builder, fd, &stmt.base, locals, func, bb_after, brek);
                 for cond in &stmt.alts {
-                    self.build_if_condition(builder, fd, cond, locals, func, bb_after);
+                    self.build_if_condition(builder, fd, cond, locals, func, bb_after, brek);
                 }
                 if let Some(otherwise) = &stmt.othw {
-                    self.build_stmt(builder, fd, otherwise.as_ref(), locals, func);
+                    self.build_stmt(builder, fd, otherwise.as_ref(), locals, func, brek);
                     if !is_block_terminated(builder.get_insert_block()) {
                         builder.build_unconditional_branch(bb_after);
                     }
@@ -362,7 +375,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                     }
                     builder.build_conditional_branch(ec.into_int_value(), bb_enter, bb_after);
                     builder.position_at_end(bb_enter);
-                    self.build_stmt(builder, fd, wh.body.as_ref(), locals, func);
+                    self.build_stmt(builder, fd, wh.body.as_ref(), locals, func, Some(bb_after));
                     if !is_block_terminated(builder.get_insert_block()) {
                         builder.build_unconditional_branch(bb_check);
                     }
@@ -393,7 +406,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                     builder.build_conditional_branch(ec.into_int_value(), bb_body, bb_after);
                     builder.position_at_end(bb_body);
                     builder.build_store(ran_once, self.iw.builtins.one(self.iw.builtins.bool));
-                    self.build_stmt(builder, fd, wh.body.as_ref(), locals, func);
+                    self.build_stmt(builder, fd, wh.body.as_ref(), locals, func, Some(bb_after));
                     if !is_block_terminated(builder.get_insert_block()) {
                         builder.build_unconditional_branch(bb_check);
                     }
@@ -408,7 +421,14 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                             bb_dootherwise,
                         );
                         builder.position_at_end(bb_dootherwise);
-                        self.build_stmt(builder, fd, otherwise.as_ref(), locals, func);
+                        self.build_stmt(
+                            builder,
+                            fd,
+                            otherwise.as_ref(),
+                            locals,
+                            func,
+                            Some(bb_alldone),
+                        );
                         if !is_block_terminated(builder.get_insert_block()) {
                             builder.build_unconditional_branch(bb_alldone);
                         }
