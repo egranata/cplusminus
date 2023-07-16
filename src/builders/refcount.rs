@@ -418,9 +418,18 @@ pub fn insert_decref_if_refcounted<'a>(
     let tb = TypeBuilder::new(iw.clone());
 
     if tb.is_refcounted_basic_type(val.get_type()).is_some() {
-        insert_decref_call(builder, iw, val.into_pointer_value());
+        insert_decref_assume_refcounted(iw, builder, val);
     }
 
+    val
+}
+
+pub fn insert_decref_assume_refcounted<'a>(
+    iw: &CompilerCore<'a>,
+    builder: &Builder<'a>,
+    val: BasicValueEnum<'a>,
+) -> BasicValueEnum<'a> {
+    insert_decref_call(builder, iw, val.into_pointer_value());
     val
 }
 

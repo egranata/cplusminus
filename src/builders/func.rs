@@ -29,7 +29,7 @@ use crate::{
 };
 
 use super::{
-    refcount::insert_decref_if_refcounted,
+    refcount::insert_decref_assume_refcounted,
     scope::{Scope, ScopeObject, VarInfo},
     stmt::StatementBuilder,
     ty::TypeBuilder,
@@ -115,8 +115,16 @@ impl<'a> FunctionBuilder<'a> {
 
     fn decref_locals(&self, builder: &Builder<'a>, vc: &FunctionExitData<'a>) {
         for vi in vc.need_decref.borrow().iter() {
-            let name = vi.get_name().to_str().unwrap_or("default");
-            insert_decref_if_refcounted(&self.iw, builder, builder.build_load(*vi, name));
+            let ptr_val_type = vi.get_type().get_element_type();
+            let tb = TypeBuilder::new(self.iw.clone());
+            if tb.is_refcounted_any_type(ptr_val_type).is_some() {
+                let name = format!(
+                    "decref_load_{}",
+                    vi.get_name().to_str().unwrap_or("default")
+                );
+                let load_vi = builder.build_load(*vi, &name);
+                insert_decref_assume_refcounted(&self.iw, builder, load_vi);
+            }
         }
     }
 
