@@ -73,7 +73,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
             .eb
             .build_expr(builder, fd, node.cond.as_ref(), locals, None)
         {
-            if self.tb.is_boolean(expr.get_type()) {
+            if TypeBuilder::is_boolean_basic(expr.get_type()) {
                 builder.build_conditional_branch(expr.into_int_value(), bb_then, bb_els);
                 builder.position_at_end(bb_then);
                 self.build_stmt(builder, fd, &node.body, locals, func, brek);
@@ -367,7 +367,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                     .eb
                     .build_expr(builder, fd, wh.cond.as_ref(), locals, None)
                 {
-                    if !self.tb.is_boolean(ec.get_type()) {
+                    if !TypeBuilder::is_boolean_basic(ec.get_type()) {
                         return self.iw.error(CompilerError::new(
                             wh.cond.loc,
                             Error::UnexpectedType(Some("boolean".to_owned())),
@@ -397,7 +397,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                     .eb
                     .build_expr(builder, fd, wh.cond.as_ref(), locals, None)
                 {
-                    if !self.tb.is_boolean(ec.get_type()) {
+                    if !TypeBuilder::is_boolean_basic(ec.get_type()) {
                         return self.iw.error(CompilerError::new(
                             wh.cond.loc,
                             Error::UnexpectedType(Some("boolean".to_owned())),
@@ -441,7 +441,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
             }
             Assert(expr) => {
                 if let Some(cond) = self.eb.build_expr(builder, fd, expr.as_ref(), locals, None) {
-                    if self.tb.is_boolean(cond.get_type()) {
+                    if TypeBuilder::is_boolean_basic(cond.get_type()) {
                         let bb_check = self.iw.context.append_basic_block(func, "check");
                         let bb_trap = self.iw.context.append_basic_block(func, "do_trap");
                         let bb_ok = self.iw.context.append_basic_block(func, "ok");

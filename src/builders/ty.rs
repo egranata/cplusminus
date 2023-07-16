@@ -16,7 +16,7 @@ use inkwell::{
     builder::Builder,
     types::{
         AnyTypeEnum, ArrayType, BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FunctionType,
-        StructType,
+        IntType, StructType,
     },
     values::{BasicValueEnum, FunctionValue, IntValue},
 };
@@ -213,12 +213,24 @@ impl<'a> TypeBuilder<'a> {
         }
     }
 
-    pub fn is_boolean(&self, ty: BasicTypeEnum<'a>) -> bool {
+    pub fn is_boolean_basic(ty: BasicTypeEnum<'a>) -> bool {
         if ty.is_int_type() {
-            ty.into_int_type().get_bit_width() == 1
+            TypeBuilder::is_boolean_int(ty.into_int_type())
         } else {
             false
         }
+    }
+
+    pub fn is_boolean_any(ty: AnyTypeEnum<'a>) -> bool {
+        if ty.is_int_type() {
+            TypeBuilder::is_boolean_int(ty.into_int_type())
+        } else {
+            false
+        }
+    }
+
+    pub fn is_boolean_int(ty: IntType<'a>) -> bool {
+        ty.get_bit_width() == 1
     }
 
     pub fn is_same_type(&self, lhs: BasicTypeEnum<'a>, rhs: AnyTypeEnum<'a>) -> bool {
@@ -636,7 +648,7 @@ impl<'a> TypeBuilder<'a> {
         }
 
         if let (IntType(st), IntType(dest_int)) = (expr_ty, ty) {
-            let sign_flag = st.get_bit_width() != 1;
+            let sign_flag = !TypeBuilder::is_boolean_int(st);
             return Some(IntValue(builder.build_int_cast_sign_flag(
                 expr.into_int_value(),
                 dest_int,

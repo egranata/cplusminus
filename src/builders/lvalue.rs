@@ -98,7 +98,7 @@ impl<'a, 'b> LvalueBuilder<'a, 'b> {
                 }
                 let ptr = pv.ptr;
                 let pointee = ptr.get_type().get_element_type();
-                if pointee.is_int_type() && pointee.into_int_type().get_bit_width() != 1 {
+                if pointee.is_int_type() && !TypeBuilder::is_boolean_int(pointee.into_int_type()) {
                     let load = builder.build_load(ptr, "").into_int_value();
                     let add =
                         builder.build_int_add(load, self.iw.builtins.one(load.get_type()), "");
@@ -121,7 +121,7 @@ impl<'a, 'b> LvalueBuilder<'a, 'b> {
                 }
                 let ptr = pv.ptr;
                 let pointee = ptr.get_type().get_element_type();
-                if pointee.is_int_type() && pointee.into_int_type().get_bit_width() != 1 {
+                if pointee.is_int_type() && !TypeBuilder::is_boolean_int(pointee.into_int_type()) {
                     let load = builder.build_load(ptr, "").into_int_value();
                     let add =
                         builder.build_int_sub(load, self.iw.builtins.one(load.get_type()), "");
