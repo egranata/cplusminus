@@ -25,6 +25,7 @@ use std::{cell::RefCell, collections::HashMap, path::Path, process::Command, rc:
 
 use crate::{
     ast::{Location, ProperStructDecl, RawStructDecl, TopLevelDecl, TopLevelDeclaration},
+    bom::{alias::AliasBomEntry, function::FunctionBomEntry, module::BillOfMaterials},
     builders::{
         func::{FunctionBuilder, FunctionBuilderOptions},
         refcount::Refcounting,
@@ -130,6 +131,7 @@ pub struct CompilerCore<'a> {
     pub diagnostics: MutableOf<Vec<CompilerDiagnostic>>,
     pub builtins: BuiltinTypes<'a>,
     pub globals: Scope<'a>,
+    pub bom: MutableOf<BillOfMaterials>,
 }
 
 impl<'a> CompilerCore<'a> {
@@ -154,6 +156,7 @@ impl<'a> CompilerCore<'a> {
             diagnostics: Rc::new(RefCell::new(Vec::new())),
             builtins: BuiltinTypes::new(context),
             globals: ScopeObject::root(),
+            bom: Default::default(),
         };
         new.fill_default_types();
         new
@@ -315,6 +318,15 @@ impl<'a> CompilerCore<'a> {
         }
     }
 
+    fn import(&self, bom: &BillOfMaterials) {
+        for ta in &bom.aliases {
+            ta.import(self, &self.globals);
+        }
+        for ef in &bom.functions {
+            ef.import(self, &self.globals);
+        }
+    }
+
     pub fn compile(&self) -> bool {
         let parsed = self.parse();
         match parsed {
@@ -332,7 +344,12 @@ impl<'a> CompilerCore<'a> {
                                 .global(true)
                                 .mangle(false)
                                 .commit();
-                            fb.declare(&self.globals, &fd.decl, opts);
+                            if let Some(fv) = fb.declare(&self.globals, &fd.decl, opts) {
+                                if fd.export {
+                                    let bom_entry = FunctionBomEntry::new(&fd.decl.name, fv);
+                                    self.bom.borrow_mut().functions.push(bom_entry);
+                                }
+                            }
                         }
                         crate::ast::TopLevelDecl::ExternFunction(fd) => {
                             let fb = FunctionBuilder::new(self.clone());
@@ -358,7 +375,14 @@ impl<'a> CompilerCore<'a> {
                         }
                         crate::ast::TopLevelDecl::Alias(ad) => {
                             let ty = TypeBuilder::new(self.clone());
-                            if ty.alias(&self.globals, &ad.name, &ad.ty).is_none() {
+                            if let Some(uty) = ty.alias(&self.globals, &ad.name, &ad.ty) {
+                                if ad.export {
+                                    // we just generated this from a descriptor, assume roundtrip is safe
+                                    let utd = TypeBuilder::descriptor_by_llvm_type(uty).unwrap();
+                                    let bom_entry = AliasBomEntry::new(&ad.name, &utd);
+                                    self.bom.borrow_mut().aliases.push(bom_entry);
+                                }
+                            } else {
                                 self.error(CompilerError::new(ad.loc, Error::InvalidExpression));
                             }
                         }
@@ -380,6 +404,16 @@ impl<'a> CompilerCore<'a> {
                                         Error::UnexpectedType(Some("structure".to_owned())),
                                     ));
                                 }
+                            }
+                        }
+                        crate::ast::TopLevelDecl::Import(id) => {
+                            if let Some(bom) = BillOfMaterials::load(Path::new(&id.path)) {
+                                self.import(&bom);
+                            } else {
+                                self.error(CompilerError::new(
+                                    tld.loc,
+                                    Error::InternalError(String::from("unable to find BOM")),
+                                ));
                             }
                         }
                         crate::ast::TopLevelDecl::Variable(vd) => {
@@ -439,11 +473,13 @@ impl<'a> CompilerCore<'a> {
                             let fb = FunctionBuilder::new(self.clone());
                             fb.build(&self.globals, fd);
                         }
-                        crate::ast::TopLevelDecl::ExternFunction(..) => {}
-                        crate::ast::TopLevelDecl::Structure(..) => {}
-                        crate::ast::TopLevelDecl::Alias(..) => {}
-                        crate::ast::TopLevelDecl::Implementation(..) => {}
-                        crate::ast::TopLevelDecl::Variable(..) => {}
+
+                        crate::ast::TopLevelDecl::Alias(..)
+                        | crate::ast::TopLevelDecl::ExternFunction(..)
+                        | crate::ast::TopLevelDecl::Implementation(..)
+                        | crate::ast::TopLevelDecl::Import(..)
+                        | crate::ast::TopLevelDecl::Structure(..)
+                        | crate::ast::TopLevelDecl::Variable(..) => {}
                     }
                 }
             }
@@ -573,6 +609,11 @@ impl<'a> CompilerCore<'a> {
             Some("obj") => self.dump_to_obj(path),
             _ => self.dump_to_binary(path),
         }
+    }
+
+    pub fn dump_bom(&self, dest: &str) {
+        let path = Path::new(dest);
+        self.bom.borrow().write(path);
     }
 
     pub fn add_struct(&self, sd: &Structure<'a>) {

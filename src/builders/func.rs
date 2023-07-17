@@ -381,6 +381,7 @@ impl<'a> FunctionBuilder<'a> {
         let new_def = FunctionDefinition {
             decl: new_decl,
             body: fd.body.clone(),
+            export: false,
         };
 
         let opts = FunctionBuilderOptions::default()

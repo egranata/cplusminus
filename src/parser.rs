@@ -317,6 +317,16 @@ peg::parser! {
         rule continue_stmt() -> Statement =
         start:position!() "continue" _ end:position!() { Statement { loc:Location{start,end}, payload:Stmt::Continue } }
 
+        rule export_attribute() -> bool =
+        start:position!() s:("export ")? _() end:position!() {
+            s.is_some()
+        }
+
+        rule vararg_attribute() -> bool =
+        start:position!() s:("vararg ")? _() end:position!() {
+            s.is_some()
+        }
+
         rule top_level_statement() -> Statement =
         _ v:(var_decl_stmt() / assignment() / typealiasstmt() / function_def_stmt() / break_stmt() / continue_stmt() / ifstmt() / whilestmt() / dowhilestmt() / ret() / decrefstmt() / assertstmt() / block() / expr_stmt()) _ ";" {v}
 
@@ -330,19 +340,19 @@ peg::parser! {
         _ "ret" _ ty:typename() _ { ty }
 
         rule extern_function() -> TopLevelDeclaration =
-        _ start:position!() "extern" __() v:("vararg" __)? "func" __() name:ident() "(" _ args:func_arg()**"," _ ")" _ ty:function_ret()? _ ";" _ end:position!() _ {
+        _ start:position!() "extern" __() v:vararg_attribute() "func" __() name:ident() "(" _ args:func_arg()**"," _ ")" _ ty:function_ret()? _ ";" _ end:position!() _ {
             let arg_types: Vec<TypeDescriptor> = args.iter().map(|arg| arg.ty.clone()).collect();
-            let td = TypeDescriptor::Function(arg_types, ty.map(Box::new), v.is_some());
+            let td = TypeDescriptor::Function(arg_types, ty.map(Box::new), v);
             let decl = FunctionDecl { loc:Location{start,end}, name,args,ty:td };
             TopLevelDeclaration::extern_function(decl.loc, decl)
         }
 
         rule inner_function_def() -> FunctionDefinition =
-        _ start:position!() "func" __() name:ident() "(" _ args:func_arg()**"," _ ")" _ ty:function_ret()? decl_end:position!() _ body:block() end:position!() _ {
+        _ start:position!() export:export_attribute() "func" __() name:ident() "(" _ args:func_arg()**"," _ ")" _ ty:function_ret()? decl_end:position!() _ body:block() end:position!() _ {
             let arg_types: Vec<TypeDescriptor> = args.iter().map(|arg| arg.ty.clone()).collect();
             let td = TypeDescriptor::Function(arg_types, ty.map(Box::new), false);
             let decl = FunctionDecl { loc:Location{start,end}, name,args,ty:td };
-            FunctionDefinition { decl,body }
+            FunctionDefinition { decl,body,export }
         }
 
         rule function_def_stmt() -> Statement =
@@ -359,8 +369,8 @@ peg::parser! {
         }
 
         rule typealias() -> TypeAliasDecl =
-        _ start:position!() "type" __() name:ident() _ "=" _ ty:typename() _ end:position!() _ {
-            TypeAliasDecl {loc:Location{start,end}, name, ty}
+        _ start:position!() export:export_attribute() "type" __() name:ident() _ "=" _ ty:typename() _ end:position!() _ {
+            TypeAliasDecl {loc:Location{start,end}, name, ty, export}
         }
 
         rule typealias_tld() -> TopLevelDeclaration =
@@ -378,6 +388,17 @@ peg::parser! {
             TopLevelDeclaration::implementation(id.loc, id)
         }
 
+        rule import_decl() -> ImportDecl =
+        _ start:position!() _ "import" __() path:strlit() _ end:position!() _ {
+            ImportDecl{loc:Location{start,end}, path}
+        }
+
+        rule import_decl_toplevel() -> TopLevelDeclaration =
+        _ start:position!() id:import_decl() _ ";" _ end:position!() {
+            let loc = Location{start,end};
+            TopLevelDeclaration::import(loc, id)
+        }
+
         rule var_decl_toplevel() -> TopLevelDeclaration =
         _ start:position!() vd:var_decl_body() _ ";" _ end:position!() {
             let loc = Location{start,end};
@@ -388,6 +409,6 @@ peg::parser! {
         top_level_expr()**","
 
         pub rule source_file() -> Vec<TopLevelDeclaration> =
-        (struct_decl() / function() / extern_function() / typealias_tld() / implementation() / var_decl_toplevel())* / expected!("function or structure")
+        (struct_decl() / function() / extern_function() / typealias_tld() / import_decl_toplevel() / implementation() / var_decl_toplevel())* / expected!("function or structure")
     }
 }

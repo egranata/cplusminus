@@ -14,6 +14,8 @@
 
 use std::fmt::Display;
 
+use serde::{Deserialize, Serialize};
+
 use crate::codegen::structure::MemoryStrategy;
 
 #[derive(Copy, Clone, Debug)]
@@ -22,7 +24,10 @@ pub struct Location {
     pub end: usize,
 }
 
-#[derive(Clone, Debug)]
+// it's not ideal to serialize an AST entry directly
+// but TypeDescriptor is pretty much good enough that I'd just
+// end up writing a copy of it
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum TypeDescriptor {
     Name(String),
     Pointer(Box<TypeDescriptor>),
@@ -173,6 +178,7 @@ pub struct FunctionDecl {
 pub struct FunctionDefinition {
     pub decl: FunctionDecl,
     pub body: Statement,
+    pub export: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -359,12 +365,19 @@ pub struct TypeAliasDecl {
     pub loc: Location,
     pub name: String,
     pub ty: TypeDescriptor,
+    pub export: bool,
 }
 
 #[derive(Clone, Debug)]
 pub struct Statement {
     pub loc: Location,
     pub payload: Stmt,
+}
+
+#[derive(Clone, Debug)]
+pub struct ImportDecl {
+    pub loc: Location,
+    pub path: String,
 }
 
 #[derive(Clone, Debug)]
@@ -375,6 +388,7 @@ pub enum TopLevelDecl {
     Alias(TypeAliasDecl),
     Implementation(ImplDecl),
     Variable(VarDecl),
+    Import(ImportDecl),
 }
 
 #[derive(Clone, Debug)]
@@ -423,6 +437,13 @@ impl TopLevelDeclaration {
         Self {
             loc: l,
             payload: TopLevelDecl::Variable(v),
+        }
+    }
+
+    pub fn import(l: Location, i: ImportDecl) -> Self {
+        Self {
+            loc: l,
+            payload: TopLevelDecl::Import(i),
         }
     }
 }

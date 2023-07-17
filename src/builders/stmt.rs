@@ -128,6 +128,11 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                         tld.loc,
                         Error::TypeNotFound(tld.ty.clone()),
                     ));
+                } else if tld.export {
+                    self.iw.warning(CompilerWarning::new(
+                        tld.loc,
+                        Warning::ExportInLocalDeclUnused,
+                    ));
                 }
             }
             Function(tld) => {
@@ -140,6 +145,11 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                 if fb.compile(locals, tld.as_ref(), opts).is_none() {
                     self.iw
                         .error(CompilerError::new(tld.decl.loc, Error::InvalidExpression));
+                } else if tld.export {
+                    self.iw.warning(CompilerWarning::new(
+                        tld.decl.loc,
+                        Warning::ExportInLocalDeclUnused,
+                    ));
                 }
             }
             Block(block) => {

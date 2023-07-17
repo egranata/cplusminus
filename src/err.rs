@@ -138,6 +138,7 @@ impl CompilerError {
 pub enum Warning {
     MutabilityArgInExternFunction,
     MutableValueNeverWrittenTo(String),
+    ExportInLocalDeclUnused,
 }
 
 impl Display for Warning {
@@ -148,6 +149,9 @@ impl Display for Warning {
             }
             Warning::MutableValueNeverWrittenTo(name) => {
                 write!(f, "variable {name} declared mutable but never written to")
+            }
+            Warning::ExportInLocalDeclUnused => {
+                write!(f, "export is ignored outside of top-level declarations")
             }
         }
     }

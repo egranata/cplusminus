@@ -348,6 +348,7 @@ impl<'a> TypeBuilder<'a> {
                 ty: fn_type,
             },
             body: init.body.clone(),
+            export: false,
         };
 
         let fb = FunctionBuilder::new(self.iw.clone());
@@ -388,6 +389,7 @@ impl<'a> TypeBuilder<'a> {
                 ty: fn_type,
             },
             body: dealloc.body.clone(),
+            export: false,
         };
 
         let fb = FunctionBuilder::new(self.iw.clone());

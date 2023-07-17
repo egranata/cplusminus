@@ -16,6 +16,7 @@
 pub mod test;
 
 pub mod ast;
+pub mod bom;
 pub mod builders;
 pub mod codegen;
 pub mod err;
@@ -50,6 +51,8 @@ struct Args {
     warn_as_err: bool,
     #[arg(short = 'l', long = "link")]
     link_extras: Vec<String>,
+    #[arg(long = "bom")]
+    bom_dest: Option<String>,
 }
 
 impl Args {
@@ -81,6 +84,10 @@ pub fn main() {
 
         if args.dump {
             iwell.module.print_to_stderr();
+        }
+
+        if let Some(bom_dest) = args.bom_dest {
+            iwell.dump_bom(&bom_dest);
         }
 
         if let Some(out) = args.output {

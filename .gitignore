@@ -19,3 +19,4 @@ Cargo.lock
 /*.ll
 /test.*
 /a.out
+/*.bom
