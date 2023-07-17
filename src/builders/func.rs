@@ -22,7 +22,10 @@ use inkwell::{
 };
 
 use crate::{
-    ast::{FunctionArgument, FunctionDecl, FunctionDefinition, ProperStructDecl, TypeDescriptor},
+    ast::{
+        FunctionArgument, FunctionDecl, FunctionDefinition, FunctionTypeDescriptor,
+        ProperStructDecl, TypeDescriptor,
+    },
     err::{CompilerError, CompilerWarning, Error, Warning},
     iw::CompilerCore,
     mangler::{mangle_function_name, mangle_method_name},
@@ -363,13 +366,14 @@ impl<'a> FunctionBuilder<'a> {
         new_args.extend_from_slice(&fd.decl.args);
         let new_arg_types: Vec<TypeDescriptor> =
             new_args.iter().map(|arg| arg.ty.clone()).collect();
-        let ret_type = if let TypeDescriptor::Function(_, ret, _) = &fd.decl.ty {
-            ret
+        let ret_type = if let TypeDescriptor::Function(ftd) = &fd.decl.ty {
+            &ftd.ret
         } else {
             panic!("unable to infer return type")
         };
 
-        let fn_type = TypeDescriptor::Function(new_arg_types, ret_type.clone(), false);
+        let ftd = FunctionTypeDescriptor::new(new_arg_types, ret_type.clone(), false);
+        let fn_type = TypeDescriptor::Function(ftd);
 
         let new_decl = FunctionDecl {
             loc: fd.decl.loc,

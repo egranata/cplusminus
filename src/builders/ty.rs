@@ -23,8 +23,8 @@ use inkwell::{
 
 use crate::{
     ast::{
-        DeallocDecl, FieldDecl, FunctionArgument, FunctionDecl, FunctionDefinition, ImplDecl,
-        InitDecl, ProperStructDecl, TypeDescriptor,
+        DeallocDecl, FieldDecl, FunctionArgument, FunctionDecl, FunctionDefinition,
+        FunctionTypeDescriptor, ImplDecl, InitDecl, ProperStructDecl, TypeDescriptor,
     },
     codegen::{
         self,
@@ -265,7 +265,8 @@ impl<'a> TypeBuilder<'a> {
         let arg_types: Vec<TypeDescriptor> = arg_types.iter().map(|x| x.clone().unwrap()).collect();
         let vararg = ty.is_var_arg();
 
-        Some(TypeDescriptor::Function(arg_types, return_type, vararg))
+        let ftd = FunctionTypeDescriptor::new(arg_types, return_type, vararg);
+        Some(TypeDescriptor::Function(ftd))
     }
 
     pub fn function_type_for_descriptor(
@@ -273,8 +274,9 @@ impl<'a> TypeBuilder<'a> {
         scope: &Scope<'a>,
         td: &TypeDescriptor,
     ) -> Option<FunctionType<'a>> {
-        if let TypeDescriptor::Function(args, ret, is_var_args) = td {
-            let map_args: Vec<Option<BasicTypeEnum>> = args
+        if let TypeDescriptor::Function(ftd) = td {
+            let map_args: Vec<Option<BasicTypeEnum>> = ftd
+                .args
                 .iter()
                 .map(|td| self.llvm_type_by_descriptor(scope, td))
                 .collect();
@@ -286,11 +288,11 @@ impl<'a> TypeBuilder<'a> {
                 .map(|at| BasicMetadataTypeEnum::try_from(at.unwrap()).unwrap())
                 .collect();
 
-            if ret.is_none() {
-                Some(self.iw.builtins.void.fn_type(&param_types, *is_var_args))
+            if ftd.ret.is_none() {
+                Some(self.iw.builtins.void.fn_type(&param_types, ftd.vararg))
             } else {
-                self.llvm_type_by_descriptor(scope, ret.as_ref().unwrap())
-                    .map(|ret| ret.fn_type(&param_types, *is_var_args))
+                self.llvm_type_by_descriptor(scope, ftd.ret.as_ref().unwrap())
+                    .map(|ret| ret.fn_type(&param_types, ftd.vararg))
             }
         } else {
             None
@@ -338,7 +340,8 @@ impl<'a> TypeBuilder<'a> {
 
         let init_arg_types: Vec<TypeDescriptor> =
             real_args.iter().map(|arg| arg.ty.clone()).collect();
-        let fn_type = TypeDescriptor::Function(init_arg_types, None, false);
+        let ftd = FunctionTypeDescriptor::new(init_arg_types, None, false);
+        let fn_type = TypeDescriptor::Function(ftd);
 
         let func_def = FunctionDefinition {
             decl: FunctionDecl {
@@ -379,7 +382,8 @@ impl<'a> TypeBuilder<'a> {
             crate::mangler::SpecialMemberFunction::UserDeallocator,
         );
 
-        let fn_type = TypeDescriptor::Function(vec![ty], None, false);
+        let ftd = FunctionTypeDescriptor::new(vec![ty], None, false);
+        let fn_type = TypeDescriptor::Function(ftd);
 
         let func_def = FunctionDefinition {
             decl: FunctionDecl {

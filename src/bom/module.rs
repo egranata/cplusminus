@@ -21,10 +21,23 @@ use serde::{Deserialize, Serialize};
 
 use super::{alias::AliasBomEntry, function::FunctionBomEntry};
 
-#[derive(Clone, Default, Debug, Serialize, Deserialize)]
+const BILL_OF_MATERIALS_VERSION: i32 = 1;
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BillOfMaterials {
+    pub version: i32,
     pub functions: Vec<FunctionBomEntry>,
     pub aliases: Vec<AliasBomEntry>,
+}
+
+impl Default for BillOfMaterials {
+    fn default() -> Self {
+        Self {
+            version: BILL_OF_MATERIALS_VERSION,
+            functions: Default::default(),
+            aliases: Default::default(),
+        }
+    }
 }
 
 impl BillOfMaterials {
@@ -46,7 +59,11 @@ impl BillOfMaterials {
 
         if let Ok(text) = fs::read_to_string(inp) {
             if let Ok(this) = from_str::<Self>(&text) {
-                return Some(this);
+                return if this.version != BILL_OF_MATERIALS_VERSION {
+                    None
+                } else {
+                    Some(this)
+                };
             }
         }
 

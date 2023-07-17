@@ -101,7 +101,10 @@ peg::parser! {
         rule typename_arr() -> TypeDescriptor =
         "[" n:integer_number() "]" t:typename() { TypeDescriptor::Array(Box::new(t),n as usize) }
         rule typename_func() -> TypeDescriptor =
-        "fn" _ "(" _ at:typename()**"," _ ")" _ rt:function_ret()? { TypeDescriptor::Function(at, rt.map(Box::new), false) }
+        "fn" _ "(" _ at:typename()**"," _ ")" _ rt:function_ret()? {
+            let ftd = FunctionTypeDescriptor::new(at, rt.map(Box::new), false);
+            TypeDescriptor::Function(ftd)
+        }
         rule typename_tuple() -> TypeDescriptor =
         "{" _ at:typename()**"," _ "}" { TypeDescriptor::Tuple(at) }
         rule typename() -> TypeDescriptor =
@@ -342,7 +345,8 @@ peg::parser! {
         rule extern_function() -> TopLevelDeclaration =
         _ start:position!() "extern" __() v:vararg_attribute() "func" __() name:ident() "(" _ args:func_arg()**"," _ ")" _ ty:function_ret()? _ ";" _ end:position!() _ {
             let arg_types: Vec<TypeDescriptor> = args.iter().map(|arg| arg.ty.clone()).collect();
-            let td = TypeDescriptor::Function(arg_types, ty.map(Box::new), v);
+            let ftd = FunctionTypeDescriptor::new(arg_types, ty.map(Box::new), v);
+            let td = TypeDescriptor::Function(ftd);
             let decl = FunctionDecl { loc:Location{start,end}, name,args,ty:td };
             TopLevelDeclaration::extern_function(decl.loc, decl)
         }
@@ -350,7 +354,8 @@ peg::parser! {
         rule inner_function_def() -> FunctionDefinition =
         _ start:position!() export:export_attribute() "func" __() name:ident() "(" _ args:func_arg()**"," _ ")" _ ty:function_ret()? decl_end:position!() _ body:block() end:position!() _ {
             let arg_types: Vec<TypeDescriptor> = args.iter().map(|arg| arg.ty.clone()).collect();
-            let td = TypeDescriptor::Function(arg_types, ty.map(Box::new), false);
+            let ftd = FunctionTypeDescriptor::new(arg_types, ty.map(Box::new), false);
+            let td = TypeDescriptor::Function(ftd);
             let decl = FunctionDecl { loc:Location{start,end}, name,args,ty:td };
             FunctionDefinition { decl,body,export }
         }

@@ -24,6 +24,21 @@ pub struct Location {
     pub end: usize,
 }
 
+// defined not inline within the TypeDescriptor because it
+// makes the resulting BOM easier to read
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct FunctionTypeDescriptor {
+    pub args: Vec<TypeDescriptor>,
+    pub ret: Option<Box<TypeDescriptor>>,
+    pub vararg: bool,
+}
+
+impl FunctionTypeDescriptor {
+    pub fn new(args: Vec<TypeDescriptor>, ret: Option<Box<TypeDescriptor>>, vararg: bool) -> Self {
+        Self { args, ret, vararg }
+    }
+}
+
 // it's not ideal to serialize an AST entry directly
 // but TypeDescriptor is pretty much good enough that I'd just
 // end up writing a copy of it
@@ -32,7 +47,7 @@ pub enum TypeDescriptor {
     Name(String),
     Pointer(Box<TypeDescriptor>),
     Array(Box<TypeDescriptor>, usize),
-    Function(Vec<TypeDescriptor>, Option<Box<TypeDescriptor>>, bool),
+    Function(FunctionTypeDescriptor),
     Tuple(Vec<TypeDescriptor>),
 }
 
@@ -57,13 +72,13 @@ impl Display for TypeDescriptor {
             TypeDescriptor::Name(name) => write!(f, "{name}"),
             TypeDescriptor::Pointer(pte) => write!(f, "*{pte}"),
             TypeDescriptor::Array(ty, sz) => write!(f, "[{sz}]{ty}"),
-            TypeDescriptor::Function(args, ret, vararg) => {
-                let s = join_commad_list(args);
+            TypeDescriptor::Function(ftd) => {
+                let s = join_commad_list(&ftd.args);
                 write!(
                     f,
                     "{}fn({s}){}",
-                    if *vararg { "vararg " } else { "" },
-                    if let Some(ret) = ret {
+                    if ftd.vararg { "vararg " } else { "" },
+                    if let Some(ret) = &ftd.ret {
                         format!(" ret {ret}")
                     } else {
                         String::new()
