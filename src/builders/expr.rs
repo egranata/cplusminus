@@ -554,6 +554,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
             }
             ConstString(s) => {
                 let gv = builder.build_global_string_ptr(s, "");
+                gv.set_linkage(inkwell::module::Linkage::Internal);
                 Some(PointerValue(gv.as_pointer_value()))
             }
             Addition(x, y) | Subtraction(x, y) => {

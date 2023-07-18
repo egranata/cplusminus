@@ -25,7 +25,10 @@ use std::{cell::RefCell, collections::HashMap, path::Path, process::Command, rc:
 
 use crate::{
     ast::{Location, ProperStructDecl, RawStructDecl, TopLevelDecl, TopLevelDeclaration},
-    bom::{alias::AliasBomEntry, function::FunctionBomEntry, module::BillOfMaterials},
+    bom::{
+        alias::AliasBomEntry, function::FunctionBomEntry, module::BillOfMaterials,
+        variable::VariableBomEntry,
+    },
     builders::{
         func::{FunctionBuilder, FunctionBuilderOptions},
         refcount::Refcounting,
@@ -155,7 +158,7 @@ impl<'a> CompilerCore<'a> {
                 Default::default(),
                 Default::default(),
                 Default::default(),
-                inkwell::targets::RelocMode::Default,
+                inkwell::targets::RelocMode::PIC,
                 inkwell::targets::CodeModel::Default,
             )
             .expect("unable to create a target machine");
@@ -204,14 +207,17 @@ impl<'a> CompilerCore<'a> {
             .insert_alias("bool", IntType(self.builtins.bool), true);
     }
 
-    fn make_global(
+    pub fn make_global(
         m: &Module<'a>,
         name: &str,
-        val: BasicValueEnum<'a>,
+        ty: BasicTypeEnum<'a>,
+        val: Option<BasicValueEnum<'a>>,
         lnk: Linkage,
     ) -> GlobalValue<'a> {
-        let global = m.add_global(val.get_type(), Default::default(), name);
-        global.set_initializer(&val);
+        let global = m.add_global(ty, Default::default(), name);
+        if let Some(val) = val {
+            global.set_initializer(&val);
+        }
         global.set_linkage(lnk);
         global
     }
@@ -225,9 +231,27 @@ impl<'a> CompilerCore<'a> {
         let itsfalse = BasicValueEnum::IntValue(bt.const_int(0, false));
         let itszero = BasicValueEnum::IntValue(i64.const_zero());
 
-        CompilerCore::make_global(m, "true", itstrue, Linkage::Internal);
-        CompilerCore::make_global(m, "false", itsfalse, Linkage::Internal);
-        CompilerCore::make_global(m, "g_FreedObjects", itszero, Linkage::Internal);
+        CompilerCore::make_global(
+            m,
+            "true",
+            itstrue.get_type(),
+            Some(itstrue),
+            Linkage::Internal,
+        );
+        CompilerCore::make_global(
+            m,
+            "false",
+            itsfalse.get_type(),
+            Some(itsfalse),
+            Linkage::Internal,
+        );
+        CompilerCore::make_global(
+            m,
+            "g_FreedObjects",
+            itszero.get_type(),
+            Some(itszero),
+            Linkage::Internal,
+        );
 
         let trap_type = void.fn_type(&[], false);
         m.add_function("llvm.trap", trap_type, Some(Linkage::Internal));
@@ -350,6 +374,9 @@ impl<'a> CompilerCore<'a> {
         for ef in &bom.functions {
             ef.import(self, &self.globals);
         }
+        for gv in &bom.variables {
+            gv.import(self, &self.globals);
+        }
     }
 
     pub fn compile(&self) -> bool {
@@ -446,24 +473,25 @@ impl<'a> CompilerCore<'a> {
                                 ));
                             }
                         }
-                        crate::ast::TopLevelDecl::Variable(vd) => {
+                        crate::ast::TopLevelDecl::Variable(gvd) => {
+                            let vd = &gvd.decl;
                             if vd.val.is_some() {
                                 self.error(CompilerError::new(
-                                    tld.loc,
+                                    gvd.loc,
                                     Error::InternalError(String::from(
                                         "globals cannot be initialized",
                                     )),
                                 ));
                             } else if !vd.rw {
                                 self.error(CompilerError::new(
-                                    tld.loc,
+                                    gvd.loc,
                                     Error::InternalError(String::from(
                                         "globals cannot be read-only",
                                     )),
                                 ));
                             } else if vd.ty.is_none() {
                                 self.error(CompilerError::new(
-                                    tld.loc,
+                                    gvd.loc,
                                     Error::InternalError(String::from(
                                         "globals must be explicitly typed",
                                     )),
@@ -473,12 +501,18 @@ impl<'a> CompilerCore<'a> {
                                 if let Some(var_type) = tb
                                     .llvm_type_by_descriptor(&self.globals, vd.ty.as_ref().unwrap())
                                 {
-                                    let global = self.module.add_global(
-                                        var_type,
-                                        Default::default(),
+                                    let global = CompilerCore::make_global(
+                                        &self.module,
                                         &vd.name,
+                                        var_type,
+                                        Some(TypeBuilder::zero_for_type(var_type)),
+                                        if gvd.export {
+                                            Linkage::External
+                                        } else {
+                                            Linkage::Internal
+                                        },
                                     );
-                                    global.set_initializer(&TypeBuilder::zero_for_type(var_type));
+
                                     let vi = VarInfo::new(
                                         tld.loc,
                                         vd.name.clone(),
@@ -486,9 +520,17 @@ impl<'a> CompilerCore<'a> {
                                         true,
                                     );
                                     self.globals.insert_variable(&vd.name, vi, true);
+
+                                    if gvd.export {
+                                        let bom_entry = VariableBomEntry::new(
+                                            global.get_name().to_str().unwrap(),
+                                            vd.ty.as_ref().unwrap(),
+                                        );
+                                        self.bom.borrow_mut().variables.push(bom_entry);
+                                    }
                                 } else {
                                     self.error(CompilerError::new(
-                                        tld.loc,
+                                        gvd.loc,
                                         Error::TypeNotFound(vd.ty.as_ref().unwrap().clone()),
                                     ));
                                 }

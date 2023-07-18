@@ -335,6 +335,13 @@ pub struct VarDecl {
 }
 
 #[derive(Clone, Debug)]
+pub struct GlobalVarDecl {
+    pub loc: Location,
+    pub decl: VarDecl,
+    pub export: bool,
+}
+
+#[derive(Clone, Debug)]
 pub struct WhileStmt {
     pub cond: Box<Expression>,
     pub body: Box<Statement>,
@@ -415,7 +422,7 @@ pub enum TopLevelDecl {
     Structure(RawStructDecl),
     Alias(TypeAliasDecl),
     Implementation(ImplDecl),
-    Variable(VarDecl),
+    Variable(GlobalVarDecl),
     Import(ImportDecl),
 }
 
@@ -461,7 +468,7 @@ impl TopLevelDeclaration {
         }
     }
 
-    pub fn variable(l: Location, v: VarDecl) -> Self {
+    pub fn variable(l: Location, v: GlobalVarDecl) -> Self {
         Self {
             loc: l,
             payload: TopLevelDecl::Variable(v),

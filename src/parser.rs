@@ -406,9 +406,10 @@ peg::parser! {
         }
 
         rule var_decl_toplevel() -> TopLevelDeclaration =
-        _ start:position!() vd:var_decl_body() _ ";" _ end:position!() {
+        _ start:position!() e:export_attribute() vd:var_decl_body() _ ";" _ end:position!() {
             let loc = Location{start,end};
-            TopLevelDeclaration::variable(loc, vd)
+            let gvd = GlobalVarDecl{ loc, decl:vd, export:e };
+            TopLevelDeclaration::variable(loc, gvd)
         }
 
         rule func_call_args() -> Vec<Expression> =
