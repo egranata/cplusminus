@@ -16,7 +16,7 @@ use inkwell::{
     context::Context,
     module::{Linkage, Module},
     passes::{PassManager, PassManagerBuilder},
-    targets::{Target, TargetTriple},
+    targets::{Target, TargetMachine, TargetTriple},
     types::{BasicTypeEnum, FloatType, IntType, VoidType},
     values::{BasicValueEnum, FloatValue, FunctionValue, GlobalValue, IntValue},
 };
@@ -125,6 +125,8 @@ pub struct CompilerCore<'a> {
     pub context: &'a Context,
     pub refcnt: Refcounting<'a>,
     pub module: Rc<Module<'a>>,
+    pub target: Rc<Target>,
+    pub machine: Rc<TargetMachine>,
     pub source: Input,
     pub options: CompilerOptions,
     pub structs: MutableOf<HashMap<String, Structure<'a>>>,
@@ -144,12 +146,28 @@ impl<'a> CompilerCore<'a> {
         let triple = TargetTriple::create(triple);
         let module = Rc::new(context.create_module(""));
         module.set_triple(&triple);
+
+        Target::initialize_all(&Default::default());
+        let target = Target::from_triple(&triple).expect("unable to create a target");
+        let tm = target
+            .create_target_machine(
+                &triple,
+                Default::default(),
+                Default::default(),
+                Default::default(),
+                inkwell::targets::RelocMode::Default,
+                inkwell::targets::CodeModel::Default,
+            )
+            .expect("unable to create a target machine");
+
         CompilerCore::fill_globals(&module, context);
         let refcnt = CompilerCore::fill_refcounting(&module, context, &options);
         let new = Self {
             context,
             refcnt,
             module,
+            target: Rc::from(target),
+            machine: Rc::from(tm),
             source: src.clone(),
             options,
             structs: Rc::new(RefCell::new(HashMap::new())),
@@ -159,7 +177,14 @@ impl<'a> CompilerCore<'a> {
             bom: Default::default(),
         };
         new.fill_default_types();
+        new.forbid_32bit_targets();
         new
+    }
+
+    fn forbid_32bit_targets(&self) {
+        if self.machine.get_target_data().get_pointer_byte_size(None) != 8 {
+            self.error(CompilerError::unbound(Error::ThirtyTwoBitUnsupported));
+        }
     }
 
     fn fill_default_types(&self) {
@@ -531,41 +556,15 @@ impl<'a> CompilerCore<'a> {
     }
 
     fn dump_to_asm(&self, out: &Path) {
-        Target::initialize_all(&Default::default());
-        if let Ok(target) = Target::from_triple(&self.module.get_triple()) {
-            if let Some(tm) = target.create_target_machine(
-                &self.module.get_triple(),
-                Default::default(),
-                Default::default(),
-                Default::default(),
-                inkwell::targets::RelocMode::Default,
-                inkwell::targets::CodeModel::Default,
-            ) {
-                let _ = tm.write_to_file(&self.module, inkwell::targets::FileType::Assembly, out);
-                return;
-            }
-        }
-
-        panic!("unable to create a target");
+        let _ = self
+            .machine
+            .write_to_file(&self.module, inkwell::targets::FileType::Assembly, out);
     }
 
     fn dump_to_obj(&self, out: &Path) {
-        Target::initialize_all(&Default::default());
-        if let Ok(target) = Target::from_triple(&self.module.get_triple()) {
-            if let Some(tm) = target.create_target_machine(
-                &self.module.get_triple(),
-                Default::default(),
-                Default::default(),
-                Default::default(),
-                inkwell::targets::RelocMode::DynamicNoPic,
-                inkwell::targets::CodeModel::Default,
-            ) {
-                let _ = tm.write_to_file(&self.module, inkwell::targets::FileType::Object, out);
-                return;
-            }
-        }
-
-        panic!("unable to create a target");
+        let _ = self
+            .machine
+            .write_to_file(&self.module, inkwell::targets::FileType::Object, out);
     }
 
     fn dump_to_binary(&self, out: &Path) {

@@ -24,6 +24,12 @@ pub struct Location {
     pub end: usize,
 }
 
+impl Location {
+    pub fn origin() -> Self {
+        Self { start: 0, end: 0 }
+    }
+}
+
 // defined not inline within the TypeDescriptor because it
 // makes the resulting BOM easier to read
 #[derive(Clone, Debug, Serialize, Deserialize)]

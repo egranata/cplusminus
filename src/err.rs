@@ -44,6 +44,7 @@ pub enum Error {
     RefTypeInValTypeForbidden,
     BreakOutsideOfLoop,
     ContinueOutsideOfLoop,
+    ThirtyTwoBitUnsupported,
 }
 
 impl Display for Error {
@@ -112,6 +113,9 @@ impl Display for Error {
             Error::BreakOutsideOfLoop | Error::ContinueOutsideOfLoop => {
                 write!(f, "this statement cannot be used outside of a loop")
             }
+            Error::ThirtyTwoBitUnsupported => {
+                write!(f, "C± does not support compilation for 32-bit targets")
+            }
         }
     }
 }
@@ -131,6 +135,12 @@ pub struct CompilerError {
 impl CompilerError {
     pub fn new(loc: Location, err: Error) -> Self {
         Self { loc, err }
+    }
+    pub fn unbound(err: Error) -> Self {
+        Self {
+            loc: Location::origin(),
+            err,
+        }
     }
 }
 
@@ -166,5 +176,11 @@ pub struct CompilerWarning {
 impl CompilerWarning {
     pub fn new(loc: Location, warn: Warning) -> Self {
         Self { loc, warn }
+    }
+    pub fn unbound(warn: Warning) -> Self {
+        Self {
+            loc: Location::origin(),
+            warn,
+        }
     }
 }
