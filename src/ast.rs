@@ -190,6 +190,13 @@ pub struct FunctionDecl {
 }
 
 #[derive(Clone, Debug)]
+pub struct ExternFunction {
+    pub loc: Location,
+    pub decl: FunctionDecl,
+    pub export: bool,
+}
+
+#[derive(Clone, Debug)]
 pub struct FunctionDefinition {
     pub decl: FunctionDecl,
     pub body: Statement,
@@ -398,7 +405,7 @@ pub struct ImportDecl {
 #[derive(Clone, Debug)]
 pub enum TopLevelDecl {
     Function(FunctionDefinition),
-    ExternFunction(FunctionDecl),
+    Extern(ExternFunction),
     Structure(RawStructDecl),
     Alias(TypeAliasDecl),
     Implementation(ImplDecl),
@@ -420,10 +427,10 @@ impl TopLevelDeclaration {
         }
     }
 
-    pub fn extern_function(l: Location, f: FunctionDecl) -> Self {
+    pub fn extern_function(l: Location, f: ExternFunction) -> Self {
         Self {
             loc: l,
-            payload: TopLevelDecl::ExternFunction(f),
+            payload: TopLevelDecl::Extern(f),
         }
     }
 

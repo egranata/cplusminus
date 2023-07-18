@@ -292,11 +292,11 @@ impl<'a> CompilerCore<'a> {
                     true
                 }
             }
-            TopLevelDecl::ExternFunction(fd) => {
-                if fd.name.starts_with("__") {
+            TopLevelDecl::Extern(fd) => {
+                if fd.decl.name.starts_with("__") {
                     self.error(CompilerError::new(
                         fd.loc,
-                        Error::ReservedIdentifier(fd.name.clone()),
+                        Error::ReservedIdentifier(fd.decl.name.clone()),
                     ));
                     false
                 } else {
@@ -351,14 +351,19 @@ impl<'a> CompilerCore<'a> {
                                 }
                             }
                         }
-                        crate::ast::TopLevelDecl::ExternFunction(fd) => {
+                        crate::ast::TopLevelDecl::Extern(fd) => {
                             let fb = FunctionBuilder::new(self.clone());
                             let opts = FunctionBuilderOptions::default()
                                 .extrn(true)
                                 .global(true)
                                 .mangle(false)
                                 .commit();
-                            fb.declare(&self.globals, fd, opts);
+                            if let Some(fv) = fb.declare(&self.globals, &fd.decl, opts) {
+                                if fd.export {
+                                    let bom_entry = FunctionBomEntry::new(&fd.decl.name, fv);
+                                    self.bom.borrow_mut().functions.push(bom_entry);
+                                }
+                            }
                         }
                         crate::ast::TopLevelDecl::Structure(sd) => {
                             let ty = TypeBuilder::new(self.clone());
@@ -475,7 +480,7 @@ impl<'a> CompilerCore<'a> {
                         }
 
                         crate::ast::TopLevelDecl::Alias(..)
-                        | crate::ast::TopLevelDecl::ExternFunction(..)
+                        | crate::ast::TopLevelDecl::Extern(..)
                         | crate::ast::TopLevelDecl::Implementation(..)
                         | crate::ast::TopLevelDecl::Import(..)
                         | crate::ast::TopLevelDecl::Structure(..)

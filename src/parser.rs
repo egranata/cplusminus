@@ -343,12 +343,13 @@ peg::parser! {
         _ "ret" _ ty:typename() _ { ty }
 
         rule extern_function() -> TopLevelDeclaration =
-        _ start:position!() "extern" __() v:vararg_attribute() "func" __() name:ident() "(" _ args:func_arg()**"," _ ")" _ ty:function_ret()? _ ";" _ end:position!() _ {
+        _ start:position!() export:export_attribute() "extern" __() v:vararg_attribute() "func" __() name:ident() "(" _ args:func_arg()**"," _ ")" _ ty:function_ret()? _ ";" _ end:position!() _ {
             let arg_types: Vec<TypeDescriptor> = args.iter().map(|arg| arg.ty.clone()).collect();
             let ftd = FunctionTypeDescriptor::new(arg_types, ty.map(Box::new), v);
             let td = TypeDescriptor::Function(ftd);
             let decl = FunctionDecl { loc:Location{start,end}, name,args,ty:td };
-            TopLevelDeclaration::extern_function(decl.loc, decl)
+            let extrn = ExternFunction { loc:decl.loc, decl, export };
+            TopLevelDeclaration::extern_function(extrn.loc, extrn)
         }
 
         rule inner_function_def() -> FunctionDefinition =
