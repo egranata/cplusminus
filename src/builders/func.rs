@@ -347,12 +347,12 @@ impl<'a> FunctionBuilder<'a> {
         ret
     }
 
-    pub fn build_method(
+    pub fn declare_method(
         &self,
         scope: &Scope<'a>,
         fd: &FunctionDefinition,
         self_decl: &ProperStructDecl,
-    ) -> Option<FunctionValue<'a>> {
+    ) -> (FunctionDecl, Option<FunctionValue<'a>>) {
         let fqn = mangle_method_name(fd, self_decl);
         let self_tyd = TypeDescriptor::Name(self_decl.name.clone());
         let self_arg = FunctionArgument {
@@ -382,18 +382,28 @@ impl<'a> FunctionBuilder<'a> {
             ty: fn_type,
         };
 
-        let new_def = FunctionDefinition {
-            decl: new_decl,
-            body: fd.body.clone(),
-            export: false,
-        };
-
         let opts = FunctionBuilderOptions::default()
             .extrn(false)
             .global(true)
             .mangle(false)
             .commit();
 
-        self.compile(scope, &new_def, opts)
+        let fv = self.declare(scope, &new_decl, opts);
+        (new_decl, fv)
+    }
+
+    pub fn define_method(
+        &self,
+        scope: &Scope<'a>,
+        fd: &FunctionDefinition,
+        func_decl: &FunctionDecl,
+    ) -> Option<FunctionValue<'a>> {
+        let new_def = FunctionDefinition {
+            decl: func_decl.clone(),
+            body: fd.body.clone(),
+            export: false,
+        };
+
+        self.build(scope, &new_def)
     }
 }

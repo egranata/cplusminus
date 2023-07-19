@@ -626,12 +626,14 @@ impl<'a> TypeBuilder<'a> {
     pub fn build_impl(&self, scope: &Scope<'a>, sd: &Structure<'a>, id: &ImplDecl) {
         let fb = FunctionBuilder::new(self.iw.clone());
         for method in &id.methods {
-            if let Some(func) = fb.build_method(scope, &method.imp, &sd.decl) {
+            let decl = fb.declare_method(scope, &method.imp, &sd.decl);
+            if let Some(func) = decl.1 {
                 let new_method = Method {
                     decl: method.clone(),
                     func,
                 };
                 sd.methods.borrow_mut().push(new_method);
+                fb.define_method(scope, &method.imp, &decl.0);
             } else {
                 self.iw
                     .error(CompilerError::new(method.loc, Error::InvalidExpression));
