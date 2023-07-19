@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use inkwell::{
+    attributes::Attribute,
     builder::Builder,
     context::Context,
     module::{Linkage, Module},
@@ -65,6 +66,24 @@ fn build_refcount_type(c: &Context) -> StructType<'_> {
     __refcount_t
 }
 
+fn add_attributes<'a>(c: &'a Context, f: FunctionValue<'a>) -> FunctionValue<'a> {
+    let optnone = Attribute::get_named_enum_kind_id("optnone");
+    let noinline = Attribute::get_named_enum_kind_id("noinline");
+    let optnone_attribute = c.create_type_attribute(optnone, c.void_type().into());
+    let noinline_attribute = c.create_type_attribute(noinline, c.void_type().into());
+
+    f.add_attribute(
+        inkwell::attributes::AttributeLoc::Function,
+        optnone_attribute,
+    );
+    f.add_attribute(
+        inkwell::attributes::AttributeLoc::Function,
+        noinline_attribute,
+    );
+
+    f
+}
+
 fn build_incref_api<'a>(
     m: &Module<'a>,
     c: &'a Context,
@@ -77,6 +96,7 @@ fn build_incref_api<'a>(
     let incref_t = void.fn_type(&[arg_ty], false);
 
     let incref_f = m.add_function("__incref_f", incref_t, Some(Linkage::Internal));
+    add_attributes(c, incref_f);
     let builder = c.create_builder();
 
     let entry = c.append_basic_block(incref_f, "entry");
@@ -144,19 +164,20 @@ fn build_getref_api<'a>(
 ) -> FunctionValue<'a> {
     let int64 = c.i64_type();
     let arg_ty = BasicMetadataTypeEnum::PointerType(__refcount_t.ptr_type(Default::default()));
-    let incref_t = int64.fn_type(&[arg_ty], false);
+    let getref_t = int64.fn_type(&[arg_ty], false);
 
-    let incref_f = m.add_function("__getref_f", incref_t, Some(Linkage::Internal));
+    let getref_f = m.add_function("__getref_f", getref_t, Some(Linkage::Internal));
+    add_attributes(c, getref_f);
     let builder = c.create_builder();
 
-    let entry = c.append_basic_block(incref_f, "entry");
-    let do_fetch = c.append_basic_block(incref_f, "do_fetch");
-    let exit = c.append_basic_block(incref_f, "exit");
+    let entry = c.append_basic_block(getref_f, "entry");
+    let do_fetch = c.append_basic_block(getref_f, "do_fetch");
+    let exit = c.append_basic_block(getref_f, "exit");
 
     builder.position_at_end(entry);
     let ret_alloca = builder.build_alloca(int64, "ret");
     builder.build_store(ret_alloca, int64.const_zero());
-    let arg0 = incref_f.get_nth_param(0).unwrap().into_pointer_value();
+    let arg0 = getref_f.get_nth_param(0).unwrap().into_pointer_value();
     if options.instrument_refcount {
         let fmt_string = builder
             .build_global_string_ptr("getref(%p)\n", "")
@@ -201,7 +222,7 @@ fn build_getref_api<'a>(
     builder.position_at_end(exit);
     builder.build_return(Some(&builder.build_load(ret_alloca, "rc")));
 
-    incref_f
+    getref_f
 }
 
 fn build_decref_api<'a>(
@@ -216,6 +237,7 @@ fn build_decref_api<'a>(
     let decref_t = void.fn_type(&[arg_ty], false);
 
     let decref_f = m.add_function("__decref_f", decref_t, Some(Linkage::Internal));
+    add_attributes(c, decref_f);
     let builder = c.create_builder();
 
     let one = int64.const_int(1, false);
