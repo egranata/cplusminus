@@ -279,6 +279,29 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         }))
     }
 
+    fn build_ptr_bin_op(
+        &self,
+        builder: &Builder<'a>,
+        x: PointerValue<'a>,
+        y: PointerValue<'a>,
+        op: &Expr,
+    ) -> Option<BasicValueEnum<'a>> {
+        let ptr_diff = builder.build_ptr_diff(x, y, "");
+        let zero = self.iw.builtins.zero(ptr_diff.get_type());
+        self.build_int_bin_op(builder, ptr_diff, zero, op)
+    }
+
+    fn build_ptr_int_bin_op(
+        &self,
+        builder: &Builder<'a>,
+        x: PointerValue<'a>,
+        y: IntValue<'a>,
+        op: &Expr,
+    ) -> Option<BasicValueEnum<'a>> {
+        let x_int = builder.build_ptr_to_int(x, y.get_type(), "");
+        self.build_int_bin_op(builder, x_int, y, op)
+    }
+
     fn build_flt_bin_op(
         &self,
         builder: &Builder<'a>,
@@ -647,17 +670,40 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     None
                 }
             }
-            GreaterThan(x, y)
-            | GreaterEqual(x, y)
-            | LessThan(x, y)
-            | LessEqual(x, y)
-            | Equality(x, y)
-            | NotEqual(x, y) => {
+            GreaterThan(x, y) | GreaterEqual(x, y) | LessThan(x, y) | LessEqual(x, y) => {
                 let (bx, by) =
                     self.get_binop_args(builder, fd, x.as_ref(), y.as_ref(), locals, type_hint);
 
                 if let (Some(IntValue(ix)), Some(IntValue(iy))) = (bx, by) {
                     return self.build_int_bin_op(builder, ix, iy, &node.payload);
+                }
+
+                if let (Some(FloatValue(ix)), Some(FloatValue(iy))) = (bx, by) {
+                    return self.build_flt_bin_op(builder, ix, iy, &node.payload);
+                }
+
+                self.iw
+                    .error(CompilerError::new(node.loc, Error::UnexpectedType(None)));
+                None
+            }
+            Equality(x, y) | NotEqual(x, y) => {
+                let (bx, by) =
+                    self.get_binop_args(builder, fd, x.as_ref(), y.as_ref(), locals, type_hint);
+
+                if let (Some(IntValue(ix)), Some(IntValue(iy))) = (bx, by) {
+                    return self.build_int_bin_op(builder, ix, iy, &node.payload);
+                }
+
+                if let (Some(PointerValue(ix)), Some(PointerValue(iy))) = (bx, by) {
+                    return self.build_ptr_bin_op(builder, ix, iy, &node.payload);
+                }
+
+                if let (Some(PointerValue(ix)), Some(IntValue(iy))) = (bx, by) {
+                    return self.build_ptr_int_bin_op(builder, ix, iy, &node.payload);
+                }
+
+                if let (Some(IntValue(ix)), Some(PointerValue(iy))) = (bx, by) {
+                    return self.build_ptr_int_bin_op(builder, iy, ix, &node.payload);
                 }
 
                 if let (Some(FloatValue(ix)), Some(FloatValue(iy))) = (bx, by) {
