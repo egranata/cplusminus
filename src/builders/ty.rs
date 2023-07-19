@@ -625,6 +625,7 @@ impl<'a> TypeBuilder<'a> {
 
     pub fn build_impl(&self, scope: &Scope<'a>, sd: &Structure<'a>, id: &ImplDecl) {
         let fb = FunctionBuilder::new(self.iw.clone());
+        let mut decls: Vec<FunctionDecl> = vec![];
         for method in &id.methods {
             let decl = fb.declare_method(scope, &method.imp, &sd.decl);
             if let Some(func) = decl.1 {
@@ -633,11 +634,16 @@ impl<'a> TypeBuilder<'a> {
                     func,
                 };
                 sd.methods.borrow_mut().push(new_method);
-                fb.define_method(scope, &method.imp, &decl.0);
+                decls.push(decl.0);
             } else {
                 self.iw
                     .error(CompilerError::new(method.loc, Error::InvalidExpression));
+                return;
             }
+        }
+        for (id, method) in id.methods.iter().enumerate() {
+            let decl = decls.get(id).unwrap();
+            fb.define_method(scope, &method.imp, decl);
         }
     }
 
