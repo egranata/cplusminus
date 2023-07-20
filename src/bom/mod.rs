@@ -15,4 +15,5 @@
 pub mod alias;
 pub mod function;
 pub mod module;
+pub mod strct;
 pub mod variable;

@@ -145,6 +145,7 @@ pub struct RawStructDecl {
     pub name: String,
     pub ms: MemoryStrategy,
     pub entries: Vec<StructEntryDecl>,
+    pub export: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -155,6 +156,7 @@ pub struct ProperStructDecl {
     pub fields: Vec<FieldDecl>,
     pub init: Option<InitDecl>,
     pub dealloc: Option<DeallocDecl>,
+    pub export: bool,
 }
 
 #[derive(Clone, Debug)]

@@ -24,8 +24,9 @@ use inkwell::{
 use crate::{
     ast::{
         DeallocDecl, FieldDecl, FunctionArgument, FunctionDecl, FunctionDefinition,
-        FunctionTypeDescriptor, ImplDecl, InitDecl, ProperStructDecl, TypeDescriptor,
+        FunctionTypeDescriptor, ImplDecl, InitDecl, Location, ProperStructDecl, TypeDescriptor,
     },
+    bom::strct::StructBomEntry,
     codegen::{
         self,
         structure::{MemoryStrategy, Method, Structure},
@@ -405,6 +406,99 @@ impl<'a> TypeBuilder<'a> {
             .export(false)
             .commit();
         fb.compile(scope, &func_def, opts)
+    }
+
+    pub fn build_structure_from_bom(
+        &self,
+        _scope: &Scope<'a>,
+        sd: &StructBomEntry,
+    ) -> Option<StructType<'a>> {
+        let ms = sd.ms;
+        let is_rc = sd.ms == MemoryStrategy::ByReference;
+        let is_val = sd.ms == MemoryStrategy::ByValue;
+
+        // if is_val && sd.init.is_some() {
+        //     self.iw.error(CompilerError::new(
+        //         sd.init.as_ref().unwrap().loc,
+        //         Error::InitDisallowedInValueTypes,
+        //     ));
+        //     return None;
+        // }
+
+        let st_ty = self.iw.context.opaque_struct_type(&sd.name);
+
+        let var_ty = if is_rc {
+            BasicTypeEnum::PointerType(st_ty.ptr_type(Default::default()))
+        } else {
+            BasicTypeEnum::StructType(st_ty)
+        };
+
+        let cdg_st = codegen::structure::Structure {
+            name: sd.name.clone(),
+            str_ty: st_ty,
+            var_ty,
+            ms,
+            fields: Default::default(),
+            methods: Default::default(),
+        };
+        self.iw.add_struct(&cdg_st);
+
+        let mut fields: Vec<BasicTypeEnum> = vec![];
+
+        for fd in &sd.fields {
+            if let Some(field_ty) =
+                self.llvm_type_by_descriptor(&self.iw.globals, &fd.underlying_type)
+            {
+                if is_val && field_ty == BasicTypeEnum::StructType(st_ty) {
+                    self.iw.error(CompilerError::new(
+                        Location::origin(),
+                        Error::RecursiveTypeForbidden(fd.name.clone()),
+                    ));
+                    return None;
+                }
+
+                if is_val && self.is_refcounted_basic_type(field_ty).is_some() {
+                    self.iw.error(CompilerError::new(
+                        Location::origin(),
+                        Error::RefTypeInValTypeForbidden,
+                    ));
+                    return None;
+                }
+
+                fields.push(field_ty);
+                cdg_st.fields.borrow_mut().push(codegen::structure::Field {
+                    name: fd.name.clone(),
+                    ty: field_ty,
+                });
+            } else {
+                self.iw.error(CompilerError::new(
+                    Location::origin(),
+                    Error::TypeNotFound(fd.underlying_type.clone()),
+                ));
+                return None;
+            }
+        }
+
+        st_ty.set_body(&fields, false);
+        //build_dealloc(self, &self.iw, st_ty);
+
+        // if let Some(init) = &sd.init {
+        //     if self.build_init(scope, st_ty, init).is_none() {
+        //         self.iw
+        //             .error(CompilerError::new(init.loc, Error::InvalidExpression));
+        //         return None;
+        //     }
+        // }
+
+        // if let Some(dealloc) = &sd.dealloc {
+        //     if self.build_usr_dealloc(scope, st_ty, dealloc).is_none() {
+        //         self.iw
+        //             .error(CompilerError::new(dealloc.loc, Error::InvalidExpression));
+        //         return None;
+        //     }
+        // }
+
+        Some(st_ty)
     }
 
     pub fn build_structure_from_decl(

@@ -33,7 +33,7 @@ use crate::{
     ast::{Location, ProperStructDecl, RawStructDecl, TopLevelDecl, TopLevelDeclaration},
     bom::{
         alias::AliasBomEntry, function::FunctionBomEntry, module::BillOfMaterials,
-        variable::VariableBomEntry,
+        strct::StructBomEntry, variable::VariableBomEntry,
     },
     builders::{
         func::{FunctionBuilder, FunctionBuilderOptions},
@@ -267,10 +267,12 @@ impl<'a> CompilerCore<'a> {
         ty: BasicTypeEnum<'a>,
         val: Option<BasicValueEnum<'a>>,
         lnk: Linkage,
+        constant: bool,
     ) -> GlobalValue<'a> {
         let global = m.add_global(ty, Default::default(), name);
         if let Some(val) = val {
             global.set_initializer(&val);
+            global.set_constant(constant);
         }
         global.set_linkage(lnk);
         global
@@ -291,6 +293,7 @@ impl<'a> CompilerCore<'a> {
             itstrue.get_type(),
             Some(itstrue),
             Linkage::Internal,
+            true,
         );
         CompilerCore::make_global(
             m,
@@ -298,6 +301,7 @@ impl<'a> CompilerCore<'a> {
             itsfalse.get_type(),
             Some(itsfalse),
             Linkage::Internal,
+            true,
         );
         CompilerCore::make_global(
             m,
@@ -305,6 +309,7 @@ impl<'a> CompilerCore<'a> {
             itszero.get_type(),
             Some(itszero),
             Linkage::Internal,
+            false,
         );
 
         let trap_type = void.fn_type(&[], false);
@@ -331,6 +336,7 @@ impl<'a> CompilerCore<'a> {
             fields: vec![],
             init: None,
             dealloc: None,
+            export: raw.export,
         };
 
         for entry in &raw.entries {
@@ -431,6 +437,9 @@ impl<'a> CompilerCore<'a> {
         for gv in &bom.variables {
             gv.import(self, &self.globals);
         }
+        for sd in &bom.structs {
+            sd.import(self, &self.globals);
+        }
     }
 
     pub fn compile(&self) -> bool {
@@ -471,7 +480,15 @@ impl<'a> CompilerCore<'a> {
                         crate::ast::TopLevelDecl::Structure(sd) => {
                             let ty = TypeBuilder::new(self.clone());
                             if let Some(psd) = self.fixup_struct_decl(sd) {
-                                if ty.build_structure_from_decl(&self.globals, &psd).is_none() {
+                                if let Some(st) = ty.build_structure_from_decl(&self.globals, &psd)
+                                {
+                                    if let Some(strct) = ty.struct_by_name(st) {
+                                        if psd.export {
+                                            let bom_entry = StructBomEntry::new(&strct);
+                                            self.bom.borrow_mut().structs.push(bom_entry);
+                                        }
+                                    }
+                                } else {
                                     self.error(CompilerError::new(
                                         sd.loc,
                                         Error::InvalidExpression,
@@ -566,6 +583,7 @@ impl<'a> CompilerCore<'a> {
                                         } else {
                                             Linkage::Internal
                                         },
+                                        false,
                                     );
 
                                     let vi = VarInfo::new(

@@ -49,6 +49,7 @@ impl VariableBomEntry {
             var_type,
             None,
             inkwell::module::Linkage::AvailableExternally,
+            false,
         );
 
         let vi = VarInfo::new(

@@ -273,9 +273,9 @@ peg::parser! {
         _ s:$("ref" / "val") __() { s == "ref" }
 
         rule struct_decl() -> TopLevelDeclaration =
-        _ start:position!() rd:ref_val_decl()? "type" __() n:ident() _ "{" _ f:(struct_entry()**",") _ "}" end:position!() _ {
+        _ start:position!() export:export_attribute() rd:ref_val_decl()? "type" __() n:ident() _ "{" _ f:(struct_entry()**",") _ "}" end:position!() _ {
             let ms = if rd.unwrap_or(true) { crate::codegen::structure::MemoryStrategy::ByReference } else { crate::codegen::structure::MemoryStrategy::ByValue };
-            let sd = RawStructDecl { loc:Location{start,end}, name:n, ms, entries:f };
+            let sd = RawStructDecl { loc:Location{start,end}, name:n, ms, entries:f, export };
             TopLevelDeclaration::structure(sd.loc, sd)
         }
 

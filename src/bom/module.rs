@@ -19,7 +19,10 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use super::{alias::AliasBomEntry, function::FunctionBomEntry, variable::VariableBomEntry};
+use super::{
+    alias::AliasBomEntry, function::FunctionBomEntry, strct::StructBomEntry,
+    variable::VariableBomEntry,
+};
 
 const BILL_OF_MATERIALS_VERSION: i32 = 1;
 
@@ -29,6 +32,7 @@ pub struct BillOfMaterials {
     pub functions: Vec<FunctionBomEntry>,
     pub aliases: Vec<AliasBomEntry>,
     pub variables: Vec<VariableBomEntry>,
+    pub structs: Vec<StructBomEntry>,
 }
 
 impl Default for BillOfMaterials {
@@ -38,6 +42,7 @@ impl Default for BillOfMaterials {
             functions: Default::default(),
             aliases: Default::default(),
             variables: Default::default(),
+            structs: Default::default(),
         }
     }
 }

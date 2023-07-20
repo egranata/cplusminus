@@ -18,6 +18,7 @@ use inkwell::{
     types::{BasicTypeEnum, StructType},
     values::FunctionValue,
 };
+use serde::{Deserialize, Serialize};
 
 use super::MutableOf;
 
@@ -33,7 +34,7 @@ pub struct Method<'a> {
     pub func: FunctionValue<'a>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MemoryStrategy {
     ByValue,
     ByReference,
