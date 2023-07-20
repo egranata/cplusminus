@@ -25,6 +25,7 @@ use crate::{
     ast::{
         FunctionArgument, FunctionDecl, FunctionDefinition, FunctionTypeDescriptor, TypeDescriptor,
     },
+    bom::function::FunctionBomEntry,
     codegen::structure::Structure,
     err::{CompilerError, CompilerWarning, Error, Warning},
     iw::CompilerCore,
@@ -43,6 +44,7 @@ pub struct FunctionBuilderOptions {
     extrn: bool,
     global: bool,
     want_mangle: bool,
+    export: bool,
 }
 
 impl FunctionBuilderOptions {
@@ -58,6 +60,11 @@ impl FunctionBuilderOptions {
 
     pub fn mangle(&mut self, m: bool) -> &mut Self {
         self.want_mangle = m;
+        self
+    }
+
+    pub fn export(&mut self, e: bool) -> &mut Self {
+        self.export = e;
         self
     }
 
@@ -344,6 +351,13 @@ impl<'a> FunctionBuilder<'a> {
             }
         }
 
+        if let Some(fv) = ret {
+            if opts.export {
+                let bom_entry = FunctionBomEntry::new(&func.name, fv);
+                self.iw.bom.borrow_mut().functions.push(bom_entry);
+            }
+        }
+
         ret
     }
 
@@ -386,6 +400,7 @@ impl<'a> FunctionBuilder<'a> {
             .extrn(false)
             .global(true)
             .mangle(false)
+            .export(false)
             .commit();
 
         let fv = self.declare(scope, &new_decl, opts);

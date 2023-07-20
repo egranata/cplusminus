@@ -141,6 +141,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                     .extrn(false)
                     .global(false)
                     .mangle(true)
+                    .export(false)
                     .commit();
                 if fb.compile(locals, tld.as_ref(), opts).is_none() {
                     self.iw

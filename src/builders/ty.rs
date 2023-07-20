@@ -359,6 +359,7 @@ impl<'a> TypeBuilder<'a> {
             .extrn(false)
             .global(true)
             .mangle(false)
+            .export(false)
             .commit();
         fb.compile(scope, &func_def, opts)
     }
@@ -401,6 +402,7 @@ impl<'a> TypeBuilder<'a> {
             .extrn(false)
             .global(true)
             .mangle(false)
+            .export(false)
             .commit();
         fb.compile(scope, &func_def, opts)
     }

@@ -395,13 +395,9 @@ impl<'a> CompilerCore<'a> {
                                 .extrn(false)
                                 .global(true)
                                 .mangle(false)
+                                .export(fd.export)
                                 .commit();
-                            if let Some(fv) = fb.declare(&self.globals, &fd.decl, opts) {
-                                if fd.export {
-                                    let bom_entry = FunctionBomEntry::new(&fd.decl.name, fv);
-                                    self.bom.borrow_mut().functions.push(bom_entry);
-                                }
-                            }
+                            fb.declare(&self.globals, &fd.decl, opts);
                         }
                         crate::ast::TopLevelDecl::Extern(fd) => {
                             let fb = FunctionBuilder::new(self.clone());
@@ -409,6 +405,7 @@ impl<'a> CompilerCore<'a> {
                                 .extrn(true)
                                 .global(true)
                                 .mangle(false)
+                                .export(false)
                                 .commit();
                             if let Some(fv) = fb.declare(&self.globals, &fd.decl, opts) {
                                 if fd.export {
