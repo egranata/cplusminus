@@ -405,7 +405,11 @@ impl<'a> TypeBuilder<'a> {
         fb.compile(scope, &func_def, opts)
     }
 
-    pub fn build_structure(&self, scope: &Scope<'a>, sd: &ProperStructDecl) -> Option<StructType> {
+    pub fn build_structure_from_decl(
+        &self,
+        scope: &Scope<'a>,
+        sd: &ProperStructDecl,
+    ) -> Option<StructType> {
         let ms = sd.ms;
         let is_rc = sd.ms == MemoryStrategy::ByReference;
         let is_val = sd.ms == MemoryStrategy::ByValue;
@@ -427,7 +431,7 @@ impl<'a> TypeBuilder<'a> {
         };
 
         let cdg_st = codegen::structure::Structure {
-            decl: sd.clone(),
+            name: sd.name.clone(),
             str_ty: st_ty,
             var_ty,
             ms,
@@ -484,7 +488,7 @@ impl<'a> TypeBuilder<'a> {
 
                 fields.push(field_ty);
                 cdg_st.fields.borrow_mut().push(codegen::structure::Field {
-                    decl: fd.clone(),
+                    name: fd.name.clone(),
                     ty: field_ty,
                 });
             } else {
@@ -627,10 +631,10 @@ impl<'a> TypeBuilder<'a> {
         let fb = FunctionBuilder::new(self.iw.clone());
         let mut decls: Vec<FunctionDecl> = vec![];
         for method in &id.methods {
-            let decl = fb.declare_method(scope, &method.imp, &sd.decl);
+            let decl = fb.declare_method(scope, &method.imp, sd);
             if let Some(func) = decl.1 {
                 let new_method = Method {
-                    decl: method.clone(),
+                    name: method.imp.decl.name.clone(),
                     func,
                 };
                 sd.methods.borrow_mut().push(new_method);

@@ -19,19 +19,17 @@ use inkwell::{
     values::FunctionValue,
 };
 
-use crate::ast::{FieldDecl, MethodDecl, ProperStructDecl};
-
 use super::MutableOf;
 
 #[derive(Clone, Debug)]
 pub struct Field<'a> {
-    pub decl: FieldDecl,
+    pub name: String,
     pub ty: BasicTypeEnum<'a>,
 }
 
 #[derive(Clone, Debug)]
 pub struct Method<'a> {
-    pub decl: MethodDecl,
+    pub name: String,
     pub func: FunctionValue<'a>,
 }
 
@@ -57,7 +55,7 @@ impl Display for MemoryStrategy {
 
 #[derive(Clone, Debug)]
 pub struct Structure<'a> {
-    pub decl: ProperStructDecl,
+    pub name: String,
     pub str_ty: StructType<'a>,
     pub var_ty: BasicTypeEnum<'a>,
     pub ms: MemoryStrategy,
@@ -70,7 +68,7 @@ impl<'a> Structure<'a> {
         let fields: &Vec<Field<'a>> = &self.fields.borrow();
         let iter = zip(fields.iter(), 0..fields.len());
         for (fd, idx) in iter {
-            if fd.decl.name == name {
+            if fd.name == name {
                 return Some(idx);
             };
         }
@@ -81,7 +79,7 @@ impl<'a> Structure<'a> {
     pub fn field_type_by_name(&self, name: &str) -> Option<BasicTypeEnum<'a>> {
         let fields: &Vec<Field<'a>> = &self.fields.borrow();
         for fd in fields.iter() {
-            if fd.decl.name == name {
+            if fd.name == name {
                 return Some(fd.ty);
             };
         }
@@ -91,7 +89,7 @@ impl<'a> Structure<'a> {
 
     pub fn method_by_name(&self, name: &str) -> Option<Method<'a>> {
         for method in self.methods.borrow().iter() {
-            if method.decl.imp.decl.name == name {
+            if method.name == name {
                 return Some(method.clone());
             }
         }

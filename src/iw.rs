@@ -420,7 +420,7 @@ impl<'a> CompilerCore<'a> {
                         crate::ast::TopLevelDecl::Structure(sd) => {
                             let ty = TypeBuilder::new(self.clone());
                             if let Some(psd) = self.fixup_struct_decl(sd) {
-                                if ty.build_structure(&self.globals, &psd).is_none() {
+                                if ty.build_structure_from_decl(&self.globals, &psd).is_none() {
                                     self.error(CompilerError::new(
                                         sd.loc,
                                         Error::InvalidExpression,
@@ -665,7 +665,7 @@ impl<'a> CompilerCore<'a> {
     pub fn add_struct(&self, sd: &Structure<'a>) {
         self.structs
             .borrow_mut()
-            .insert(sd.decl.name.clone(), sd.clone());
+            .insert(sd.name.clone(), sd.clone());
     }
 
     pub fn error(&self, err: CompilerError) {

@@ -15,7 +15,7 @@
 use inkwell::types::StructType;
 
 use crate::{
-    ast::{FunctionDecl, FunctionDefinition, ProperStructDecl},
+    ast::{FunctionDecl, FunctionDefinition},
     builders::ty::TypeBuilder,
 };
 
@@ -43,11 +43,11 @@ pub fn mangle_special_method(self_decl: StructType<'_>, func: SpecialMemberFunct
     )
 }
 
-pub fn mangle_method_name(fd: &FunctionDefinition, self_decl: &ProperStructDecl) -> String {
+pub fn mangle_method_name(fd: &FunctionDefinition, self_name: &str) -> String {
     format!(
         "@__{}{}__{}{}",
-        self_decl.name.len(),
-        self_decl.name,
+        self_name.len(),
+        self_name,
         fd.decl.name.len(),
         fd.decl.name
     )

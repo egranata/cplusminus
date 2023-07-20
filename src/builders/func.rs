@@ -23,9 +23,9 @@ use inkwell::{
 
 use crate::{
     ast::{
-        FunctionArgument, FunctionDecl, FunctionDefinition, FunctionTypeDescriptor,
-        ProperStructDecl, TypeDescriptor,
+        FunctionArgument, FunctionDecl, FunctionDefinition, FunctionTypeDescriptor, TypeDescriptor,
     },
+    codegen::structure::Structure,
     err::{CompilerError, CompilerWarning, Error, Warning},
     iw::CompilerCore,
     mangler::{mangle_function_name, mangle_method_name},
@@ -351,9 +351,9 @@ impl<'a> FunctionBuilder<'a> {
         &self,
         scope: &Scope<'a>,
         fd: &FunctionDefinition,
-        self_decl: &ProperStructDecl,
+        self_decl: &Structure<'a>,
     ) -> (FunctionDecl, Option<FunctionValue<'a>>) {
-        let fqn = mangle_method_name(fd, self_decl);
+        let fqn = mangle_method_name(fd, &self_decl.name);
         let self_tyd = TypeDescriptor::Name(self_decl.name.clone());
         let self_arg = FunctionArgument {
             loc: fd.decl.loc,
