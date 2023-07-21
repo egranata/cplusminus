@@ -67,11 +67,42 @@ impl Input {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct CompilerOptions {
+    pub triple: String,
     pub warn_as_err: bool,
     pub instrument_refcount: bool,
     pub link_extras: Vec<String>,
+    pub dump_ir_text: bool,
+    pub dump_bom: bool,
+    pub optimize: bool,
+}
+
+impl Default for CompilerOptions {
+    fn default() -> Self {
+        Self {
+            triple: String::from("x86_64-pc-linux-gnu"),
+            warn_as_err: false,
+            instrument_refcount: false,
+            link_extras: vec![],
+            dump_ir_text: false,
+            dump_bom: false,
+            optimize: false,
+        }
+    }
+}
+
+impl CompilerOptions {
+    pub fn unoptimized() -> Self {
+        Default::default()
+    }
+
+    pub fn optimized() -> Self {
+        Self {
+            optimize: true,
+            ..Default::default()
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -140,13 +171,8 @@ pub struct CompilerCore<'a> {
 }
 
 impl<'a> CompilerCore<'a> {
-    pub fn new(
-        context: &'a Context,
-        triple: &str,
-        src: &Input,
-        options: CompilerOptions,
-    ) -> CompilerCore<'a> {
-        let triple = TargetTriple::create(triple);
+    pub fn new(context: &'a Context, src: &Input, options: CompilerOptions) -> CompilerCore<'a> {
+        let triple = TargetTriple::create(&options.triple);
         let module = Rc::new(context.create_module(""));
         module.set_triple(&triple);
 
@@ -642,8 +668,7 @@ impl<'a> CompilerCore<'a> {
         }
     }
 
-    pub fn dump(&self, dest: &str) {
-        let path = Path::new(dest);
+    pub fn dump(&self, path: &Path) {
         let ext = path.extension().map(|osstr| osstr.to_str().unwrap());
         match ext {
             Some("ir") => self.dump_to_ir(path),
@@ -654,8 +679,7 @@ impl<'a> CompilerCore<'a> {
         }
     }
 
-    pub fn dump_bom(&self, dest: &str) {
-        let path = Path::new(dest);
+    pub fn dump_bom(&self, path: &Path) {
         self.bom.borrow().write(path);
     }
 

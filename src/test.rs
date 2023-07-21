@@ -16,19 +16,17 @@ use std::fmt::Display;
 
 #[derive(Clone, Debug)]
 enum TestFailure {
-    CompileTime(Vec<crate::err::CompilerDiagnostic>),
-    RuntimeNoMain,
     RuntimeNoSpawn(String),
     RuntimeNoExitCode,
+    RuntimeJit(String),
 }
 
 impl Display for TestFailure {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TestFailure::CompileTime(_) => write!(f, "compilation failed"),
-            TestFailure::RuntimeNoMain => write!(f, "main function not found"),
             TestFailure::RuntimeNoSpawn(err) => write!(f, "program execution failed: {err}"),
             TestFailure::RuntimeNoExitCode => write!(f, "program did not exit with a result"),
+            TestFailure::RuntimeJit(err) => write!(f, "LLVM JIT error: {err}"),
         }
     }
 }
@@ -45,55 +43,53 @@ impl Drop for FileToBeDropped {
 
 #[cfg(test)]
 mod aout_tests {
-    use crate::iw::{self, Input};
-    use inkwell::context::Context;
+    use std::path::PathBuf;
+
+    use crate::iw::CompilerOptions;
     use rand::Rng;
 
     use super::{FileToBeDropped, TestFailure};
 
-    fn compile_run_temp(program: &str, optimize: bool) -> Result<i32, TestFailure> {
+    fn compile_run_temp(program: &PathBuf, optimize: bool) -> Result<i32, TestFailure> {
+        let compiler_options = if optimize {
+            CompilerOptions::unoptimized()
+        } else {
+            CompilerOptions::optimized()
+        };
+
         let mut rng = rand::thread_rng();
-        let llvm = Context::create();
-        let source = Input::from_string(program);
-        let iwell =
-            iw::CompilerCore::new(&llvm, "x86_64-pc-linux-gnu", &source, Default::default());
-        if iwell.compile() {
-            if optimize {
-                iwell.run_passes();
-            }
-            let mut temp_dir = std::env::temp_dir();
-            let n: u32 = rng.gen();
-            temp_dir.push(format!("test{}.out", n));
-            let temp_aout_path = FileToBeDropped {
-                path: temp_dir.as_path().as_os_str().to_str().unwrap().to_string(),
-            };
-            iwell.dump(&temp_aout_path.path);
-            println!("trying to run {}", &temp_aout_path.path);
-            let mut cmd = std::process::Command::new(&temp_aout_path.path);
-            match cmd.spawn() {
-                Ok(mut child) => match child.wait() {
-                    Ok(exit) => match exit.code() {
-                        Some(code) => return Ok(code),
-                        None => return Err(TestFailure::RuntimeNoExitCode),
-                    },
-                    Err(err) => {
-                        return Err(TestFailure::RuntimeNoSpawn(err.to_string()));
-                    }
+        let mut temp_dir = std::env::temp_dir();
+        let n: u32 = rng.gen();
+        temp_dir.push(format!("test{}.out", n));
+        let temp_aout_path = FileToBeDropped {
+            path: temp_dir.as_path().as_os_str().to_str().unwrap().to_string(),
+        };
+
+        crate::driver::build_aout(
+            &[program.to_path_buf()],
+            PathBuf::from(&temp_aout_path.path),
+            compiler_options,
+        );
+        let mut cmd = std::process::Command::new(&temp_aout_path.path);
+        match cmd.spawn() {
+            Ok(mut child) => match child.wait() {
+                Ok(exit) => match exit.code() {
+                    Some(code) => return Ok(code),
+                    None => return Err(TestFailure::RuntimeNoExitCode),
                 },
                 Err(err) => {
                     return Err(TestFailure::RuntimeNoSpawn(err.to_string()));
                 }
+            },
+            Err(err) => {
+                return Err(TestFailure::RuntimeNoSpawn(err.to_string()));
             }
-        } else {
-            return Err(TestFailure::CompileTime(
-                iwell.diagnostics.as_ref().borrow().clone(),
-            ));
         }
     }
 
-    fn expect_aout_pass(program: &str) {
+    fn expect_aout_pass(program: PathBuf) {
         for opt in &[false, true] {
-            let result = compile_run_temp(program, *opt);
+            let result = compile_run_temp(&program, *opt);
             if result.is_ok() {
                 assert!(result.unwrap() == 0);
             } else {
@@ -103,9 +99,9 @@ mod aout_tests {
         }
     }
 
-    fn expect_aout_fail(program: &str) {
+    fn expect_aout_fail(program: PathBuf) {
         for opt in &[false, true] {
-            let result = compile_run_temp(program, *opt);
+            let result = compile_run_temp(&program, *opt);
             assert!(result.is_err());
         }
     }
@@ -116,41 +112,29 @@ mod aout_tests {
 
 #[cfg(test)]
 mod jit_tests {
-    use crate::{
-        iw::{self, Input},
-        jit,
-    };
-    use inkwell::{context::Context, execution_engine::JitFunction};
+    use std::path::PathBuf;
+
+    use crate::iw::CompilerOptions;
 
     use super::TestFailure;
 
-    fn run_jit_source(program: &str, optimize: bool) -> Result<u64, TestFailure> {
-        type MainFunc = unsafe extern "C" fn() -> u64;
-        let llvm = Context::create();
-        let source = Input::from_string(program);
-        let iwell =
-            iw::CompilerCore::new(&llvm, "x86_64-pc-linux-gnu", &source, Default::default());
-        if iwell.compile() {
-            if optimize {
-                iwell.run_passes();
-            }
-            let main: Option<JitFunction<MainFunc>> =
-                jit::get_runnable_function(&iwell, "main", false);
-            if let Some(main) = main {
-                return Ok(unsafe { main.call() });
-            } else {
-                return Err(TestFailure::RuntimeNoMain);
-            }
+    fn run_jit_source(program: &PathBuf, optimize: bool) -> Result<u64, TestFailure> {
+        let compiler_options = if optimize {
+            CompilerOptions::unoptimized()
         } else {
-            return Err(TestFailure::CompileTime(
-                iwell.diagnostics.as_ref().borrow().clone(),
-            ));
-        }
+            CompilerOptions::optimized()
+        };
+
+        let result = crate::driver::run_jit(program, &compiler_options);
+        return match result {
+            Ok(ret) => Ok(ret),
+            Err(msg) => Err(TestFailure::RuntimeJit(msg)),
+        };
     }
 
-    fn expect_jit_pass(program: &str) {
+    fn expect_jit_pass(program: PathBuf) {
         for opt in &[false, true] {
-            let result = run_jit_source(program, *opt);
+            let result = run_jit_source(&program, *opt);
             if result.is_ok() {
                 assert!(result.unwrap() == 0);
             } else {
@@ -160,9 +144,9 @@ mod jit_tests {
         }
     }
 
-    fn expect_jit_fail(program: &str) {
+    fn expect_jit_fail(program: PathBuf) {
         for opt in &[false, true] {
-            let result = run_jit_source(program, *opt);
+            let result = run_jit_source(&program, *opt);
             assert!(result.is_err());
         }
     }
@@ -185,8 +169,7 @@ mod test {
         type MainFunc = unsafe extern "C" fn() -> u64;
         let llvm = Context::create();
         let source = Input::from_string(program);
-        let iwell =
-            iw::CompilerCore::new(&llvm, "x86_64-pc-linux-gnu", &source, Default::default());
+        let iwell = iw::CompilerCore::new(&llvm, &source, Default::default());
         if iwell.compile() {
             let main: Option<JitFunction<MainFunc>> =
                 jit::get_runnable_function(&iwell, "main", false);
@@ -203,8 +186,7 @@ mod test {
     fn helper_compile_errors(program: &str) -> Vec<CompilerError> {
         let llvm = Context::create();
         let source = Input::from_string(program);
-        let iwell =
-            iw::CompilerCore::new(&llvm, "x86_64-pc-linux-gnu", &source, Default::default());
+        let iwell = iw::CompilerCore::new(&llvm, &source, Default::default());
         iwell.compile();
 
         return iwell.errors();
@@ -213,8 +195,7 @@ mod test {
     fn helper_compile_warnings(program: &str) -> Vec<CompilerWarning> {
         let llvm = Context::create();
         let source = Input::from_string(program);
-        let iwell =
-            iw::CompilerCore::new(&llvm, "x86_64-pc-linux-gnu", &source, Default::default());
+        let iwell = iw::CompilerCore::new(&llvm, &source, Default::default());
         iwell.compile();
 
         let x = iwell.errors();

@@ -19,16 +19,15 @@ pub mod ast;
 pub mod bom;
 pub mod builders;
 pub mod codegen;
+pub mod driver;
 pub mod err;
 pub mod iw;
 pub mod jit;
 pub mod mangler;
 pub mod parser;
 
-use std::path::Path;
+use std::path::PathBuf;
 
-use crate::iw::Input;
-use inkwell::{context::Context, execution_engine::JitFunction};
 use iw::CompilerOptions;
 
 use clap::Parser;
@@ -44,7 +43,7 @@ struct Args {
     #[arg(long, required = false, default_value = "x86_64-pc-linux-gnu")]
     triple: String,
     #[arg(required = true)]
-    input: String,
+    inputs: Vec<String>,
     #[arg(long, default_value_t = false)]
     instrument_refcount: bool,
     #[arg(long = "Werr", default_value_t = false)]
@@ -52,15 +51,19 @@ struct Args {
     #[arg(short = 'l', long = "link")]
     link_extras: Vec<String>,
     #[arg(long = "bom")]
-    bom_dest: Option<String>,
+    bom: bool,
 }
 
 impl Args {
     fn to_codegen_options(&self) -> CompilerOptions {
         CompilerOptions {
+            triple: self.triple.clone(),
             warn_as_err: self.warn_as_err,
             instrument_refcount: self.instrument_refcount,
             link_extras: self.link_extras.clone(),
+            dump_ir_text: self.dump,
+            dump_bom: self.bom,
+            optimize: self.optimize,
         }
     }
 }
@@ -68,42 +71,18 @@ impl Args {
 pub fn main() {
     let args = Args::parse();
 
-    let llvm = Context::create();
-    let input = Input::from_file(Path::new(&args.input));
     let options = args.to_codegen_options();
-    let triple = args.triple;
-    let iwell = iw::CompilerCore::new(&llvm, &triple, &input, options);
-    let ok = iwell.compile();
+    let inputs: Vec<PathBuf> = args.inputs.iter().map(PathBuf::from).collect();
 
-    if ok {
-        iwell.display_diagnostics();
-
-        if args.optimize {
-            iwell.run_passes();
+    if inputs.len() == 1 && args.output.is_none() {
+        match driver::run_jit(&inputs[0], &options) {
+            Ok(ret) => println!("main returned {ret}"),
+            Err(msg) => println!("jit error: {msg}"),
         }
-
-        if args.dump {
-            iwell.module.print_to_stderr();
-        }
-
-        if let Some(bom_dest) = args.bom_dest {
-            iwell.dump_bom(&bom_dest);
-        }
-
-        if let Some(out) = args.output {
-            iwell.dump(&out);
-        } else {
-            type MainFunc = unsafe extern "C" fn() -> u64;
-            let main: Option<JitFunction<MainFunc>> =
-                jit::get_runnable_function(&iwell, "main", args.optimize);
-            if let Some(main) = main {
-                let ret = unsafe { main.call() };
-                println!("main() returned {ret}");
-            } else {
-                println!("unable to find main function");
-            }
-        }
+    } else if args.output.is_none() {
+        driver::build_objects(&inputs, options);
     } else {
-        iwell.display_diagnostics();
+        let output = PathBuf::from(args.output.unwrap());
+        driver::build_aout(&inputs, output, options);
     }
 }
