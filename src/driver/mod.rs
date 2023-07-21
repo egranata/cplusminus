@@ -117,8 +117,6 @@ pub fn build_aout(sources: &[PathBuf], target: PathBuf, options: CompilerOptions
     }
     clang
         .arg("-fPIC")
-        .arg("-Wl,-z")
-        .arg("-Wl,muldefs")
         .arg("-o")
         .arg(target.as_os_str().to_str().unwrap());
 

@@ -25,6 +25,8 @@ pub enum SpecialMemberFunction {
     BuiltinDeallocator,
 }
 
+const CPM_MANGLE_PREFIX: char = 'X';
+
 pub fn mangle_special_method(self_decl: StructType<'_>, func: SpecialMemberFunction) -> String {
     assert!(!TypeBuilder::is_tuple_type(self_decl));
 
@@ -35,7 +37,8 @@ pub fn mangle_special_method(self_decl: StructType<'_>, func: SpecialMemberFunct
         SpecialMemberFunction::BuiltinDeallocator => "dealloc",
     };
     format!(
-        "@__{}{}_{}{}",
+        "{}__{}{}_{}{}",
+        CPM_MANGLE_PREFIX,
         type_name.len(),
         type_name,
         func_name.len(),
@@ -45,7 +48,8 @@ pub fn mangle_special_method(self_decl: StructType<'_>, func: SpecialMemberFunct
 
 pub fn mangle_method_name(fd: &FunctionDefinition, self_name: &str) -> String {
     format!(
-        "@__{}{}__{}{}",
+        "{}__{}{}__{}{}",
+        CPM_MANGLE_PREFIX,
         self_name.len(),
         self_name,
         fd.decl.name.len(),
@@ -54,9 +58,9 @@ pub fn mangle_method_name(fd: &FunctionDefinition, self_name: &str) -> String {
 }
 
 pub fn mangle_function_name(fd: &FunctionDecl) -> String {
-    if fd.name.starts_with('@') {
+    if fd.name.starts_with(CPM_MANGLE_PREFIX) {
         fd.name.to_string()
     } else {
-        format!("@_{}{}", fd.name.len(), fd.name)
+        format!("{}_{}{}", CPM_MANGLE_PREFIX, fd.name.len(), fd.name)
     }
 }
