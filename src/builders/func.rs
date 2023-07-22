@@ -18,7 +18,9 @@ use inkwell::{
     basic_block::BasicBlock,
     builder::Builder,
     types::FunctionType,
-    values::{AnyValue, FunctionValue, InstructionOpcode, InstructionValue, PointerValue},
+    values::{
+        AnyValue, BasicValueEnum, FunctionValue, InstructionOpcode, InstructionValue, PointerValue,
+    },
 };
 
 use crate::{
@@ -103,8 +105,49 @@ pub fn is_block_terminated(blk: Option<BasicBlock>) -> bool {
 
 pub struct FunctionExitData<'a> {
     pub ret_alloca: Option<PointerValue<'a>>,
+    pub allocas_block: BasicBlock<'a>,
     pub exit_block: BasicBlock<'a>,
     pub need_decref: Rc<RefCell<Vec<PointerValue<'a>>>>,
+}
+
+pub enum AllocaInitialValue<'a> {
+    Zero,
+    Undef,
+    Val(BasicValueEnum<'a>),
+}
+
+impl<'a> FunctionExitData<'a> {
+    pub fn create_alloca<T: inkwell::types::BasicType<'a> + Copy>(
+        &self,
+        bldr: &Builder<'a>,
+        ty: T,
+        name: Option<&str>,
+        val: Option<AllocaInitialValue<'a>>,
+    ) -> PointerValue<'a> {
+        let blk = bldr.get_insert_block().unwrap();
+        bldr.position_at(
+            self.allocas_block,
+            &self.allocas_block.get_first_instruction().unwrap(),
+        );
+        // this alloca is whitelisted because it is the bulk of create_alloca behind the scenes
+        let pv = bldr.build_alloca(ty, name.unwrap_or(""));
+        if let Some(val) = val {
+            let ty = ty.as_basic_type_enum();
+            match val {
+                AllocaInitialValue::Zero => {
+                    bldr.build_store(pv, ty.const_zero());
+                }
+                AllocaInitialValue::Undef => {
+                    bldr.build_store(pv, TypeBuilder::undef_for_type(ty));
+                }
+                AllocaInitialValue::Val(bv) => {
+                    bldr.build_store(pv, bv);
+                }
+            }
+        }
+        bldr.position_at_end(blk);
+        pv
+    }
 }
 
 impl<'a> FunctionExitData<'a> {
@@ -160,6 +203,7 @@ impl<'a> FunctionBuilder<'a> {
 
     fn build_body(&self, func: FunctionValue<'a>, fd: &FunctionDefinition) {
         let entry = self.iw.context.append_basic_block(func, "entry");
+        let body = self.iw.context.append_basic_block(func, "body");
         let builder = self.iw.context.create_builder();
         builder.position_at_end(entry);
 
@@ -167,6 +211,7 @@ impl<'a> FunctionBuilder<'a> {
 
         let locals = self.build_argument_allocas(func, &builder, fd);
         if let Some(ret_ty) = func.get_type().get_return_type() {
+            // this alloca is whitelisted because it is created at function entry
             ret_alloca = Some(builder.build_alloca(ret_ty, "ret_alloca"));
             builder.build_store(ret_alloca.unwrap(), TypeBuilder::undef_for_type(ret_ty));
         } else {
@@ -174,13 +219,16 @@ impl<'a> FunctionBuilder<'a> {
         }
 
         let exit_block = self.iw.context.append_basic_block(func, "exit");
-        builder.position_at_end(entry);
 
         let exit = FunctionExitData {
             ret_alloca,
+            allocas_block: entry,
             exit_block,
             need_decref: Rc::new(RefCell::new(Vec::new())),
         };
+
+        builder.build_unconditional_branch(body);
+        builder.position_at_end(body);
 
         let sb = StatementBuilder::new(self.iw.clone(), &exit);
         sb.build_stmt(&builder, fd, &fd.body, &locals, func, None);
@@ -212,6 +260,7 @@ impl<'a> FunctionBuilder<'a> {
             let param_rw = fd.decl.args[i].rw;
             let param_value = func.get_nth_param(i as u32).unwrap();
             let param_type = param_value.get_type();
+            // this alloca is whitelisted because it does not participate in exit deallocation
             let alloca = builder.build_alloca(param_type, param_name);
             builder.build_store(alloca, param_value);
             ret.insert_variable(

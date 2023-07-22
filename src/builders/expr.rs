@@ -151,7 +151,12 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
             .try_as_basic_value()
             .left()
         {
-            let temp_pv = builder.build_alloca(obj.get_type(), "temp_func");
+            let temp_pv = self.exit.create_alloca(
+                builder,
+                obj.get_type(),
+                Some("temp_func"),
+                Some(super::func::AllocaInitialValue::Zero),
+            );
             builder.build_store(temp_pv, obj);
             self.exit.decref_on_exit(temp_pv);
             Some(obj)
@@ -427,7 +432,12 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         init: &Option<AllocInitializer>,
     ) -> Option<BasicValueEnum<'a>> {
         let pv = alloc_refcounted_type(builder, &self.iw, ty);
-        let temp_pv = builder.build_alloca(pv.get_type(), "temp_alloc");
+        let temp_pv = self.exit.create_alloca(
+            builder,
+            pv.get_type(),
+            Some("temp_alloc"),
+            Some(super::func::AllocaInitialValue::Zero),
+        );
         builder.build_store(temp_pv, pv);
         let ret = builder.build_load(temp_pv, "");
         self.exit.decref_on_exit(temp_pv);
@@ -957,7 +967,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 let elem_ty = eval_exprs[0].get_type();
                 let len = eval_exprs.len();
                 let arr_ty = self.tb.llvm_array_type(elem_ty, len as u32);
-                let arr_ptr = builder.build_alloca(arr_ty, "");
+                let arr_ptr = self.exit.create_alloca(builder, arr_ty, None, None);
                 let mut arr = builder.build_load(arr_ptr, "").into_array_value();
                 for (i, eval_expr) in eval_exprs.iter().enumerate().take(len) {
                     arr = builder
@@ -998,7 +1008,12 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 }
 
                 let tuple_struct_type = self.iw.context.struct_type(&eval_types, false);
-                let tuple_struct_alloca = builder.build_alloca(tuple_struct_type, "");
+                let tuple_struct_alloca = self.exit.create_alloca(
+                    builder,
+                    tuple_struct_type,
+                    None,
+                    Some(crate::builders::func::AllocaInitialValue::Zero),
+                );
                 let mut tuple_struct_value = builder
                     .build_load(tuple_struct_alloca, "")
                     .into_struct_value();

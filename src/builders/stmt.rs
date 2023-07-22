@@ -197,7 +197,12 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                             self.exit.ret_alloca.unwrap().get_type().get_element_type(),
                         ) {
                             if self.tb.is_refcounted_basic_type(value.get_type()).is_some() {
-                                let tmp = builder.build_alloca(value.get_type(), "temp_ret");
+                                let tmp = self.exit.create_alloca(
+                                    builder,
+                                    value.get_type(),
+                                    Some("temp_ret"),
+                                    Some(crate::builders::func::AllocaInitialValue::Zero),
+                                );
                                 builder.build_store(tmp, value);
                                 insert_incref_if_refcounted(&self.iw, builder, value);
                             }
@@ -300,7 +305,12 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                     return;
                 }
 
-                let alloca = builder.build_alloca(decl_ty, &var.name);
+                let alloca = self.exit.create_alloca(
+                    builder,
+                    decl_ty,
+                    Some(&var.name),
+                    Some(crate::builders::func::AllocaInitialValue::Zero),
+                );
                 builder.build_store(alloca, value);
                 insert_incref_if_refcounted(&self.iw, builder, value);
                 self.exit.decref_on_exit(alloca);
@@ -312,7 +322,12 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
             }
             Expression(e) => {
                 if let Some(obj) = self.eb.build_expr(builder, fd, e.as_ref(), locals, None) {
-                    let temp_rv = builder.build_alloca(obj.get_type(), "temp_stmt_expr");
+                    let temp_rv = self.exit.create_alloca(
+                        builder,
+                        obj.get_type(),
+                        Some("temp_stmt_expr"),
+                        Some(crate::builders::func::AllocaInitialValue::Zero),
+                    );
                     builder.build_store(temp_rv, obj);
                 }
             }
@@ -418,7 +433,9 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                 let bb_check = self.iw.context.append_basic_block(func, "check");
                 let bb_body = self.iw.context.append_basic_block(func, "do");
                 let bb_after = self.iw.context.append_basic_block(func, "after");
-                let ran_once = builder.build_alloca(self.iw.builtins.bool, "");
+                let ran_once = self
+                    .exit
+                    .create_alloca(builder, self.iw.builtins.bool, None, None);
                 builder.build_store(ran_once, self.iw.builtins.zero(self.iw.builtins.bool));
                 builder.build_unconditional_branch(bb_check);
                 builder.position_at_end(bb_check);

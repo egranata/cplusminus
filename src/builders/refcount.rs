@@ -175,6 +175,7 @@ fn build_getref_api<'a>(
     let exit = c.append_basic_block(getref_f, "exit");
 
     builder.position_at_end(entry);
+    // this alloca is whitelisted because this function implements memory management
     let ret_alloca = builder.build_alloca(int64, "ret");
     builder.build_store(ret_alloca, int64.const_zero());
     let arg0 = getref_f.get_nth_param(0).unwrap().into_pointer_value();
