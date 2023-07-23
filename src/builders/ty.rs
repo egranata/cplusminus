@@ -26,7 +26,7 @@ use crate::{
         DeallocDecl, FieldDecl, FunctionArgument, FunctionDecl, FunctionDefinition,
         FunctionTypeDescriptor, ImplDecl, InitDecl, Location, ProperStructDecl, TypeDescriptor,
     },
-    bom::strct::StructBomEntry,
+    bom::strct::{ImplBomEntry, StructBomEntry},
     codegen::{
         self,
         structure::{MemoryStrategy, Method, Structure},
@@ -442,6 +442,7 @@ impl<'a> TypeBuilder<'a> {
             ms,
             fields: Default::default(),
             methods: Default::default(),
+            export: false, // no need to re-export?
         };
         self.iw.add_struct(&cdg_st);
 
@@ -535,6 +536,7 @@ impl<'a> TypeBuilder<'a> {
             ms,
             fields: Default::default(),
             methods: Default::default(),
+            export: sd.export,
         };
         self.iw.add_struct(&cdg_st);
 
@@ -729,6 +731,7 @@ impl<'a> TypeBuilder<'a> {
     }
 
     pub fn build_impl(&self, scope: &Scope<'a>, sd: &Structure<'a>, id: &ImplDecl) {
+        let mut bom_entry = ImplBomEntry::new(sd);
         let fb = FunctionBuilder::new(self.iw.clone());
         let mut decls: Vec<FunctionDecl> = vec![];
         for method in &id.methods {
@@ -738,6 +741,7 @@ impl<'a> TypeBuilder<'a> {
                     name: method.imp.decl.name.clone(),
                     func,
                 };
+                bom_entry.add_method(&new_method);
                 sd.methods.borrow_mut().push(new_method);
                 decls.push(decl.0);
             } else {
@@ -749,6 +753,9 @@ impl<'a> TypeBuilder<'a> {
         for (id, method) in id.methods.iter().enumerate() {
             let decl = decls.get(id).unwrap();
             fb.define_method(scope, &method.imp, decl);
+        }
+        if sd.export {
+            self.iw.bom.borrow_mut().impls.push(bom_entry);
         }
     }
 

@@ -449,7 +449,7 @@ impl<'a> FunctionBuilder<'a> {
             .extrn(false)
             .global(true)
             .mangle(false)
-            .export(false)
+            .export(self_decl.export)
             .commit();
 
         let fv = self.declare(scope, &new_decl, opts);

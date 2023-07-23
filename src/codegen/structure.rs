@@ -62,6 +62,7 @@ pub struct Structure<'a> {
     pub ms: MemoryStrategy,
     pub fields: MutableOf<Vec<Field<'a>>>,
     pub methods: MutableOf<Vec<Method<'a>>>,
+    pub export: bool,
 }
 
 impl<'a> Structure<'a> {

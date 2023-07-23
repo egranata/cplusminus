@@ -1,0 +1,7 @@
+{
+    "source_files": [
+        "util.cpm",
+        "main.cpm"
+    ],
+    "bom": true
+}

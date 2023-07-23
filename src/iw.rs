@@ -30,7 +30,10 @@ use std::{
 };
 
 use crate::{
-    ast::{Location, ProperStructDecl, RawStructDecl, TopLevelDecl, TopLevelDeclaration},
+    ast::{
+        Location, ProperStructDecl, RawStructDecl, TopLevelDecl, TopLevelDeclaration,
+        TypeDescriptor,
+    },
     bom::{
         alias::AliasBomEntry, function::FunctionBomEntry, module::BillOfMaterials,
         strct::StructBomEntry, variable::VariableBomEntry,
@@ -461,6 +464,23 @@ impl<'a> CompilerCore<'a> {
                     id.loc,
                     Error::ImportFailed(ef.user_facing_name.clone()),
                 ));
+            }
+        }
+
+        for il in &bom.impls {
+            let tb = TypeBuilder::new(self.clone());
+            let struct_descriptor = TypeDescriptor::Name(il.struct_name.clone());
+            if let Some(bst) = tb.llvm_type_by_descriptor(&self.globals, &struct_descriptor) {
+                if let Some(structure) = tb.is_val_or_ref_basic_type(bst) {
+                    if let Some(sdef) = tb.struct_by_name(structure) {
+                        if il.import(self, &sdef).is_none() {
+                            self.error(CompilerError::new(
+                                id.loc,
+                                Error::ImportFailed(format!("impl {}", struct_descriptor)),
+                            ));
+                        }
+                    }
+                }
             }
         }
     }
