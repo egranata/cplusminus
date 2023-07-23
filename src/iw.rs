@@ -138,6 +138,8 @@ pub struct BuiltinTypes<'a> {
     pub float32: FloatType<'a>,
     pub float64: FloatType<'a>,
     pub void: VoidType<'a>,
+    pub default_int_type: IntType<'a>,
+    pub default_float_type: FloatType<'a>,
 }
 
 impl<'a> BuiltinTypes<'a> {
@@ -150,6 +152,8 @@ impl<'a> BuiltinTypes<'a> {
             float32: c.f32_type(),
             float64: c.f64_type(),
             void: c.void_type(),
+            default_int_type: c.i64_type(),
+            default_float_type: c.f64_type(),
         }
     }
 

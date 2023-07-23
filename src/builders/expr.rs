@@ -356,12 +356,12 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
     }
 
     fn resolve_const_int(&self, n: i64, th: Option<IntType<'a>>) -> IntValue<'a> {
-        let ty = th.unwrap_or(self.iw.builtins.int64);
+        let ty = th.unwrap_or(self.iw.builtins.default_int_type);
         self.iw.builtins.n(n as u64, ty)
     }
 
     fn resolve_const_float(&self, n: f64, th: Option<FloatType<'a>>) -> FloatValue<'a> {
-        let ty = th.unwrap_or(self.iw.builtins.float64);
+        let ty = th.unwrap_or(self.iw.builtins.default_float_type);
         self.iw.builtins.flt_n(n, ty)
     }
 
