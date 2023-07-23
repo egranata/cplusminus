@@ -42,6 +42,57 @@ impl Drop for FileToBeDropped {
 }
 
 #[cfg(test)]
+mod driver_tests {
+    use std::path::PathBuf;
+
+    use crate::iw::CompilerOptions;
+
+    use super::TestFailure;
+
+    fn compile_run_temp(
+        sources: &[PathBuf],
+        target: &PathBuf,
+        options: &CompilerOptions,
+    ) -> Result<i32, TestFailure> {
+        crate::driver::build_aout(sources, target.clone(), options.clone());
+        let mut cmd = std::process::Command::new(target);
+        match cmd.spawn() {
+            Ok(mut child) => match child.wait() {
+                Ok(exit) => match exit.code() {
+                    Some(code) => return Ok(code),
+                    None => return Err(TestFailure::RuntimeNoExitCode),
+                },
+                Err(err) => {
+                    return Err(TestFailure::RuntimeNoSpawn(err.to_string()));
+                }
+            },
+            Err(err) => {
+                return Err(TestFailure::RuntimeNoSpawn(err.to_string()));
+            }
+        }
+    }
+
+    fn expect_driver_pass(sources: &[PathBuf], target: &PathBuf, options: &CompilerOptions) {
+        let result = compile_run_temp(sources, target, options);
+        if result.is_ok() {
+            assert!(result.unwrap() == 0);
+        } else {
+            eprintln!("test failure: {}", result.unwrap_err());
+            assert!(false);
+        }
+    }
+
+    #[allow(dead_code)]
+    fn expect_driver_fail(sources: &[PathBuf], target: &PathBuf, options: &CompilerOptions) {
+        let result = compile_run_temp(sources, target, options);
+        assert!(result.is_err());
+    }
+
+    include!(concat!(env!("OUT_DIR"), "/test_driverpass.rs"));
+    // include!(concat!(env!("OUT_DIR"), "/test_driverfail.rs"));
+}
+
+#[cfg(test)]
 mod aout_tests {
     use std::path::PathBuf;
 

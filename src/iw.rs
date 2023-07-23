@@ -21,7 +21,13 @@ use inkwell::{
     values::{BasicValueEnum, FloatValue, FunctionValue, GlobalValue, IntValue},
 };
 use peg::{error::ParseError, str::LineCol};
-use std::{cell::RefCell, collections::HashMap, path::Path, process::Command, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    path::{Path, PathBuf},
+    process::Command,
+    rc::Rc,
+};
 
 use crate::{
     ast::{Location, ProperStructDecl, RawStructDecl, TopLevelDecl, TopLevelDeclaration},
@@ -47,22 +53,40 @@ use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 
 #[derive(Clone)]
 pub struct Input {
-    pub path: String,
+    pub path: PathBuf,
     pub content: String,
 }
 
 impl Input {
+    #[allow(clippy::result_unit_err)]
+    pub fn file_in_input_path(&self, name: &str) -> Result<PathBuf, ()> {
+        if self.path.exists() {
+            // if this path exists, expect the parent to exist too
+            Ok(self.path.parent().unwrap().join(name))
+        } else {
+            Err(())
+        }
+    }
+
     pub fn from_string(content: &str) -> Self {
         Self {
-            path: String::from("<buffer>"),
+            path: PathBuf::new(),
             content: content.to_string(),
         }
     }
 
     pub fn from_file(path: &Path) -> Self {
         Self {
-            path: path.to_str().unwrap().to_string(),
+            path: path.to_path_buf(),
             content: std::fs::read_to_string(path).unwrap(),
+        }
+    }
+
+    pub fn path_to_string(&self) -> String {
+        if self.path.exists() {
+            self.path.to_str().unwrap().to_owned()
+        } else {
+            String::from("<unknown buffer>")
         }
     }
 }
@@ -487,7 +511,11 @@ impl<'a> CompilerCore<'a> {
                             }
                         }
                         crate::ast::TopLevelDecl::Import(id) => {
-                            if let Some(bom) = BillOfMaterials::load(Path::new(&id.path)) {
+                            let bom_path = self
+                                .source
+                                .file_in_input_path(&id.path)
+                                .unwrap_or(PathBuf::from(&id.path));
+                            if let Some(bom) = BillOfMaterials::load(bom_path.as_path()) {
                                 self.import(&bom);
                             } else {
                                 self.error(CompilerError::new(
@@ -741,7 +769,7 @@ impl<'a> CompilerCore<'a> {
 
     pub fn display_diagnostics(&self) {
         let mut files = SimpleFiles::new();
-        let file_id = files.add(&self.source.path, &self.source.content);
+        let file_id = files.add(self.source.path_to_string(), &self.source.content);
         let writer = StandardStream::stderr(ColorChoice::Always);
         let config = codespan_reporting::term::Config::default();
 
@@ -763,7 +791,7 @@ impl<'a> CompilerCore<'a> {
     pub fn display_errors(&self) {
         let mut files = SimpleFiles::new();
 
-        let file_id = files.add(&self.source.path, &self.source.content);
+        let file_id = files.add(self.source.path_to_string(), &self.source.content);
 
         for err in &self.errors() {
             let diagnostic = Diagnostic::error()
@@ -779,7 +807,7 @@ impl<'a> CompilerCore<'a> {
     pub fn display_warnings(&self) {
         let mut files = SimpleFiles::new();
 
-        let file_id = files.add(&self.source.path, &self.source.content);
+        let file_id = files.add(self.source.path_to_string(), &self.source.content);
 
         for warn in &self.warnings() {
             let diagnostic = Diagnostic::warning()
