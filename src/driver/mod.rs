@@ -115,6 +115,9 @@ pub fn build_aout(sources: &[PathBuf], target: PathBuf, options: CompilerOptions
     for objf in &object_files {
         clang.arg(objf.as_os_str().to_str().unwrap());
     }
+    for le in &options.link_extras {
+        clang.arg(format!("-l{le}"));
+    }
     clang
         .arg("-fPIC")
         .arg("-o")

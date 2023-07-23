@@ -1,0 +1,32 @@
+(* Copyright 2023 Enrico Granata *)
+(* *)
+(* Licensed under the Apache License, Version 2.0 (the "License"); *)
+(* you may not use this file except in compliance with the License. *)
+(* You may obtain a copy of the License at *)
+(*  *)
+(*     http://www.apache.org/licenses/LICENSE-2.0 *)
+(*  *)
+(* Unless required by applicable law or agreed to in writing, software *)
+(* distributed under the License is distributed on an "AS IS" BASIS, *)
+(* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. *)
+(* See the License for the specific language governing permissions and *)
+(* limitations under the License. *)
+
+extern func sin(f: float64) ret float64;
+extern func cos(f: float64) ret float64;
+
+func main() ret int64 {
+    let pi: float64 = 3.14159265358979323846264338327;
+    let half_pi = pi/2.0;
+    let sin$half_pi = sin(half_pi);
+    let cos$pi = cos(pi);
+    var diff = sin$half_pi + cos$pi;
+    if (diff < 0.0) {
+        diff = -diff;
+    };
+    if (diff > 0.001) {
+        return 1;
+    } else {
+        return 0;
+    };
+}
