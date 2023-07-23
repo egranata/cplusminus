@@ -517,7 +517,9 @@ pub fn build_dealloc<'a>(
         ty,
         crate::mangler::SpecialMemberFunction::BuiltinDeallocator,
     );
-    let func = iw.module.add_function(&name, func_type, Default::default());
+    let func = iw
+        .module
+        .add_function(&name, func_type, Some(Linkage::Internal));
     let builder = iw.context.create_builder();
 
     let decref_f = &iw.refcnt.decref_func;

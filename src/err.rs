@@ -45,6 +45,7 @@ pub enum Error {
     BreakOutsideOfLoop,
     ContinueOutsideOfLoop,
     ThirtyTwoBitUnsupported,
+    ImportFailed(String),
 }
 
 impl Display for Error {
@@ -115,6 +116,9 @@ impl Display for Error {
             }
             Error::ThirtyTwoBitUnsupported => {
                 write!(f, "C± does not support compilation for 32-bit targets")
+            }
+            Error::ImportFailed(name) => {
+                write!(f, "import of declaration {name} failed")
             }
         }
     }

@@ -326,6 +326,7 @@ impl<'a> TypeBuilder<'a> {
         scope: &Scope<'a>,
         this_ty: StructType<'a>,
         init: &InitDecl,
+        export: bool,
     ) -> Option<FunctionValue<'a>> {
         let ty = TypeDescriptor::Name(this_ty.get_name().unwrap().to_str().unwrap().to_owned());
         let mut real_args = vec![FunctionArgument {
@@ -360,7 +361,7 @@ impl<'a> TypeBuilder<'a> {
             .extrn(false)
             .global(true)
             .mangle(false)
-            .export(false)
+            .export(export)
             .commit();
         fb.compile(scope, &func_def, opts)
     }
@@ -370,6 +371,7 @@ impl<'a> TypeBuilder<'a> {
         scope: &Scope<'a>,
         this_ty: StructType<'a>,
         dealloc: &DeallocDecl,
+        export: bool,
     ) -> Option<FunctionValue<'a>> {
         let ty = TypeDescriptor::Name(this_ty.get_name().unwrap().to_str().unwrap().to_owned());
         let real_args = vec![FunctionArgument {
@@ -403,7 +405,7 @@ impl<'a> TypeBuilder<'a> {
             .extrn(false)
             .global(true)
             .mangle(false)
-            .export(false)
+            .export(export)
             .commit();
         fb.compile(scope, &func_def, opts)
     }
@@ -480,7 +482,7 @@ impl<'a> TypeBuilder<'a> {
         }
 
         st_ty.set_body(&fields, false);
-        //build_dealloc(self, &self.iw, st_ty);
+        build_dealloc(self, &self.iw, st_ty);
 
         // if let Some(init) = &sd.init {
         //     if self.build_init(scope, st_ty, init).is_none() {
@@ -600,7 +602,7 @@ impl<'a> TypeBuilder<'a> {
         build_dealloc(self, &self.iw, st_ty);
 
         if let Some(init) = &sd.init {
-            if self.build_init(scope, st_ty, init).is_none() {
+            if self.build_init(scope, st_ty, init, sd.export).is_none() {
                 self.iw
                     .error(CompilerError::new(init.loc, Error::InvalidExpression));
                 return None;
@@ -608,7 +610,10 @@ impl<'a> TypeBuilder<'a> {
         }
 
         if let Some(dealloc) = &sd.dealloc {
-            if self.build_usr_dealloc(scope, st_ty, dealloc).is_none() {
+            if self
+                .build_usr_dealloc(scope, st_ty, dealloc, sd.export)
+                .is_none()
+            {
                 self.iw
                     .error(CompilerError::new(dealloc.loc, Error::InvalidExpression));
                 return None;

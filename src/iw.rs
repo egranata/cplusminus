@@ -427,18 +427,41 @@ impl<'a> CompilerCore<'a> {
         }
     }
 
-    fn import(&self, bom: &BillOfMaterials) {
-        for ta in &bom.aliases {
-            ta.import(self, &self.globals);
-        }
-        for ef in &bom.functions {
-            ef.import(self, &self.globals);
-        }
-        for gv in &bom.variables {
-            gv.import(self, &self.globals);
-        }
+    fn import(&self, id: &crate::ast::ImportDecl, bom: &BillOfMaterials) {
         for sd in &bom.structs {
-            sd.import(self, &self.globals);
+            if sd.import(self, &self.globals).is_none() {
+                self.error(CompilerError::new(
+                    id.loc,
+                    Error::ImportFailed(sd.name.clone()),
+                ));
+            }
+        }
+
+        for ta in &bom.aliases {
+            if ta.import(self, &self.globals).is_none() {
+                self.error(CompilerError::new(
+                    id.loc,
+                    Error::ImportFailed(ta.user_facing_name.clone()),
+                ));
+            }
+        }
+
+        for gv in &bom.variables {
+            if gv.import(self, &self.globals).is_none() {
+                self.error(CompilerError::new(
+                    id.loc,
+                    Error::ImportFailed(gv.user_facing_name.clone()),
+                ));
+            }
+        }
+
+        for ef in &bom.functions {
+            if ef.import(self, &self.globals).is_none() {
+                self.error(CompilerError::new(
+                    id.loc,
+                    Error::ImportFailed(ef.user_facing_name.clone()),
+                ));
+            }
         }
     }
 
@@ -537,7 +560,7 @@ impl<'a> CompilerCore<'a> {
                                 .file_in_input_path(&id.path)
                                 .unwrap_or(PathBuf::from(&id.path));
                             if let Some(bom) = BillOfMaterials::load(bom_path.as_path()) {
-                                self.import(&bom);
+                                self.import(id, &bom);
                             } else {
                                 self.error(CompilerError::new(
                                     tld.loc,
