@@ -852,36 +852,4 @@ impl<'a> CompilerCore<'a> {
                 .expect("<io error>");
         }
     }
-
-    pub fn display_errors(&self) {
-        let mut files = SimpleFiles::new();
-
-        let file_id = files.add(self.source.path_to_string(), &self.source.content);
-
-        for err in &self.errors() {
-            let diagnostic = Diagnostic::error()
-                .with_message(format!("{}", err.err))
-                .with_labels(vec![Label::primary(file_id, err.loc.start..err.loc.end)]);
-            let writer = StandardStream::stderr(ColorChoice::Always);
-            let config = codespan_reporting::term::Config::default();
-            codespan_reporting::term::emit(&mut writer.lock(), &config, &files, &diagnostic)
-                .expect("<io error>");
-        }
-    }
-
-    pub fn display_warnings(&self) {
-        let mut files = SimpleFiles::new();
-
-        let file_id = files.add(self.source.path_to_string(), &self.source.content);
-
-        for warn in &self.warnings() {
-            let diagnostic = Diagnostic::warning()
-                .with_message(format!("{}", warn.warn))
-                .with_labels(vec![Label::primary(file_id, warn.loc.start..warn.loc.end)]);
-            let writer = StandardStream::stderr(ColorChoice::Always);
-            let config = codespan_reporting::term::Config::default();
-            codespan_reporting::term::emit(&mut writer.lock(), &config, &files, &diagnostic)
-                .expect("<io error>");
-        }
-    }
 }
