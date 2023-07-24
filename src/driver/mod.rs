@@ -44,7 +44,7 @@ fn run_compiler_machinery<'a>(
     src: &Path,
     llvm: &'a Context,
     options: &CompilerOptions,
-) -> Result<CompilerCore<'a>, ()> {
+) -> (bool, CompilerCore<'a>) {
     let input = Input::from_file(src);
     let iwell = CompilerCore::new(llvm, &input, options.clone());
     let ok = iwell.compile();
@@ -60,10 +60,10 @@ fn run_compiler_machinery<'a>(
             bom_path.set_extension("bom");
             iwell.dump_bom(bom_path.as_path());
         }
-        Ok(iwell)
+        (true, iwell)
     } else {
         iwell.display_diagnostics();
-        Err(())
+        (false, iwell)
     }
 }
 
@@ -71,7 +71,7 @@ pub fn run_jit(src: &Path, options: &CompilerOptions) -> Result<u64, String> {
     let llvm = Context::create();
     let rst: Result<u64, String>;
     match run_compiler_machinery(src, &llvm, options) {
-        Ok(iwell) => {
+        (true, iwell) => {
             type MainFunc = unsafe extern "C" fn() -> u64;
             let main: Option<JitFunction<MainFunc>> =
                 jit::get_runnable_function(&iwell, "main", options.optimize);
@@ -82,21 +82,25 @@ pub fn run_jit(src: &Path, options: &CompilerOptions) -> Result<u64, String> {
                 rst = Err(String::from("main not found"));
             }
         }
-        Err(..) => {
+        (false, _iwell) => {
             rst = Err(String::from("compilation error"));
         }
     };
     rst
 }
 
-pub fn build_aout(sources: &[PathBuf], target: PathBuf, options: CompilerOptions) {
+pub fn build_aout(
+    sources: &[PathBuf],
+    target: PathBuf,
+    options: CompilerOptions,
+) -> Result<(), String> {
     let mut tempfiles: Vec<NamedTempFile> = vec![];
     let mut object_files: Vec<PathBuf> = vec![];
     for src in sources {
         if is_cpm_source(src) {
             let llvm = Context::create();
             match run_compiler_machinery(src.as_path(), &llvm, &options) {
-                Ok(iwell) => {
+                (true, iwell) => {
                     let mut ntf_builder = tempfile::Builder::new();
                     ntf_builder.suffix(".obj");
                     let tmp_file = ntf_builder.tempfile().expect("valid output file");
@@ -104,7 +108,10 @@ pub fn build_aout(sources: &[PathBuf], target: PathBuf, options: CompilerOptions
                     iwell.dump(tmp_file.path());
                     tempfiles.push(tmp_file);
                 }
-                Err(..) => return,
+                (false, iwell) => {
+                    iwell.display_diagnostics();
+                    return Err(iwell.diagnostics_to_string());
+                }
             };
         } else {
             object_files.push(src.clone());
@@ -126,28 +133,31 @@ pub fn build_aout(sources: &[PathBuf], target: PathBuf, options: CompilerOptions
     let process = clang.spawn();
     if let Ok(mut child) = process {
         match child.wait() {
-            Ok(_) => {}
-            Err(err) => {
-                panic!("compilation failed: {err}");
-            }
+            Ok(_) => Ok(()),
+            Err(err) => Err(format!("execution error: {err}")),
         }
     } else {
         panic!("unable to spawn system compiler; consider installing clang");
     }
 }
 
-pub fn build_objects(sources: &[PathBuf], options: CompilerOptions) {
+pub fn build_objects(sources: &[PathBuf], options: CompilerOptions) -> Result<(), String> {
     for src in sources {
         if is_cpm_source(src) {
             let llvm = Context::create();
             match run_compiler_machinery(src.as_path(), &llvm, &options) {
-                Ok(iwell) => {
+                (true, iwell) => {
                     let mut dst = src.clone();
                     dst.set_extension("obj");
                     iwell.dump(dst.as_path());
                 }
-                Err(..) => return,
+                (false, iwell) => {
+                    iwell.display_diagnostics();
+                    return Err(iwell.diagnostics_to_string());
+                }
             };
         }
     }
+
+    Ok(())
 }

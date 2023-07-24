@@ -16,6 +16,7 @@ use std::fmt::Display;
 
 #[derive(Clone, Debug)]
 enum TestFailure {
+    CompileFailure(String),
     RuntimeNoSpawn(String),
     RuntimeNoExitCode,
     RuntimeJit(String),
@@ -24,6 +25,7 @@ enum TestFailure {
 impl Display for TestFailure {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            TestFailure::CompileFailure(err) => write!(f, "{}", err),
             TestFailure::RuntimeNoSpawn(err) => write!(f, "program execution failed: {err}"),
             TestFailure::RuntimeNoExitCode => write!(f, "program did not exit with a result"),
             TestFailure::RuntimeJit(err) => write!(f, "LLVM JIT error: {err}"),
@@ -65,7 +67,10 @@ mod driver_tests {
         target: &PathBuf,
         options: &CompilerOptions,
     ) -> Result<i32, TestFailure> {
-        crate::driver::build_aout(sources, target.clone(), options.clone());
+        let cmplr = crate::driver::build_aout(sources, target.clone(), options.clone());
+        if let Err(msg) = cmplr {
+            return Err(TestFailure::CompileFailure(msg));
+        }
         let mut cmd = std::process::Command::new(target);
         match cmd.spawn() {
             Ok(mut child) => match child.wait() {
@@ -83,7 +88,12 @@ mod driver_tests {
         }
     }
 
-    fn expect_driver_pass(sources: &[PathBuf], target: &PathBuf, options: &CompilerOptions) {
+    fn expect_driver_pass(
+        sources: &[PathBuf],
+        target: &PathBuf,
+        options: &CompilerOptions,
+        _diags: &Option<Vec<String>>,
+    ) {
         let result = compile_run_temp(sources, target, options);
         if result.is_ok() {
             assert!(result.unwrap() == 0);
@@ -94,9 +104,24 @@ mod driver_tests {
     }
 
     #[allow(dead_code)]
-    fn expect_driver_fail(sources: &[PathBuf], target: &PathBuf, options: &CompilerOptions) {
+    fn expect_driver_fail(
+        sources: &[PathBuf],
+        target: &PathBuf,
+        options: &CompilerOptions,
+        diags: &Option<Vec<String>>,
+    ) {
         let result = compile_run_temp(sources, target, options);
         assert!(result.is_err());
+        match result.unwrap_err() {
+            TestFailure::CompileFailure(msg) => {
+                if let Some(diags) = diags {
+                    for diag in diags {
+                        assert!(msg.contains(diag));
+                    }
+                }
+            }
+            _ => {}
+        }
     }
 
     include!(concat!(env!("OUT_DIR"), "/test_driverpass.rs"));
@@ -127,11 +152,14 @@ mod aout_tests {
             path: temp_dir.as_path().as_os_str().to_str().unwrap().to_string(),
         };
 
-        crate::driver::build_aout(
+        if let Err(err) = crate::driver::build_aout(
             &[program.to_path_buf()],
             PathBuf::from(&temp_aout_path.path),
             compiler_options,
-        );
+        ) {
+            return Err(TestFailure::CompileFailure(err));
+        }
+
         let mut cmd = std::process::Command::new(&temp_aout_path.path);
         match cmd.spawn() {
             Ok(mut child) => match child.wait() {

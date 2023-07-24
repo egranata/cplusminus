@@ -76,6 +76,7 @@ fn build_driver_test_code(func_to_call: &str, indir: &Path, outfile_path: &Path)
     struct DriverTestConfig {
         source_files: Vec<String>,
         bom: bool,
+        diags: Option<Vec<String>>,
     }
 
     let mut outfile_handle = File::create(outfile_path).unwrap();
@@ -105,6 +106,13 @@ fn build_driver_test_code(func_to_call: &str, indir: &Path, outfile_path: &Path)
         }
         let test_descriptor: DriverTestConfig =
             serde_json::from_reader(File::open(test_json_path).unwrap()).unwrap();
+        let diags = test_descriptor.diags.map(|diags| {
+            diags
+                .iter()
+                .map(|x| format!("\"{x}\".to_string()"))
+                .collect::<Vec<String>>()
+                .join(",")
+        });
         let sources: Vec<PathBuf> = test_descriptor
             .source_files
             .iter()
@@ -128,6 +136,21 @@ fn build_driver_test_code(func_to_call: &str, indir: &Path, outfile_path: &Path)
             format!("    let sources: Vec<PathBuf> = vec![{sources}];\n")
         )
         .expect("<io error>");
+        if let Some(d) = diags {
+            write!(
+                outfile_handle,
+                "{}",
+                format!("    let diags: Option<Vec<String>> = Some(vec![{d}]);\n")
+            )
+            .expect("<io error>");
+        } else {
+            write!(
+                outfile_handle,
+                "{}",
+                format!("    let diags: Option<Vec<String>> = None;\n")
+            )
+            .expect("<io error>");
+        }
         write!(
             outfile_handle,
             "{}",
@@ -144,7 +167,7 @@ fn build_driver_test_code(func_to_call: &str, indir: &Path, outfile_path: &Path)
         write!(
             outfile_handle,
             "{}",
-            format!("    {func_to_call}(&sources, &dest, &opts);")
+            format!("    {func_to_call}(&sources, &dest, &opts, &diags);")
         )
         .expect("<io error>");
         write!(
@@ -157,7 +180,7 @@ fn build_driver_test_code(func_to_call: &str, indir: &Path, outfile_path: &Path)
         write!(
             outfile_handle,
             "{}",
-            format!("    {func_to_call}(&sources, &dest, &opts);")
+            format!("    {func_to_call}(&sources, &dest, &opts, &diags);")
         )
         .expect("<io error>");
         write!(

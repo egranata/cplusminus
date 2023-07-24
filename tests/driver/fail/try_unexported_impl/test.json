@@ -3,5 +3,9 @@
         "util.cpm",
         "main.cpm"
     ],
-    "bom": true
+    "bom": true,
+    "diags": [
+        "identifier add not found",
+        "main.cpm:21:13"
+    ]
 }

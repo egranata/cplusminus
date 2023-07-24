@@ -80,9 +80,9 @@ pub fn main() {
             Err(msg) => println!("jit error: {msg}"),
         }
     } else if args.output.is_none() {
-        driver::build_objects(&inputs, options);
+        let _ = driver::build_objects(&inputs, options);
     } else {
         let output = PathBuf::from(args.output.unwrap());
-        driver::build_aout(&inputs, output, options);
+        let _ = driver::build_aout(&inputs, output, options);
     }
 }
