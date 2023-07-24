@@ -50,9 +50,12 @@ use crate::{
 
 use crate::codegen::{structure::Structure, MutableOf};
 
-use codespan_reporting::diagnostic::{Diagnostic, Label};
 use codespan_reporting::files::SimpleFiles;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
+use codespan_reporting::{
+    diagnostic::{Diagnostic, Label},
+    term::termcolor::WriteColor,
+};
 
 #[derive(Clone)]
 pub struct Input {
@@ -832,10 +835,9 @@ impl<'a> CompilerCore<'a> {
         self.errors().is_empty()
     }
 
-    pub fn display_diagnostics(&self) {
+    fn run_through_diags(&self, writer: &mut dyn WriteColor) {
         let mut files = SimpleFiles::new();
         let file_id = files.add(self.source.path_to_string(), &self.source.content);
-        let writer = StandardStream::stderr(ColorChoice::Always);
         let config = codespan_reporting::term::Config::default();
 
         for diag in self.diagnostics.borrow().iter() {
@@ -848,8 +850,56 @@ impl<'a> CompilerCore<'a> {
                     .with_labels(vec![Label::primary(file_id, warn.loc.start..warn.loc.end)]),
             };
 
-            codespan_reporting::term::emit(&mut writer.lock(), &config, &files, &diagnostic)
+            codespan_reporting::term::emit(writer, &config, &files, &diagnostic)
                 .expect("<io error>");
         }
+    }
+
+    pub fn display_diagnostics(&self) {
+        let writer = StandardStream::stderr(ColorChoice::Always);
+        self.run_through_diags(&mut writer.lock());
+    }
+
+    pub fn diagnostics_to_string(&self) -> String {
+        #[derive(Default)]
+        struct StringStream {
+            s: String,
+        }
+        impl std::io::Write for StringStream {
+            fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+                if let Ok(str) = String::from_utf8(buf.to_vec()) {
+                    self.s = format!("{}{}", self.s, str);
+                    Ok(str.len())
+                } else {
+                    Err(std::io::Error::from(std::io::ErrorKind::InvalidData))
+                }
+            }
+
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+        impl WriteColor for StringStream {
+            fn supports_color(&self) -> bool {
+                false
+            }
+
+            fn set_color(
+                &mut self,
+                _: &codespan_reporting::term::termcolor::ColorSpec,
+            ) -> std::io::Result<()> {
+                Ok(())
+            }
+
+            fn reset(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+
+        let mut writer = StringStream::default();
+
+        self.run_through_diags(&mut writer);
+
+        writer.s
     }
 }
