@@ -100,7 +100,7 @@ mod driver_tests {
     }
 
     include!(concat!(env!("OUT_DIR"), "/test_driverpass.rs"));
-    // include!(concat!(env!("OUT_DIR"), "/test_driverfail.rs"));
+    include!(concat!(env!("OUT_DIR"), "/test_driverfail.rs"));
 }
 
 #[cfg(test)]

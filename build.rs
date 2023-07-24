@@ -217,6 +217,7 @@ fn build_tests(indir: &mut Path, outdir: &Path) {
     driver_fail_indir.push("fail");
 
     build_driver_tests(&driver_pass_indir, outdir, true);
+    build_driver_tests(&driver_fail_indir, outdir, false);
 }
 
 fn main() {

@@ -153,6 +153,7 @@ pub enum Warning {
     MutabilityArgInExternFunction,
     MutableValueNeverWrittenTo(String),
     ExportInLocalDeclUnused,
+    ExportImplIgnored,
 }
 
 impl Display for Warning {
@@ -166,6 +167,12 @@ impl Display for Warning {
             }
             Warning::ExportInLocalDeclUnused => {
                 write!(f, "export is ignored outside of top-level declarations")
+            }
+            Warning::ExportImplIgnored => {
+                write!(
+                    f,
+                    "this type is not exported; export of its impls is ignored"
+                )
             }
         }
     }

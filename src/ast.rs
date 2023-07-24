@@ -164,6 +164,7 @@ pub struct ImplDecl {
     pub loc: Location,
     pub of: TypeDescriptor,
     pub methods: Vec<MethodDecl>,
+    pub export: bool,
 }
 
 #[derive(Clone, Debug)]

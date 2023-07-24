@@ -415,6 +415,7 @@ impl<'a> FunctionBuilder<'a> {
         scope: &Scope<'a>,
         fd: &FunctionDefinition,
         self_decl: &Structure<'a>,
+        export: bool,
     ) -> (FunctionDecl, Option<FunctionValue<'a>>) {
         let fqn = mangle_method_name(fd, &self_decl.name);
         let self_tyd = TypeDescriptor::Name(self_decl.name.clone());
@@ -449,7 +450,7 @@ impl<'a> FunctionBuilder<'a> {
             .extrn(false)
             .global(true)
             .mangle(false)
-            .export(self_decl.export)
+            .export(export)
             .commit();
 
         let fv = self.declare(scope, &new_decl, opts);

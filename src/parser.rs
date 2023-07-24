@@ -385,9 +385,9 @@ peg::parser! {
         }
 
         rule impl_def() -> ImplDecl =
-        _ start:position!() "impl" __() name:ident() _ "{" _ methods:method_def()* _ "}" _ end:position!() _ {
+        _ start:position!() export:export_attribute() "impl" __() name:ident() _ "{" _ methods:method_def()* _ "}" _ end:position!() _ {
             let td = TypeDescriptor::Name(name);
-            ImplDecl { loc:Location{start,end}, of: td, methods }
+            ImplDecl { loc:Location{start,end}, of: td, methods, export }
         }
 
         rule implementation() -> TopLevelDeclaration = id:impl_def() {

@@ -31,7 +31,7 @@ use crate::{
         self,
         structure::{MemoryStrategy, Method, Structure},
     },
-    err::{CompilerError, Error},
+    err::{CompilerError, CompilerWarning, Error},
     iw::CompilerCore,
     mangler::mangle_special_method,
 };
@@ -734,8 +734,17 @@ impl<'a> TypeBuilder<'a> {
         let mut bom_entry = ImplBomEntry::new(sd);
         let fb = FunctionBuilder::new(self.iw.clone());
         let mut decls: Vec<FunctionDecl> = vec![];
+        let export = if id.export && !sd.export {
+            self.iw.warning(CompilerWarning::new(
+                id.loc,
+                crate::err::Warning::ExportImplIgnored,
+            ));
+            false
+        } else {
+            sd.export && id.export
+        };
         for method in &id.methods {
-            let decl = fb.declare_method(scope, &method.imp, sd);
+            let decl = fb.declare_method(scope, &method.imp, sd, export);
             if let Some(func) = decl.1 {
                 let new_method = Method {
                     name: method.imp.decl.name.clone(),
@@ -754,7 +763,7 @@ impl<'a> TypeBuilder<'a> {
             let decl = decls.get(id).unwrap();
             fb.define_method(scope, &method.imp, decl);
         }
-        if sd.export {
+        if export {
             self.iw.bom.borrow_mut().impls.push(bom_entry);
         }
     }

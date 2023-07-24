@@ -17,7 +17,7 @@ export val type Pair {
     y: int32
 }
 
-impl Pair {
+export impl Pair {
     func add() ret int32 {
         return self.x + self.y;
     }
