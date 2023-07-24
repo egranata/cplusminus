@@ -134,6 +134,12 @@ fn build_driver_test_code(func_to_call: &str, indir: &Path, outfile_path: &Path)
             format!("    let dest: PathBuf = PathBuf::from(\"{dest}\");\n")
         )
         .expect("<io error>");
+        write!(
+            outfile_handle,
+            "{}",
+            format!("    remove_stale_files(&dest);\n")
+        )
+        .expect("<io error>");
         write!(outfile_handle, "{}", format!("    let opts = CompilerOptions{{ optimize: true, dump_bom:{}, ..Default::default()  }};\n", test_descriptor.bom)).expect("<io error>");
         write!(
             outfile_handle,
@@ -141,11 +147,23 @@ fn build_driver_test_code(func_to_call: &str, indir: &Path, outfile_path: &Path)
             format!("    {func_to_call}(&sources, &dest, &opts);")
         )
         .expect("<io error>");
+        write!(
+            outfile_handle,
+            "{}",
+            format!("    remove_stale_files(&dest);\n")
+        )
+        .expect("<io error>");
         write!(outfile_handle, "{}", format!("    let opts = CompilerOptions{{ optimize: false, dump_bom:{}, ..Default::default()  }};\n", test_descriptor.bom)).expect("<io error>");
         write!(
             outfile_handle,
             "{}",
             format!("    {func_to_call}(&sources, &dest, &opts);")
+        )
+        .expect("<io error>");
+        write!(
+            outfile_handle,
+            "{}",
+            format!("    remove_stale_files(&dest);\n")
         )
         .expect("<io error>");
         write!(outfile_handle, "{}", format!("}}\n")).expect("<io error>");

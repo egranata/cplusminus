@@ -49,6 +49,17 @@ mod driver_tests {
 
     use super::TestFailure;
 
+    fn remove_stale_files(dest: &PathBuf) {
+        let container = dest.parent().unwrap().to_path_buf();
+        let aout = container.clone().join("a.out");
+        let _ = std::fs::remove_file(&aout);
+        for path in glob::glob(&format!("{}", container.join("*.bom").display())).unwrap() {
+            if let Ok(path) = path {
+                let _ = std::fs::remove_file(&path);
+            }
+        }
+    }
+
     fn compile_run_temp(
         sources: &[PathBuf],
         target: &PathBuf,
