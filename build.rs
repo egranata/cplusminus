@@ -10,7 +10,7 @@ fn status_msg(msg: String) {
     std::io::stdout().write_all(msg.as_bytes()).unwrap();
 }
 
-fn build_test_code(func_to_call: &str, indir: &Path, outfile_path: &Path) {
+fn build_jit_test_code(func_to_call: &str, indir: &Path, outfile_path: &Path) {
     let mut outfile_handle = File::create(outfile_path).unwrap();
     status_msg(format!(
         "building tests from {} into {}\n",
@@ -55,19 +55,7 @@ fn build_jit_tests(indir: &Path, outdir: &Path, pass: bool) {
     } else {
         "expect_jit_fail"
     };
-    build_test_code(func_to_call, indir, &outfile_path);
-}
-
-fn build_aout_tests(indir: &Path, outdir: &Path, pass: bool) {
-    let mut outfile_path = PathBuf::from(outdir);
-    let outfile_name = format!("test_aout{}.rs", if pass { "pass" } else { "fail" });
-    outfile_path.push(outfile_name);
-    let func_to_call = if pass {
-        "expect_aout_pass"
-    } else {
-        "expect_aout_fail"
-    };
-    build_test_code(func_to_call, indir, &outfile_path);
+    build_jit_test_code(func_to_call, indir, &outfile_path);
 }
 
 #[allow(clippy::format_in_format_args)]
@@ -221,16 +209,6 @@ fn build_tests(indir: &mut Path, outdir: &Path) {
 
     build_jit_tests(&jit_pass_indir, outdir, true);
     build_jit_tests(&jit_fail_indir, outdir, false);
-
-    let mut aout_pass_indir = indir.to_path_buf();
-    let mut aout_fail_indir = indir.to_path_buf();
-    aout_pass_indir.push("aout");
-    aout_pass_indir.push("pass");
-    aout_fail_indir.push("aout");
-    aout_fail_indir.push("fail");
-
-    build_aout_tests(&aout_pass_indir, outdir, true);
-    build_aout_tests(&aout_fail_indir, outdir, false);
 
     let mut driver_pass_indir = indir.to_path_buf();
     let mut driver_fail_indir = indir.to_path_buf();

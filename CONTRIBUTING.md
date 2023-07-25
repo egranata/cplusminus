@@ -16,11 +16,10 @@ This project is licensed under Apache 2.0. I ask that you submit patches under y
 
 ## Testing
 
-There are four testing styles in this project:
+There are three testing styles in this project:
 - **inline unoptimized JIT tests**: these are the original test format, but unless you need to do interesting checks on the compiler's output (which nobody does anyway), they are discouraged;
 - **out of band JIT tests**: these are great for simple tests that can fail but won't bring the entire compiler down (e.g. no unreachable code, no failed asserts, ...); they will run with and without optimization;
-- **out of band a.out tests**: these are great if you're testing things that can easily crash (LLVM edge cases, failed assertions, memory smashers) and will also run with and without optimization.
-- **out of band driver tests**: these can compile multiple files, will eventually be able to link external libraries, and have all the advantages of the a.out tests
+- **out of band driver tests**: these can compile multiple files, will eventually be able to link external libraries, and work really well to test things that can easily crash (LLVM edge cases, failed assertions, memory smashers); they are intended to run with and without optimization;
 
 When you submit a patch, make sure no tests break. Add tests for your work. If you can't add a test, this will make the patch subject to extra scrutiny before being merged.
 
