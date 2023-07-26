@@ -1,0 +1,12 @@
+{
+    "source_files": [
+        "test.cpm"
+    ],
+    "bom": true,
+    "diags": [
+        "type mismatch in expression: expected float32",
+        "test.cpm:25:20",
+        "type mismatch in expression: expected int32",
+        "test.cpm:27:23"
+    ]
+}

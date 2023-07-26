@@ -178,13 +178,21 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
             }
             Return(expr) => {
                 if expr.is_some() != func.get_type().get_return_type().is_some() {
-                    let msg = String::from(
-                        "no return value for void function (maybe forgot a ret clause?)",
-                    );
-                    self.iw.error(CompilerError::new(
-                        node.loc,
-                        Error::UnexpectedType(Some(msg)),
-                    ));
+                    if expr.is_some() {
+                        let msg = String::from(
+                            "no return value for void function (maybe forgot a ret clause?)",
+                        );
+                        self.iw.error(CompilerError::new(
+                            node.loc,
+                            Error::UnexpectedType(Some(msg)),
+                        ));
+                    } else {
+                        let msg = String::from("value being returned");
+                        self.iw.error(CompilerError::new(
+                            node.loc,
+                            Error::UnexpectedType(Some(msg)),
+                        ));
+                    }
                 } else if expr.is_none() {
                     builder.build_unconditional_branch(self.exit.exit_block);
                     return;

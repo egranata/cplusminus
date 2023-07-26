@@ -235,4 +235,6 @@ fn main() {
     path_manifest_dir.push("tests");
 
     build_tests(&mut path_manifest_dir, &path_out_dir);
+
+    println!("cargo:rerun-if-changed=tests");
 }

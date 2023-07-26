@@ -12,6 +12,14 @@
 (* See the License for the specific language governing permissions and *)
 (* limitations under the License. *)
 
+func foo() ret byte {
+    return;
+}
+
+func bar() {
+    return 1;
+}
+
 func main() ret int64 {
-    break;
+    return 0;
 }

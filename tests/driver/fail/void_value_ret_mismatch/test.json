@@ -1,0 +1,12 @@
+{
+    "source_files": [
+        "test.cpm"
+    ],
+    "bom": false,
+    "diags": [
+        "expected value being returned",
+        "test.cpm:16:5",
+        "expected no return value for void function",
+        "test.cpm:20:5"
+    ]
+}
