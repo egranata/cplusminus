@@ -1034,17 +1034,30 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
 
                 return Some(BasicValueEnum::StructValue(tuple_struct_value));
             }
-            SizeofVar(e) => self
+            PropertyofVar(e, tp) => self
                 .build_expr(builder, fd, e.as_ref(), locals, type_hint)
-                .map(|expr| BasicValueEnum::IntValue(self.tb.sizeof(expr.get_type()))),
-            SizeofTy(ident) => {
+                .map(|expr| {
+                    BasicValueEnum::IntValue(match tp {
+                        crate::ast::TypeProperty::Size => self.tb.sizeof(expr.get_type()),
+                        crate::ast::TypeProperty::Alignment => self.tb.alignof(expr.get_type()),
+                    })
+                }),
+            PropertyofType(ident, tp) => {
                 return if let Some(ty) = self.tb.llvm_type_by_descriptor(locals, ident) {
                     if let Some(struct_type) = self.tb.is_refcounted_basic_type(ty) {
-                        Some(BasicValueEnum::IntValue(
-                            self.tb.sizeof(BasicTypeEnum::StructType(struct_type)),
-                        ))
+                        Some(BasicValueEnum::IntValue(match tp {
+                            crate::ast::TypeProperty::Size => {
+                                self.tb.sizeof(BasicTypeEnum::StructType(struct_type))
+                            }
+                            crate::ast::TypeProperty::Alignment => {
+                                self.tb.alignof(BasicTypeEnum::StructType(struct_type))
+                            }
+                        }))
                     } else {
-                        Some(BasicValueEnum::IntValue(self.tb.sizeof(ty)))
+                        Some(BasicValueEnum::IntValue(match tp {
+                            crate::ast::TypeProperty::Size => self.tb.sizeof(ty),
+                            crate::ast::TypeProperty::Alignment => self.tb.alignof(ty),
+                        }))
                     }
                 } else {
                     self.iw.error(CompilerError::new(

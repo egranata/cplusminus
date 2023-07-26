@@ -162,8 +162,10 @@ peg::parser! {
             }
             "incref" __() e:expr() _ { Expr::Incref(Box::new(e)) }
             "getref" __() e:expr() _ { Expr::Getref(Box::new(e)) }
-            "sizeof" __() "expr" __() e:expr() _ { Expr::SizeofVar(Box::new(e)) }
-            "sizeof" __() "type" __() ty:typename() _ { Expr::SizeofTy(ty) }
+            "sizeof" __() "expr" __() e:expr() _ { Expr::PropertyofVar(Box::new(e), TypeProperty::Size) }
+            "sizeof" __() "type" __() ty:typename() _ { Expr::PropertyofType(ty, TypeProperty::Size) }
+            "alignof" __() "expr" __() e:expr() _ { Expr::PropertyofVar(Box::new(e), TypeProperty::Alignment) }
+            "alignof" __() "type" __() ty:typename() _ { Expr::PropertyofType(ty, TypeProperty::Alignment) }
             --
             x:(@) _ "<<" _ y:@ { Expr::ShiftLeft(Box::new(x), Box::new(y)) }
             x:(@) _ ">>" _ y:@ { Expr::ShiftRight(Box::new(x), Box::new(y)) }

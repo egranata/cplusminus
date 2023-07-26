@@ -249,6 +249,17 @@ impl<'a> TypeBuilder<'a> {
         }
     }
 
+    pub fn alignof(&self, ty: BasicTypeEnum<'a>) -> IntValue<'a> {
+        match ty {
+            BasicTypeEnum::ArrayType(at) => at.get_alignment(),
+            BasicTypeEnum::FloatType(ft) => ft.get_alignment(),
+            BasicTypeEnum::IntType(it) => it.get_alignment(),
+            BasicTypeEnum::PointerType(pt) => pt.get_alignment(),
+            BasicTypeEnum::StructType(st) => st.get_alignment(),
+            BasicTypeEnum::VectorType(vt) => vt.get_alignment(),
+        }
+    }
+
     pub fn descriptor_for_function_type(ty: FunctionType) -> Option<TypeDescriptor> {
         let return_type = if ty.get_return_type().is_none() {
             None

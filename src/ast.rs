@@ -263,6 +263,12 @@ pub enum Number {
 }
 
 #[derive(Clone, Debug)]
+pub enum TypeProperty {
+    Size,
+    Alignment,
+}
+
+#[derive(Clone, Debug)]
 pub enum Expr {
     ConstantNumber(Number),
     ConstString(String),
@@ -292,8 +298,8 @@ pub enum Expr {
     Rvalue(Lvalue),
     Cast(Box<Expression>, TypeDescriptor),
     Array(Vec<Expression>),
-    SizeofVar(Box<Expression>),
-    SizeofTy(TypeDescriptor),
+    PropertyofVar(Box<Expression>, TypeProperty),
+    PropertyofType(TypeDescriptor, TypeProperty),
     Deref(Box<Expression>),
     Tuple(Vec<Expression>),
     AddressOf(Lvalue),
