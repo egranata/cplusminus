@@ -75,7 +75,8 @@ pub fn main() {
     let inputs: Vec<PathBuf> = args.inputs.iter().map(PathBuf::from).collect();
 
     if inputs.len() == 1 && args.output.is_none() {
-        match driver::run_jit(&inputs[0], &options) {
+        let jit_result = driver::run_jit(&inputs[0], &options);
+        match jit_result.result {
             Ok(ret) => println!("main returned {ret}"),
             Err(msg) => println!("jit error: {msg}"),
         }

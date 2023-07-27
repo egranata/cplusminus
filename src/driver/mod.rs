@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use std::{
+    collections::HashMap,
     path::{Path, PathBuf},
     process::Command,
 };
@@ -40,6 +41,54 @@ fn is_cpm_source(p: &Path) -> bool {
     }
 }
 
+pub type CompilerDiagnostics = HashMap<String, String>;
+
+pub struct CompilationResult<TSuccess, TFailure> {
+    pub result: Result<TSuccess, TFailure>,
+    pub diagnostics: CompilerDiagnostics,
+}
+
+impl<TSuccess, TFailure> CompilationResult<TSuccess, TFailure> {
+    pub fn ok<T: Into<TSuccess>>(s: T) -> Self {
+        Self {
+            result: Ok(s.into()),
+            diagnostics: Default::default(),
+        }
+    }
+
+    pub fn err<T: Into<TFailure>>(f: T) -> Self {
+        Self {
+            result: Err(f.into()),
+            diagnostics: Default::default(),
+        }
+    }
+
+    pub fn into_ok<T: Into<TSuccess>>(&mut self, s: T) -> &mut Self {
+        self.result = Ok(s.into());
+
+        self
+    }
+
+    pub fn into_err<T: Into<TFailure>>(&mut self, f: T) -> &mut Self {
+        self.result = Err(f.into());
+
+        self
+    }
+
+    pub fn set_diagnostics(&mut self, diags: HashMap<String, String>) -> &mut Self {
+        self.diagnostics = diags;
+
+        self
+    }
+
+    pub fn add_diagnostics(&mut self, file: &Path, diags: &str) -> &mut Self {
+        self.diagnostics
+            .insert(file.to_str().unwrap().to_owned(), diags.to_owned());
+
+        self
+    }
+}
+
 fn run_compiler_machinery<'a>(
     src: &Path,
     llvm: &'a Context,
@@ -48,6 +97,8 @@ fn run_compiler_machinery<'a>(
     let input = Input::from_file(src);
     let iwell = CompilerCore::new(llvm, &input, options.clone());
     let ok = iwell.compile();
+    iwell.display_diagnostics();
+
     if ok {
         if options.optimize {
             iwell.run_passes();
@@ -62,14 +113,13 @@ fn run_compiler_machinery<'a>(
         }
         (true, iwell)
     } else {
-        iwell.display_diagnostics();
         (false, iwell)
     }
 }
 
-pub fn run_jit(src: &Path, options: &CompilerOptions) -> Result<u64, String> {
+pub fn run_jit(src: &Path, options: &CompilerOptions) -> CompilationResult<u64, String> {
     let llvm = Context::create();
-    let rst: Result<u64, String>;
+    let mut rst: CompilationResult<u64, String>;
     match run_compiler_machinery(src, &llvm, options) {
         (true, iwell) => {
             type MainFunc = unsafe extern "C" fn() -> u64;
@@ -77,13 +127,16 @@ pub fn run_jit(src: &Path, options: &CompilerOptions) -> Result<u64, String> {
                 jit::get_runnable_function(&iwell, "main", options.optimize);
             if let Some(main) = main {
                 let ret = unsafe { main.call() };
-                rst = Ok(ret);
+                rst = CompilationResult::ok(ret);
+                rst.add_diagnostics(src, &iwell.diagnostics_to_string());
             } else {
-                rst = Err(String::from("main not found"));
+                rst = CompilationResult::err("main function not found");
+                rst.add_diagnostics(src, &iwell.diagnostics_to_string());
             }
         }
-        (false, _iwell) => {
-            rst = Err(String::from("compilation error"));
+        (false, iwell) => {
+            rst = CompilationResult::err("compilation error");
+            rst.add_diagnostics(src, &iwell.diagnostics_to_string());
         }
     };
     rst
@@ -93,7 +146,9 @@ pub fn build_aout(
     sources: &[PathBuf],
     target: PathBuf,
     options: CompilerOptions,
-) -> Result<(), String> {
+) -> CompilationResult<(), String> {
+    let mut rst = CompilationResult::ok(());
+
     let mut tempfiles: Vec<NamedTempFile> = vec![];
     let mut object_files: Vec<PathBuf> = vec![];
     for src in sources {
@@ -107,10 +162,12 @@ pub fn build_aout(
                     object_files.push(tmp_file.path().to_path_buf());
                     iwell.dump(tmp_file.path());
                     tempfiles.push(tmp_file);
+                    rst.add_diagnostics(src.as_path(), &iwell.diagnostics_to_string());
                 }
                 (false, iwell) => {
-                    iwell.display_diagnostics();
-                    return Err(iwell.diagnostics_to_string());
+                    rst.add_diagnostics(src.as_path(), &iwell.diagnostics_to_string());
+                    rst.into_err("compilation error");
+                    return rst;
                 }
             };
         } else {
@@ -133,12 +190,16 @@ pub fn build_aout(
     let process = clang.spawn();
     if let Ok(mut child) = process {
         match child.wait() {
-            Ok(_) => Ok(()),
-            Err(err) => Err(format!("execution error: {err}")),
+            Ok(_) => {}
+            Err(err) => {
+                rst.into_err(format!("linker execution failed: {err}"));
+            }
         }
     } else {
-        panic!("unable to spawn system compiler; consider installing clang");
+        rst.into_err("unable to spawn system compiler; consider installing clang");
     }
+
+    rst
 }
 
 pub fn build_objects(sources: &[PathBuf], options: CompilerOptions) -> Result<(), String> {
@@ -152,7 +213,6 @@ pub fn build_objects(sources: &[PathBuf], options: CompilerOptions) -> Result<()
                     iwell.dump(dst.as_path());
                 }
                 (false, iwell) => {
-                    iwell.display_diagnostics();
                     return Err(iwell.diagnostics_to_string());
                 }
             };

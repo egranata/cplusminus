@@ -16,7 +16,7 @@ use std::fmt::Display;
 
 #[derive(Clone, Debug)]
 enum TestFailure {
-    CompileFailure(String),
+    CompileFailure(crate::driver::CompilerDiagnostics),
     RuntimeNoSpawn(String),
     RuntimeNoExitCode,
     RuntimeJit(String),
@@ -25,7 +25,7 @@ enum TestFailure {
 impl Display for TestFailure {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TestFailure::CompileFailure(err) => write!(f, "{}", err),
+            TestFailure::CompileFailure(_) => write!(f, "compiler error"),
             TestFailure::RuntimeNoSpawn(err) => write!(f, "program execution failed: {err}"),
             TestFailure::RuntimeNoExitCode => write!(f, "program did not exit with a result"),
             TestFailure::RuntimeJit(err) => write!(f, "LLVM JIT error: {err}"),
@@ -66,16 +66,16 @@ mod driver_tests {
         sources: &[PathBuf],
         target: &PathBuf,
         options: &CompilerOptions,
-    ) -> Result<i32, TestFailure> {
+    ) -> Result<(i32, crate::driver::CompilerDiagnostics), TestFailure> {
         let cmplr = crate::driver::build_aout(sources, target.clone(), options.clone());
-        if let Err(msg) = cmplr {
-            return Err(TestFailure::CompileFailure(msg));
+        if let Err(_) = cmplr.result {
+            return Err(TestFailure::CompileFailure(cmplr.diagnostics));
         }
         let mut cmd = std::process::Command::new(target);
         match cmd.spawn() {
             Ok(mut child) => match child.wait() {
                 Ok(exit) => match exit.code() {
-                    Some(code) => return Ok(code),
+                    Some(code) => return Ok((code, cmplr.diagnostics)),
                     None => return Err(TestFailure::RuntimeNoExitCode),
                 },
                 Err(err) => {
@@ -92,15 +92,31 @@ mod driver_tests {
         sources: &[PathBuf],
         target: &PathBuf,
         options: &CompilerOptions,
-        _diags: &Option<Vec<String>>,
+        diags: &Option<Vec<String>>,
     ) {
         let result = compile_run_temp(sources, target, options);
         if result.is_ok() {
-            assert!(result.unwrap() == 0);
+            let (rc, compiler_diagnostics) = result.unwrap();
+            assert!(rc == 0);
+            if let Some(diags) = diags {
+                for diag in diags {
+                    assert!(find_string_in_map(&diag, &compiler_diagnostics));
+                }
+            }
         } else {
             eprintln!("test failure: {}", result.unwrap_err());
             assert!(false);
         }
+    }
+
+    fn find_string_in_map(msg: &str, diags: &crate::driver::CompilerDiagnostics) -> bool {
+        for diag in diags.values() {
+            if diag.contains(msg) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     #[allow(dead_code)]
@@ -113,10 +129,10 @@ mod driver_tests {
         let result = compile_run_temp(sources, target, options);
         assert!(result.is_err());
         match result.unwrap_err() {
-            TestFailure::CompileFailure(msg) => {
+            TestFailure::CompileFailure(compiler_diagnostics) => {
                 if let Some(diags) = diags {
                     for diag in diags {
-                        assert!(msg.contains(diag));
+                        assert!(find_string_in_map(&diag, &compiler_diagnostics));
                     }
                 }
             }
@@ -144,7 +160,7 @@ mod jit_tests {
         };
 
         let result = crate::driver::run_jit(program, &compiler_options);
-        return match result {
+        return match result.result {
             Ok(ret) => Ok(ret),
             Err(msg) => Err(TestFailure::RuntimeJit(msg)),
         };

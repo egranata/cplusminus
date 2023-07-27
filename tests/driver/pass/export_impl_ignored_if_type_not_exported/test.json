@@ -1,0 +1,10 @@
+{
+    "source_files": [
+        "test.cpm"
+    ],
+    "bom": true,
+    "diags": [
+        "this type is not exported; export of its impls is ignored",
+        "test.cpm:16:1"
+    ]
+}
