@@ -194,7 +194,7 @@ mod test {
     use inkwell::{context::Context, execution_engine::JitFunction};
 
     use crate::{
-        err::{CompilerError, CompilerWarning},
+        err::CompilerError,
         iw::{self, Input},
         jit,
     };
@@ -224,19 +224,6 @@ mod test {
         iwell.compile();
 
         return iwell.errors();
-    }
-
-    fn helper_compile_warnings(program: &str) -> Vec<CompilerWarning> {
-        let llvm = Context::create();
-        let source = Input::from_string(program);
-        let iwell = iw::CompilerCore::new(&llvm, &source, Default::default());
-        iwell.compile();
-
-        let x = iwell.errors();
-        if x.len() > 0 {
-            return vec![];
-        };
-        return iwell.warnings();
     }
 
     #[test]
@@ -787,25 +774,6 @@ func main() ret int32 {
     }
 
     #[test]
-    fn test_dup_arg_names() {
-        assert_ne!(
-            0,
-            helper_compile_errors(
-                "
-func foo(x: int32, y: int32, x: int32) ret int32 {
-    return x + y * z;
-}
-        
-func main() ret int32 {
-    return foo(3,4,6);
-}
-"
-            )
-            .len()
-        );
-    }
-
-    #[test]
     fn test_var_let_decl() {
         assert_eq!(
             8,
@@ -1075,38 +1043,6 @@ func main() ret int64 {
     }
 
     #[test]
-    fn test_err_typeless_var() {
-        assert_ne!(
-            0,
-            helper_compile_errors(
-                "
-func main() ret int64 {
-    var x;
-    return 12;
-}
-"
-            )
-            .len()
-        );
-    }
-
-    #[test]
-    fn test_err_default_let() {
-        assert_ne!(
-            0,
-            helper_compile_errors(
-                "
-func main() ret int64 {
-    let x: int64;
-    return 12;
-}
-"
-            )
-            .len()
-        );
-    }
-
-    #[test]
     fn test_define_ref_struct() {
         assert_eq!(
             0,
@@ -1189,75 +1125,6 @@ func main() ret int64 {
 "
             )
             .unwrap()
-        );
-    }
-
-    #[test]
-    fn test_ref_struct_access_err() {
-        assert_ne!(
-            0,
-            helper_compile_errors(
-                "
-type pair {
-    x: int64,
-    y: int64
-}
-
-func main() ret int64 {
-    var p = alloc pair;
-    p.no = 3;
-    p.such = 4;
-    return p.x + p.field + 1;
-}
-"
-            )
-            .len()
-        );
-    }
-
-    #[test]
-    fn test_val_struct_access_err() {
-        assert_ne!(
-            0,
-            helper_compile_errors(
-                "
-val type pair {
-    x: int64,
-    y: int64
-}
-
-func main() ret int64 {
-    var p = alloc pair;
-    p.no = 3;
-    p.such = 4;
-    return p.x + p.field + 1;
-}
-"
-            )
-            .len()
-        );
-    }
-
-    #[test]
-    fn test_let_struct_write_err() {
-        assert_ne!(
-            0,
-            helper_compile_errors(
-                "
-type pair {
-    x: int64,
-    y: int64
-}
-
-func main() ret int64 {
-    let p = alloc pair;
-    p.x = 3;
-    p = alloc pair;
-    return 0;
-}
-"
-            )
-            .len()
         );
     }
 
@@ -1538,28 +1405,6 @@ func main() ret int64 {
     }
 
     #[test]
-    fn test_ptr_struct_deref() {
-        assert_ne!(
-            0,
-            helper_compile_errors(
-                "
-type foo {
-    x: byte
-}
-
-func main() ret byte {
-    let f = alloc foo;
-    f.x = 65 as byte;
-    let q = deref f;
-    return q.x;
-}
-"
-            )
-            .len()
-        );
-    }
-
-    #[test]
     fn test_mutable_arg() {
         assert_eq!(
             13,
@@ -1602,26 +1447,6 @@ func main() ret int64 {
 "
             )
             .unwrap()
-        );
-    }
-
-    #[test]
-    fn test_explicit_immutable_arg() {
-        assert_ne!(
-            0,
-            helper_compile_errors(
-                "
-func foo(let n: int64) ret int64 {
-    n = n + 1;
-    return n;
-}
-
-func main() ret int64 {
-    return foo(12);
-}
-"
-            )
-            .len()
         );
     }
 
@@ -1960,96 +1785,6 @@ func main() ret int64 {
 "
             )
             .unwrap()
-        );
-    }
-
-    #[test]
-    fn test_argc_mismatch_err() {
-        assert_ne!(
-            0,
-            helper_compile_errors(
-                "
-func foo() ret int64 {
-    return 0;
-}
-
-func main() ret int64 {
-    return foo(1,2,3);
-}
-"
-            )
-            .len()
-        );
-    }
-
-    #[test]
-    fn test_argc_mismatch_ptr() {
-        assert_ne!(
-            0,
-            helper_compile_errors(
-                "
-func foo() ret int64 {
-    return 0;
-}
-
-func main() ret int64 {
-    let fp = &foo;
-    return (*fp)(1,2,3);
-}
-"
-            )
-            .len()
-        );
-    }
-
-    #[test]
-    fn test_argc_mismatch_method() {
-        assert_ne!(
-            0,
-            helper_compile_errors(
-                "
-type pair {
-    x: int64,
-    y: int64
-}
-
-impl pair {
-    func add() ret int64 {
-        return self.x + self.y;
-    }
-}
-
-func main() ret int64 {
-    var p = alloc pair;
-    p.x = 12;
-    p.y = 13;
-    return p->add(1,2,3);
-}
-"
-            )
-            .len()
-        );
-    }
-
-    #[test]
-    fn test_mutable_unwritten_warning() {
-        assert!(
-            helper_compile_warnings(
-                "
-func foo() ret int64 {
-    var q = 5;
-    return q + 1;
-}
-
-func main() ret int64 {
-    var n = 5;
-    var m = foo() + n;
-    return n + m;
-}
-"
-            )
-            .len()
-                >= 3
         );
     }
 

@@ -1,0 +1,10 @@
+{
+    "source_files": [
+        "test.cpm"
+    ],
+    "bom": false,
+    "diags": [
+        "delayed writing to a let value is not implemented",
+        "test.cpm:16:5"
+    ]
+}

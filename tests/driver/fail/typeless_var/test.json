@@ -1,0 +1,10 @@
+{
+    "source_files": [
+        "test.cpm"
+    ],
+    "bom": false,
+    "diags": [
+        "this declaration cannot be resolved to a type",
+        "test.cpm:16:5"
+    ]
+}

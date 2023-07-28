@@ -1,0 +1,12 @@
+{
+    "source_files": [
+        "test.cpm"
+    ],
+    "bom": false,
+    "diags": [
+        "field no not found",
+        "field such not found",
+        "field missing not found",
+        "field field not found"
+    ]
+}

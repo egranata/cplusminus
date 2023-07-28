@@ -1,0 +1,12 @@
+{
+    "source_files": [
+        "test.cpm"
+    ],
+    "bom": false,
+    "diags": [
+        "n is read-only",
+        "test.cpm:16:5",
+        "x is read-only",
+        "test.cpm:21:5"
+    ]
+}

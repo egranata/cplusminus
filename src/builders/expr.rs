@@ -1082,7 +1082,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     if self.tb.is_refcounted_basic_type(ev.get_type()).is_some() {
                         self.iw.error(CompilerError::new(
                             e.loc,
-                            Error::UnexpectedType(Some("refcounted type".to_owned())),
+                            Error::UnexpectedType(Some("not a refcounted type".to_owned())),
                         ));
                         None
                     } else if let PointerValue(pv) = ev {
@@ -1090,14 +1090,14 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     } else {
                         self.iw.error(CompilerError::new(
                             e.loc,
-                            Error::UnexpectedType(Some("refcounted type".to_owned())),
+                            Error::UnexpectedType(Some("pointer type".to_owned())),
                         ));
                         return None;
                     }
                 } else {
                     self.iw.error(CompilerError::new(
                         e.loc,
-                        Error::UnexpectedType(Some("refcounted type".to_owned())),
+                        Error::UnexpectedType(Some("valid pointer expression".to_owned())),
                     ));
                     None
                 }

@@ -1,0 +1,12 @@
+{
+    "source_files": [
+        "test.cpm"
+    ],
+    "bom": false,
+    "diags": [
+        "type mismatch in expression: expected not a refcounted type",
+        "test.cpm:22:14",
+        "type mismatch in expression: expected pointer type",
+        "test.cpm:24:14"
+    ]
+}

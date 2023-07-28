@@ -1,0 +1,10 @@
+{
+    "source_files": [
+        "test.cpm"
+    ],
+    "bom": false,
+    "diags": [
+        "argument x already defined for this function",
+        "test.cpm:15:30"
+    ]
+}

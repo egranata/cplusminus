@@ -1,0 +1,10 @@
+{
+    "source_files": [
+        "test.cpm"
+    ],
+    "bom": false,
+    "diags": [
+        "variable q declared mutable but never written to",
+        "variable m declared mutable but never written to"
+    ]
+}
