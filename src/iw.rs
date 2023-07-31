@@ -50,7 +50,7 @@ use crate::{
 
 use crate::codegen::{structure::Structure, MutableOf};
 
-use codespan_reporting::files::SimpleFiles;
+use codespan_reporting::files::SimpleFile;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use codespan_reporting::{
     diagnostic::{Diagnostic, Label},
@@ -61,6 +61,7 @@ use codespan_reporting::{
 pub struct Input {
     pub path: PathBuf,
     pub content: String,
+    pub diag_file: SimpleFile<String, String>,
 }
 
 impl Input {
@@ -75,16 +76,22 @@ impl Input {
     }
 
     pub fn from_string(content: &str) -> Self {
+        let content = content.to_owned();
         Self {
             path: PathBuf::new(),
-            content: content.to_string(),
+            content: content.clone(),
+            diag_file: SimpleFile::new(String::from("<buffer>"), content),
         }
     }
 
     pub fn from_file(path: &Path) -> Self {
+        let path = path.to_path_buf();
+        let content = std::fs::read_to_string(&path).unwrap();
+
         Self {
-            path: path.to_path_buf(),
-            content: std::fs::read_to_string(path).unwrap(),
+            path: path.clone(),
+            content: content.clone(),
+            diag_file: SimpleFile::new(path.to_str().unwrap().to_owned(), content),
         }
     }
 
@@ -836,8 +843,8 @@ impl<'a> CompilerCore<'a> {
     }
 
     fn run_through_diags(&self, writer: &mut dyn WriteColor) {
-        let mut files = SimpleFiles::new();
-        let file_id = files.add(self.source.path_to_string(), &self.source.content);
+        #[allow(clippy::let_unit_value)]
+        let file_id = ();
         let config = codespan_reporting::term::Config::default();
 
         for diag in self.diagnostics.borrow().iter() {
@@ -850,7 +857,7 @@ impl<'a> CompilerCore<'a> {
                     .with_labels(vec![Label::primary(file_id, warn.loc.start..warn.loc.end)]),
             };
 
-            codespan_reporting::term::emit(writer, &config, &files, &diagnostic)
+            codespan_reporting::term::emit(writer, &config, &self.source.diag_file, &diagnostic)
                 .expect("<io error>");
         }
     }
