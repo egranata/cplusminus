@@ -31,8 +31,8 @@ use std::{
 
 use crate::{
     ast::{
-        Location, ProperStructDecl, RawStructDecl, TopLevelDecl, TopLevelDeclaration,
-        TypeDescriptor,
+        ProperStructDecl, RawStructDecl, TokenLocation, TokenSpan, TopLevelDecl,
+        TopLevelDeclaration, TypeDescriptor,
     },
     bom::{
         alias::AliasBomEntry, function::FunctionBomEntry, module::BillOfMaterials,
@@ -50,7 +50,7 @@ use crate::{
 
 use crate::codegen::{structure::Structure, MutableOf};
 
-use codespan_reporting::files::SimpleFile;
+use codespan_reporting::files::{Files, SimpleFile};
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use codespan_reporting::{
     diagnostic::{Diagnostic, Label},
@@ -100,6 +100,14 @@ impl Input {
             self.path.to_str().unwrap().to_owned()
         } else {
             String::from("<unknown buffer>")
+        }
+    }
+
+    pub fn index_to_location(&self, idx: usize) -> TokenLocation {
+        let loc = self.diag_file.location((), idx).unwrap();
+        TokenLocation {
+            line: loc.line_number,
+            column: loc.column_number,
         }
     }
 }
@@ -682,7 +690,7 @@ impl<'a> CompilerCore<'a> {
                 }
             }
             Err(err) => {
-                let loc = Location {
+                let loc = TokenSpan {
                     start: err.location.offset,
                     end: err.location.offset + 1,
                 };

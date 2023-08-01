@@ -19,11 +19,11 @@ use inkwell::{
     values::{FunctionValue, PointerValue},
 };
 
-use crate::{ast::Location, codegen::MutableOf};
+use crate::{ast::TokenSpan, codegen::MutableOf};
 
 #[derive(Clone)]
 pub struct VarInfo<'a> {
-    pub loc: Location,
+    pub loc: TokenSpan,
     pub name: String,
     pub alloca: PointerValue<'a>,
     pub rw: bool,
@@ -31,7 +31,7 @@ pub struct VarInfo<'a> {
 }
 
 impl<'a> VarInfo<'a> {
-    pub fn new(loc: Location, name: String, alloca: PointerValue<'a>, rw: bool) -> Self {
+    pub fn new(loc: TokenSpan, name: String, alloca: PointerValue<'a>, rw: bool) -> Self {
         Self {
             loc,
             name,

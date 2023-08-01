@@ -145,7 +145,7 @@ peg::parser! {
         value_type_alloc_entries() / ref_type_alloc_entries();
 
         pub rule expr() -> Expression = precedence!{
-            start:position!() node:@ end:position!() { Expression { loc:Location{start,end}, payload:node} }
+            start:position!() node:@ end:position!() { Expression { loc:TokenSpan{start,end}, payload:node} }
 
             ae:array_expr() { ae }
             --
@@ -219,14 +219,14 @@ peg::parser! {
 
         rule var_decl_stmt() -> Statement =
         start:position!() vd:var_decl_body() _ end:position!() {
-            Statement { loc:Location{start,end}, payload:Stmt::VarDecl(vd) }
+            Statement { loc:TokenSpan{start,end}, payload:Stmt::VarDecl(vd) }
         }
 
         rule ret_payload() -> Expression =
         __() e:top_level_expr() { e }
 
         rule ret() -> Statement =
-        start:position!() "return" e:ret_payload()? end:position!() { Statement { loc:Location{start,end}, payload:Stmt::Return(e) } }
+        start:position!() "return" e:ret_payload()? end:position!() { Statement { loc:TokenSpan{start,end}, payload:Stmt::Return(e) } }
 
         #[cache_left_rec]
         rule lvalue() -> Lvalue =
@@ -237,10 +237,10 @@ peg::parser! {
         i:ident() { Lvalue::Identifier(i) }
 
         rule assignment() -> Statement =
-        start:position!() lv:lvalue() _ "=" _ e:top_level_expr() end:position!() { Statement { loc:Location{start,end}, payload:Stmt::Assignment(lv,Box::new(e)) } }
+        start:position!() lv:lvalue() _ "=" _ e:top_level_expr() end:position!() { Statement { loc:TokenSpan{start,end}, payload:Stmt::Assignment(lv,Box::new(e)) } }
 
         rule ifcond() -> IfCondition =
-        start:position!() "(" _ cond:top_level_expr() _ ")" _ body:block() end:position!() { IfCondition{loc:Location{start,end},cond:Box::new(cond),body:Box::new(body)} }
+        start:position!() "(" _ cond:top_level_expr() _ ")" _ body:block() end:position!() { IfCondition{loc:TokenSpan{start,end},cond:Box::new(cond),body:Box::new(body)} }
 
         rule ifcheck() -> IfCondition =
         "if" _ cond:ifcond() _ { cond }
@@ -253,19 +253,19 @@ peg::parser! {
 
         rule field_decl() -> StructEntryDecl =
         start:position!() _ n:ident() _ ty:type_decl() _ end:position!() {
-            let field = FieldDecl { loc:Location{start,end}, name:n, ty };
+            let field = FieldDecl { loc:TokenSpan{start,end}, name:n, ty };
             StructEntryDecl::Field(field)
         }
 
         rule init_decl() -> StructEntryDecl =
         _ start:position!() _ "init" _ "(" _ args:func_arg()**"," _ ")" _ body:block() end:position!() _ {
-            let init = InitDecl { loc:Location{start, end}, args, body };
+            let init = InitDecl { loc:TokenSpan{start, end}, args, body };
             StructEntryDecl::Init(init)
         }
 
         rule dealloc_decl() -> StructEntryDecl =
         _ start:position!() _ "dealloc" _ body:block() end:position!() _ {
-            let dealloc = DeallocDecl { loc:Location{start, end}, body };
+            let dealloc = DeallocDecl { loc:TokenSpan{start, end}, body };
             StructEntryDecl::Dealloc(dealloc)
         }
 
@@ -277,15 +277,15 @@ peg::parser! {
         rule struct_decl() -> TopLevelDeclaration =
         _ start:position!() export:export_attribute() rd:ref_val_decl()? "type" __() n:ident() _ "{" _ f:(struct_entry()**",") _ "}" end:position!() _ {
             let ms = if rd.unwrap_or(true) { crate::codegen::structure::MemoryStrategy::ByReference } else { crate::codegen::structure::MemoryStrategy::ByValue };
-            let sd = RawStructDecl { loc:Location{start,end}, name:n, ms, entries:f, export };
+            let sd = RawStructDecl { loc:TokenSpan{start,end}, name:n, ms, entries:f, export };
             TopLevelDeclaration::structure(sd.loc, sd)
         }
 
         rule ifstmt() -> Statement =
-        start:position!() a:ifcheck() _ b:elsifcheck()* _ c:elscheck()? end:position!() { Statement { loc:Location{start,end}, payload: Stmt::If(IfStatement{base:a,alts:b,othw:c}) } }
+        start:position!() a:ifcheck() _ b:elsifcheck()* _ c:elscheck()? end:position!() { Statement { loc:TokenSpan{start,end}, payload: Stmt::If(IfStatement{base:a,alts:b,othw:c}) } }
 
         rule expr_stmt() -> Statement =
-        start:position!() e:top_level_expr() end:position!() { Statement { loc:Location{start,end}, payload:Stmt::Expression(Box::new(e)) } }
+        start:position!() e:top_level_expr() end:position!() { Statement { loc:TokenSpan{start,end}, payload:Stmt::Expression(Box::new(e)) } }
 
         rule whilestmt() -> Statement =
         start:position!() "while" _ "(" c:top_level_expr() _ ")" _ blk:block() _ els:elscheck()? end:position!()  {
@@ -294,7 +294,7 @@ peg::parser! {
                 body: Box::new(blk),
                 els,
             };
-            Statement { loc:Location{start,end}, payload:Stmt::While(wh) }
+            Statement { loc:TokenSpan{start,end}, payload:Stmt::While(wh) }
         }
 
         rule dowhilestmt() -> Statement =
@@ -303,14 +303,14 @@ peg::parser! {
                 body: Box::new(blk),
                 cond: Box::new(c),
             };
-            Statement { loc:Location{start,end}, payload:Stmt::DoWhile(wh) }
+            Statement { loc:TokenSpan{start,end}, payload:Stmt::DoWhile(wh) }
         }
 
         rule decrefstmt() -> Statement =
-        start:position!() "decref" __() c:top_level_expr() _ end:position!() { Statement { loc:Location{start,end}, payload:Stmt::Decref(Box::new(c)) } }
+        start:position!() "decref" __() c:top_level_expr() _ end:position!() { Statement { loc:TokenSpan{start,end}, payload:Stmt::Decref(Box::new(c)) } }
 
         rule assertstmt() -> Statement =
-        start:position!() "assert" __() c:top_level_expr() _ end:position!() { Statement { loc:Location{start,end}, payload:Stmt::Assert(Box::new(c)) } }
+        start:position!() "assert" __() c:top_level_expr() _ end:position!() { Statement { loc:TokenSpan{start,end}, payload:Stmt::Assert(Box::new(c)) } }
 
         rule typealiasstmt() -> Statement =
         decl:typealias() {
@@ -318,9 +318,9 @@ peg::parser! {
         }
 
         rule break_stmt() -> Statement =
-        start:position!() "break" _ end:position!() { Statement { loc:Location{start,end}, payload:Stmt::Break } }
+        start:position!() "break" _ end:position!() { Statement { loc:TokenSpan{start,end}, payload:Stmt::Break } }
         rule continue_stmt() -> Statement =
-        start:position!() "continue" _ end:position!() { Statement { loc:Location{start,end}, payload:Stmt::Continue } }
+        start:position!() "continue" _ end:position!() { Statement { loc:TokenSpan{start,end}, payload:Stmt::Continue } }
 
         rule export_attribute() -> bool =
         start:position!() s:("export ")? _() end:position!() {
@@ -336,10 +336,10 @@ peg::parser! {
         _ v:(var_decl_stmt() / assignment() / typealiasstmt() / function_def_stmt() / break_stmt() / continue_stmt() / ifstmt() / whilestmt() / dowhilestmt() / ret() / decrefstmt() / assertstmt() / block() / expr_stmt()) _ ";" {v}
 
         rule block() -> Statement =
-        start:position!() "{" _ s:top_level_statement()* _ "}" end:position!() { Statement { loc:Location{start,end}, payload:Stmt::Block(s) } }
+        start:position!() "{" _ s:top_level_statement()* _ "}" end:position!() { Statement { loc:TokenSpan{start,end}, payload:Stmt::Block(s) } }
 
         rule func_arg() -> FunctionArgument =
-        _ start:position!() rw:var_decl_rw_ro()? _ name:ident() _ ty:type_decl() end:position!() _ { FunctionArgument{loc:Location{start,end}, name,ty,rw:rw.unwrap_or(false), explicit_rw:rw.is_some()} }
+        _ start:position!() rw:var_decl_rw_ro()? _ name:ident() _ ty:type_decl() end:position!() _ { FunctionArgument{loc:TokenSpan{start,end}, name,ty,rw:rw.unwrap_or(false), explicit_rw:rw.is_some()} }
 
         rule function_ret() -> TypeDescriptor =
         _ "ret" _ ty:typename() _ { ty }
@@ -349,7 +349,7 @@ peg::parser! {
             let arg_types: Vec<TypeDescriptor> = args.iter().map(|arg| arg.ty.clone()).collect();
             let ftd = FunctionTypeDescriptor::new(arg_types, ty.map(Box::new), v);
             let td = TypeDescriptor::Function(ftd);
-            let decl = FunctionDecl { loc:Location{start,end}, name,args,ty:td };
+            let decl = FunctionDecl { loc:TokenSpan{start,end}, name,args,ty:td };
             let extrn = ExternFunction { loc:decl.loc, decl, export };
             TopLevelDeclaration::extern_function(extrn.loc, extrn)
         }
@@ -359,7 +359,7 @@ peg::parser! {
             let arg_types: Vec<TypeDescriptor> = args.iter().map(|arg| arg.ty.clone()).collect();
             let ftd = FunctionTypeDescriptor::new(arg_types, ty.map(Box::new), false);
             let td = TypeDescriptor::Function(ftd);
-            let decl = FunctionDecl { loc:Location{start,end}, name,args,ty:td };
+            let decl = FunctionDecl { loc:TokenSpan{start,end}, name,args,ty:td };
             FunctionDefinition { decl,body,export }
         }
 
@@ -378,7 +378,7 @@ peg::parser! {
 
         rule typealias() -> TypeAliasDecl =
         _ start:position!() export:export_attribute() "type" __() name:ident() _ "=" _ ty:typename() _ end:position!() _ {
-            TypeAliasDecl {loc:Location{start,end}, name, ty, export}
+            TypeAliasDecl {loc:TokenSpan{start,end}, name, ty, export}
         }
 
         rule typealias_tld() -> TopLevelDeclaration =
@@ -389,7 +389,7 @@ peg::parser! {
         rule impl_def() -> ImplDecl =
         _ start:position!() export:export_attribute() "impl" __() name:ident() _ "{" _ methods:method_def()* _ "}" _ end:position!() _ {
             let td = TypeDescriptor::Name(name);
-            ImplDecl { loc:Location{start,end}, of: td, methods, export }
+            ImplDecl { loc:TokenSpan{start,end}, of: td, methods, export }
         }
 
         rule implementation() -> TopLevelDeclaration = id:impl_def() {
@@ -398,18 +398,18 @@ peg::parser! {
 
         rule import_decl() -> ImportDecl =
         _ start:position!() _ "import" __() path:strlit() _ end:position!() _ {
-            ImportDecl{loc:Location{start,end}, path}
+            ImportDecl{loc:TokenSpan{start,end}, path}
         }
 
         rule import_decl_toplevel() -> TopLevelDeclaration =
         _ start:position!() id:import_decl() _ ";" _ end:position!() {
-            let loc = Location{start,end};
+            let loc = TokenSpan{start,end};
             TopLevelDeclaration::import(loc, id)
         }
 
         rule var_decl_toplevel() -> TopLevelDeclaration =
         _ start:position!() e:export_attribute() vd:var_decl_body() _ ";" _ end:position!() {
-            let loc = Location{start,end};
+            let loc = TokenSpan{start,end};
             let gvd = GlobalVarDecl{ loc, decl:vd, export:e };
             TopLevelDeclaration::variable(loc, gvd)
         }

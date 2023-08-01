@@ -24,7 +24,7 @@ use inkwell::{
 use crate::{
     ast::{
         DeallocDecl, FieldDecl, FunctionArgument, FunctionDecl, FunctionDefinition,
-        FunctionTypeDescriptor, ImplDecl, InitDecl, Location, ProperStructDecl, TypeDescriptor,
+        FunctionTypeDescriptor, ImplDecl, InitDecl, ProperStructDecl, TokenSpan, TypeDescriptor,
     },
     bom::strct::{ImplBomEntry, StructBomEntry},
     codegen::{
@@ -465,7 +465,7 @@ impl<'a> TypeBuilder<'a> {
             {
                 if is_val && field_ty == BasicTypeEnum::StructType(st_ty) {
                     self.iw.error(CompilerError::new(
-                        Location::origin(),
+                        TokenSpan::origin(),
                         Error::RecursiveTypeForbidden(fd.name.clone()),
                     ));
                     return None;
@@ -473,7 +473,7 @@ impl<'a> TypeBuilder<'a> {
 
                 if is_val && self.is_refcounted_basic_type(field_ty).is_some() {
                     self.iw.error(CompilerError::new(
-                        Location::origin(),
+                        TokenSpan::origin(),
                         Error::RefTypeInValTypeForbidden,
                     ));
                     return None;
@@ -486,7 +486,7 @@ impl<'a> TypeBuilder<'a> {
                 });
             } else {
                 self.iw.error(CompilerError::new(
-                    Location::origin(),
+                    TokenSpan::origin(),
                     Error::TypeNotFound(fd.underlying_type.clone()),
                 ));
                 return None;

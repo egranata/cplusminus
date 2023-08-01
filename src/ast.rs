@@ -19,15 +19,21 @@ use serde::{Deserialize, Serialize};
 use crate::codegen::structure::MemoryStrategy;
 
 #[derive(Copy, Clone, Debug)]
-pub struct Location {
+pub struct TokenSpan {
     pub start: usize,
     pub end: usize,
 }
 
-impl Location {
+impl TokenSpan {
     pub fn origin() -> Self {
         Self { start: 0, end: 0 }
     }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct TokenLocation {
+    pub line: usize,
+    pub column: usize,
 }
 
 // defined not inline within the TypeDescriptor because it
@@ -101,7 +107,7 @@ impl Display for TypeDescriptor {
 
 #[derive(Clone, Debug)]
 pub struct FieldDecl {
-    pub loc: Location,
+    pub loc: TokenSpan,
     pub name: String,
     pub ty: TypeDescriptor,
 }
@@ -115,20 +121,20 @@ pub struct MethodCall {
 
 #[derive(Clone, Debug)]
 pub struct MethodDecl {
-    pub loc: Location,
+    pub loc: TokenSpan,
     pub imp: FunctionDefinition,
 }
 
 #[derive(Clone, Debug)]
 pub struct InitDecl {
-    pub loc: Location,
+    pub loc: TokenSpan,
     pub args: Vec<FunctionArgument>,
     pub body: Statement,
 }
 
 #[derive(Clone, Debug)]
 pub struct DeallocDecl {
-    pub loc: Location,
+    pub loc: TokenSpan,
     pub body: Statement,
 }
 
@@ -141,7 +147,7 @@ pub enum StructEntryDecl {
 
 #[derive(Clone, Debug)]
 pub struct RawStructDecl {
-    pub loc: Location,
+    pub loc: TokenSpan,
     pub name: String,
     pub ms: MemoryStrategy,
     pub entries: Vec<StructEntryDecl>,
@@ -150,7 +156,7 @@ pub struct RawStructDecl {
 
 #[derive(Clone, Debug)]
 pub struct ProperStructDecl {
-    pub loc: Location,
+    pub loc: TokenSpan,
     pub name: String,
     pub ms: MemoryStrategy,
     pub fields: Vec<FieldDecl>,
@@ -161,7 +167,7 @@ pub struct ProperStructDecl {
 
 #[derive(Clone, Debug)]
 pub struct ImplDecl {
-    pub loc: Location,
+    pub loc: TokenSpan,
     pub of: TypeDescriptor,
     pub methods: Vec<MethodDecl>,
     pub export: bool,
@@ -169,7 +175,7 @@ pub struct ImplDecl {
 
 #[derive(Clone, Debug)]
 pub struct FunctionArgument {
-    pub loc: Location,
+    pub loc: TokenSpan,
     pub name: String,
     pub ty: TypeDescriptor,
     pub rw: bool,
@@ -178,7 +184,7 @@ pub struct FunctionArgument {
 
 #[derive(Clone, Debug)]
 pub struct IfCondition {
-    pub loc: Location,
+    pub loc: TokenSpan,
     pub cond: Box<Expression>,
     pub body: Box<Statement>,
 }
@@ -192,7 +198,7 @@ pub struct IfStatement {
 
 #[derive(Clone, Debug)]
 pub struct FunctionDecl {
-    pub loc: Location,
+    pub loc: TokenSpan,
     pub name: String,
     pub args: Vec<FunctionArgument>,
     pub ty: TypeDescriptor,
@@ -200,7 +206,7 @@ pub struct FunctionDecl {
 
 #[derive(Clone, Debug)]
 pub struct ExternFunction {
-    pub loc: Location,
+    pub loc: TokenSpan,
     pub decl: FunctionDecl,
     pub export: bool,
 }
@@ -345,7 +351,7 @@ pub struct VarDecl {
 
 #[derive(Clone, Debug)]
 pub struct GlobalVarDecl {
-    pub loc: Location,
+    pub loc: TokenSpan,
     pub decl: VarDecl,
     pub export: bool,
 }
@@ -383,7 +389,7 @@ pub enum Stmt {
 
 #[derive(Clone, Debug)]
 pub struct Expression {
-    pub loc: Location,
+    pub loc: TokenSpan,
     pub payload: Expr,
 }
 
@@ -392,7 +398,7 @@ impl Expression {
         self.payload.as_identifier()
     }
 
-    pub fn identifier(loc: Location, i: &str) -> Expression {
+    pub fn identifier(loc: TokenSpan, i: &str) -> Expression {
         Self {
             loc,
             payload: Expr::identifier(i),
@@ -406,7 +412,7 @@ impl Expression {
 
 #[derive(Clone, Debug)]
 pub struct TypeAliasDecl {
-    pub loc: Location,
+    pub loc: TokenSpan,
     pub name: String,
     pub ty: TypeDescriptor,
     pub export: bool,
@@ -414,13 +420,13 @@ pub struct TypeAliasDecl {
 
 #[derive(Clone, Debug)]
 pub struct Statement {
-    pub loc: Location,
+    pub loc: TokenSpan,
     pub payload: Stmt,
 }
 
 #[derive(Clone, Debug)]
 pub struct ImportDecl {
-    pub loc: Location,
+    pub loc: TokenSpan,
     pub path: String,
 }
 
@@ -437,54 +443,54 @@ pub enum TopLevelDecl {
 
 #[derive(Clone, Debug)]
 pub struct TopLevelDeclaration {
-    pub loc: Location,
+    pub loc: TokenSpan,
     pub payload: TopLevelDecl,
 }
 
 impl TopLevelDeclaration {
-    pub fn function(l: Location, f: FunctionDefinition) -> Self {
+    pub fn function(l: TokenSpan, f: FunctionDefinition) -> Self {
         Self {
             loc: l,
             payload: TopLevelDecl::Function(f),
         }
     }
 
-    pub fn extern_function(l: Location, f: ExternFunction) -> Self {
+    pub fn extern_function(l: TokenSpan, f: ExternFunction) -> Self {
         Self {
             loc: l,
             payload: TopLevelDecl::Extern(f),
         }
     }
 
-    pub fn structure(l: Location, s: RawStructDecl) -> Self {
+    pub fn structure(l: TokenSpan, s: RawStructDecl) -> Self {
         Self {
             loc: l,
             payload: TopLevelDecl::Structure(s),
         }
     }
 
-    pub fn typealias(l: Location, a: TypeAliasDecl) -> Self {
+    pub fn typealias(l: TokenSpan, a: TypeAliasDecl) -> Self {
         Self {
             loc: l,
             payload: TopLevelDecl::Alias(a),
         }
     }
 
-    pub fn implementation(l: Location, i: ImplDecl) -> Self {
+    pub fn implementation(l: TokenSpan, i: ImplDecl) -> Self {
         Self {
             loc: l,
             payload: TopLevelDecl::Implementation(i),
         }
     }
 
-    pub fn variable(l: Location, v: GlobalVarDecl) -> Self {
+    pub fn variable(l: TokenSpan, v: GlobalVarDecl) -> Self {
         Self {
             loc: l,
             payload: TopLevelDecl::Variable(v),
         }
     }
 
-    pub fn import(l: Location, i: ImportDecl) -> Self {
+    pub fn import(l: TokenSpan, i: ImportDecl) -> Self {
         Self {
             loc: l,
             payload: TopLevelDecl::Import(i),

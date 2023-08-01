@@ -16,7 +16,7 @@ use inkwell::values::GlobalValue;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ast::{Location, TypeDescriptor},
+    ast::{TokenSpan, TypeDescriptor},
     builders::{
         scope::{Scope, VarInfo},
         ty::TypeBuilder,
@@ -53,7 +53,7 @@ impl VariableBomEntry {
         );
 
         let vi = VarInfo::new(
-            Location::origin(),
+            TokenSpan::origin(),
             self.user_facing_name.clone(),
             gv.as_pointer_value(),
             true,

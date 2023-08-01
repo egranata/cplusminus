@@ -14,7 +14,7 @@
 
 use std::fmt::Display;
 
-use crate::ast::{Location, TypeDescriptor};
+use crate::ast::{TokenSpan, TypeDescriptor};
 
 #[derive(Clone, Debug)]
 pub enum Error {
@@ -132,17 +132,17 @@ pub enum CompilerDiagnostic {
 
 #[derive(Clone, Debug)]
 pub struct CompilerError {
-    pub loc: Location,
+    pub loc: TokenSpan,
     pub err: Error,
 }
 
 impl CompilerError {
-    pub fn new(loc: Location, err: Error) -> Self {
+    pub fn new(loc: TokenSpan, err: Error) -> Self {
         Self { loc, err }
     }
     pub fn unbound(err: Error) -> Self {
         Self {
-            loc: Location::origin(),
+            loc: TokenSpan::origin(),
             err,
         }
     }
@@ -180,17 +180,17 @@ impl Display for Warning {
 
 #[derive(Clone, Debug)]
 pub struct CompilerWarning {
-    pub loc: Location,
+    pub loc: TokenSpan,
     pub warn: Warning,
 }
 
 impl CompilerWarning {
-    pub fn new(loc: Location, warn: Warning) -> Self {
+    pub fn new(loc: TokenSpan, warn: Warning) -> Self {
         Self { loc, warn }
     }
     pub fn unbound(warn: Warning) -> Self {
         Self {
-            loc: Location::origin(),
+            loc: TokenSpan::origin(),
             warn,
         }
     }
