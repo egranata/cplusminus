@@ -121,6 +121,7 @@ pub struct CompilerOptions {
     pub dump_ir_text: bool,
     pub dump_bom: bool,
     pub optimize: bool,
+    pub debug: bool,
 }
 
 impl Default for CompilerOptions {
@@ -133,6 +134,7 @@ impl Default for CompilerOptions {
             dump_ir_text: false,
             dump_bom: false,
             optimize: false,
+            debug: false,
         }
     }
 }

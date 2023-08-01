@@ -52,6 +52,8 @@ struct Args {
     link_extras: Vec<String>,
     #[arg(long = "bom")]
     bom: bool,
+    #[arg(short = 'g')]
+    debug: bool,
 }
 
 impl Args {
@@ -64,6 +66,7 @@ impl Args {
             dump_ir_text: self.dump,
             dump_bom: self.bom,
             optimize: self.optimize,
+            debug: self.debug,
         }
     }
 }
@@ -73,6 +76,11 @@ pub fn main() {
 
     let options = args.to_codegen_options();
     let inputs: Vec<PathBuf> = args.inputs.iter().map(PathBuf::from).collect();
+
+    if args.optimize && args.debug {
+        eprintln!("cannot generate debug info in optimized builds");
+        std::process::exit(1);
+    }
 
     if inputs.len() == 1 && args.output.is_none() {
         let jit_result = driver::run_jit(&inputs[0], &options);
