@@ -139,7 +139,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         args: &[BasicMetadataValueEnum<'a>],
     ) -> Option<BasicValueEnum<'a>> {
         if !info.check_arg_size_match(args) {
-            self.iw.error(CompilerError::new(
+            self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                 node.loc,
                 Error::ArgCountMismatch(info.argc, args.len()),
             ));
@@ -190,7 +190,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                         } else {
                             // safe because compat is always true when no type hint is available
                             let exp_type = TypeBuilder::descriptor_by_llvm_type(type_hint.unwrap());
-                            self.iw.error(CompilerError::new(
+                            self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                                 expr.loc,
                                 Error::UnexpectedType(exp_type.map(|t| format!("{t}"))),
                             ));
@@ -198,6 +198,8 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                         }
                     } else {
                         self.iw
+                            .diagnostics
+                            .borrow_mut()
                             .error(CompilerError::new(expr.loc, Error::InvalidExpression));
                         return None;
                     }
@@ -393,14 +395,14 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                                     .unwrap()
                                     .into_struct_value();
                             } else {
-                                self.iw.error(CompilerError::new(
+                                self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                                     fi.value.loc,
                                     Error::InvalidExpression,
                                 ));
                                 return None;
                             }
                         } else {
-                            self.iw.error(CompilerError::new(
+                            self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                                 node.loc,
                                 Error::FieldNotFound(fi.field.clone()),
                             ));
@@ -409,7 +411,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     }
                 }
                 AllocInitializer::ByInit(_) => {
-                    self.iw.error(CompilerError::new(
+                    self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                         node.loc,
                         Error::InitDisallowedInValueTypes,
                     ));
@@ -455,6 +457,8 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                         .is_some()
                     {
                         self.iw
+                            .diagnostics
+                            .borrow_mut()
                             .error(CompilerError::new(node.loc, Error::InitMustBeUsed));
                         return None;
                     }
@@ -469,14 +473,14 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                                 let gep = unsafe { builder.build_gep(pv, &[zero, idx], "") };
                                 builder.build_store(gep, finit);
                             } else {
-                                self.iw.error(CompilerError::new(
+                                self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                                     fi.value.loc,
                                     Error::InvalidExpression,
                                 ));
                                 return None;
                             }
                         } else {
-                            self.iw.error(CompilerError::new(
+                            self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                                 node.loc,
                                 Error::FieldNotFound(fi.field.clone()),
                             ));
@@ -500,11 +504,13 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                             builder.build_call(init_func, &call_args, "");
                         } else {
                             self.iw
+                                .diagnostics
+                                .borrow_mut()
                                 .error(CompilerError::new(node.loc, Error::InvalidExpression));
                             return None;
                         }
                     } else {
-                        self.iw.error(CompilerError::new(
+                        self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                             node.loc,
                             Error::FieldNotFound(String::from("init")),
                         ));
@@ -519,6 +525,8 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     .is_some()
                 {
                     self.iw
+                        .diagnostics
+                        .borrow_mut()
                         .error(CompilerError::new(node.loc, Error::InitMustBeUsed));
                     return None;
                 }
@@ -615,6 +623,8 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 }
 
                 self.iw
+                    .diagnostics
+                    .borrow_mut()
                     .error(CompilerError::new(node.loc, Error::UnexpectedType(None)));
                 None
             }
@@ -631,6 +641,8 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 }
 
                 self.iw
+                    .diagnostics
+                    .borrow_mut()
                     .error(CompilerError::new(node.loc, Error::UnexpectedType(None)));
                 None
             }
@@ -642,6 +654,8 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     self.build_int_bin_op(builder, ix, iy, &node.payload)
                 } else {
                     self.iw
+                        .diagnostics
+                        .borrow_mut()
                         .error(CompilerError::new(node.loc, Error::UnexpectedType(None)));
                     None
                 };
@@ -654,6 +668,8 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     self.build_int_bin_op(builder, ix, iy, &node.payload)
                 } else {
                     self.iw
+                        .diagnostics
+                        .borrow_mut()
                         .error(CompilerError::new(node.loc, Error::UnexpectedType(None)));
                     None
                 };
@@ -666,6 +682,8 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     Some(FloatValue(builder.build_float_neg(x, "")))
                 } else {
                     self.iw
+                        .diagnostics
+                        .borrow_mut()
                         .error(CompilerError::new(node.loc, Error::UnexpectedType(None)));
                     None
                 }
@@ -676,6 +694,8 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     Some(IntValue(builder.build_not(x, "")))
                 } else {
                     self.iw
+                        .diagnostics
+                        .borrow_mut()
                         .error(CompilerError::new(node.loc, Error::UnexpectedType(None)));
                     None
                 }
@@ -693,6 +713,8 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 }
 
                 self.iw
+                    .diagnostics
+                    .borrow_mut()
                     .error(CompilerError::new(node.loc, Error::UnexpectedType(None)));
                 None
             }
@@ -721,6 +743,8 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 }
 
                 self.iw
+                    .diagnostics
+                    .borrow_mut()
                     .error(CompilerError::new(node.loc, Error::UnexpectedType(None)));
                 None
             }
@@ -743,7 +767,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 }
 
                 if fv.is_none() {
-                    self.iw.error(CompilerError::new(
+                    self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                         node.loc,
                         Error::IdentifierNotFound(id.clone()),
                     ));
@@ -760,7 +784,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 {
                     self.build_function_call(node, builder, &fv, &args)
                 } else {
-                    self.iw.error(CompilerError::new(
+                    self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                         node.loc,
                         Error::UnexpectedType(Some("callable function".to_owned())),
                     ));
@@ -784,7 +808,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                                 ));
                                 matched = true;
                             } else {
-                                self.iw.error(CompilerError::new(
+                                self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                                     node.loc,
                                     Error::IdentifierNotFound(mc.name.clone()),
                                 ));
@@ -800,7 +824,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                                 ));
                                 matched = true;
                             } else {
-                                self.iw.error(CompilerError::new(
+                                self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                                     node.loc,
                                     Error::IdentifierNotFound(mc.name.clone()),
                                 ));
@@ -808,7 +832,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                             }
                         }
                     } else {
-                        self.iw.error(CompilerError::new(
+                        self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                             mc.this.loc,
                             Error::UnexpectedType(Some("value or refcounted type".to_owned())),
                         ));
@@ -850,14 +874,14 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     } else if let Some(struct_type) = self.tb.is_value_basic_type(basic_type) {
                         return self.alloc_value_type(builder, locals, struct_type, fd, node, init);
                     } else {
-                        self.iw.error(CompilerError::new(
+                        self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                             node.loc,
                             Error::TypeNotRefcounted(Some(ty.clone())),
                         ));
                         return None;
                     }
                 } else {
-                    self.iw.error(CompilerError::new(
+                    self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                         node.loc,
                         Error::TypeNotFound(ty.clone()),
                     ));
@@ -870,7 +894,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                         insert_incref_if_refcounted(&self.iw, builder, expr);
                         Some(expr)
                     } else {
-                        self.iw.error(CompilerError::new(
+                        self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                             node.loc,
                             Error::TypeNotRefcounted(TypeBuilder::descriptor_by_llvm_type(
                                 expr.get_type(),
@@ -889,11 +913,13 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                             return Some(BasicValueEnum::IntValue(val));
                         } else {
                             self.iw
+                                .diagnostics
+                                .borrow_mut()
                                 .error(CompilerError::new(node.loc, Error::InvalidExpression));
                             None
                         }
                     } else {
-                        self.iw.error(CompilerError::new(
+                        self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                             node.loc,
                             Error::TypeNotRefcounted(TypeBuilder::descriptor_by_llvm_type(
                                 expr.get_type(),
@@ -920,7 +946,10 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                         }
                     }
                     Err(err) => {
-                        self.iw.error(CompilerError::new(node.loc, err));
+                        self.iw
+                            .diagnostics
+                            .borrow_mut()
+                            .error(CompilerError::new(node.loc, err));
                         None
                     }
                 };
@@ -932,11 +961,15 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                             Some(ret)
                         } else {
                             self.iw
+                                .diagnostics
+                                .borrow_mut()
                                 .error(CompilerError::new(node.loc, Error::InvalidCast));
                             None
                         }
                     } else {
                         self.iw
+                            .diagnostics
+                            .borrow_mut()
                             .error(CompilerError::new(e.loc, Error::TypeNotFound(t.clone())));
                         None
                     }
@@ -951,7 +984,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                         if eval_exprs.is_empty() {
                             eval_exprs.push(eval);
                         } else if eval.get_type() != eval_exprs[0].get_type() {
-                            self.iw.error(CompilerError::new(
+                            self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                                 expr.loc,
                                 Error::UnexpectedType(Some("uniform typed entries".to_owned())),
                             ));
@@ -1025,7 +1058,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 }
 
                 if self.tb.is_valtype_with_refcount_field(tuple_struct_type) {
-                    self.iw.error(CompilerError::new(
+                    self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                         node.loc,
                         Error::RefTypeInValTypeForbidden,
                     ));
@@ -1060,7 +1093,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                         }))
                     }
                 } else {
-                    self.iw.error(CompilerError::new(
+                    self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                         node.loc,
                         Error::TypeNotFound(ident.clone()),
                     ));
@@ -1072,7 +1105,10 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 return match lv {
                     Ok(pv) => Some(PointerValue(pv.ptr)),
                     Err(err) => {
-                        self.iw.error(CompilerError::new(node.loc, err));
+                        self.iw
+                            .diagnostics
+                            .borrow_mut()
+                            .error(CompilerError::new(node.loc, err));
                         None
                     }
                 };
@@ -1080,7 +1116,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
             Deref(e) => {
                 if let Some(ev) = self.build_expr(builder, fd, e.as_ref(), locals, type_hint) {
                     if self.tb.is_refcounted_basic_type(ev.get_type()).is_some() {
-                        self.iw.error(CompilerError::new(
+                        self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                             e.loc,
                             Error::UnexpectedType(Some("not a refcounted type".to_owned())),
                         ));
@@ -1088,14 +1124,14 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     } else if let PointerValue(pv) = ev {
                         return Some(builder.build_load(pv, ""));
                     } else {
-                        self.iw.error(CompilerError::new(
+                        self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                             e.loc,
                             Error::UnexpectedType(Some("pointer type".to_owned())),
                         ));
                         return None;
                     }
                 } else {
-                    self.iw.error(CompilerError::new(
+                    self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                         e.loc,
                         Error::UnexpectedType(Some("valid pointer expression".to_owned())),
                     ));

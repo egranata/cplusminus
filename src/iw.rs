@@ -44,18 +44,13 @@ use crate::{
         scope::{Scope, ScopeObject, VarInfo},
         ty::TypeBuilder,
     },
-    err::{CompilerDiagnostic, CompilerError, CompilerWarning, Error},
+    err::{CompilerError, Error},
     parser::cpm::source_file,
 };
 
 use crate::codegen::{structure::Structure, MutableOf};
 
 use codespan_reporting::files::{Files, SimpleFile};
-use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
-use codespan_reporting::{
-    diagnostic::{Diagnostic, Label},
-    term::termcolor::WriteColor,
-};
 
 #[derive(Clone)]
 pub struct Input {
@@ -215,7 +210,7 @@ pub struct CompilerCore<'a> {
     pub source: Input,
     pub options: CompilerOptions,
     pub structs: MutableOf<HashMap<String, Structure<'a>>>,
-    pub diagnostics: MutableOf<Vec<CompilerDiagnostic>>,
+    pub diagnostics: MutableOf<crate::driver::diags::Diagnostics>,
     pub builtins: BuiltinTypes<'a>,
     pub globals: Scope<'a>,
     pub bom: MutableOf<BillOfMaterials>,
@@ -226,6 +221,7 @@ impl<'a> CompilerCore<'a> {
         let triple = TargetTriple::create(&options.triple);
         let module = Rc::new(context.create_module(""));
         module.set_triple(&triple);
+        let warn_as_err = options.warn_as_err;
 
         Target::initialize_all(&Default::default());
         let target = Target::from_triple(&triple).expect("unable to create a target");
@@ -251,7 +247,7 @@ impl<'a> CompilerCore<'a> {
             source: src.clone(),
             options,
             structs: Rc::new(RefCell::new(HashMap::new())),
-            diagnostics: Rc::new(RefCell::new(Vec::new())),
+            diagnostics: crate::driver::diags::Diagnostics::new(warn_as_err, src),
             builtins: BuiltinTypes::new(context),
             globals: ScopeObject::root(),
             bom: Default::default(),
@@ -263,7 +259,9 @@ impl<'a> CompilerCore<'a> {
 
     fn forbid_32bit_targets(&self) {
         if self.machine.get_target_data().get_pointer_byte_size(None) != 8 {
-            self.error(CompilerError::unbound(Error::ThirtyTwoBitUnsupported));
+            self.diagnostics
+                .borrow_mut()
+                .error(CompilerError::unbound(Error::ThirtyTwoBitUnsupported));
         }
     }
 
@@ -367,7 +365,7 @@ impl<'a> CompilerCore<'a> {
                 crate::ast::StructEntryDecl::Field(field) => proper.fields.push(field.clone()),
                 crate::ast::StructEntryDecl::Init(init) => {
                     if proper.init.is_some() {
-                        self.error(CompilerError::new(
+                        self.diagnostics.borrow_mut().error(CompilerError::new(
                             init.loc,
                             Error::DuplicatedStructMember("init".to_owned()),
                         ));
@@ -378,7 +376,7 @@ impl<'a> CompilerCore<'a> {
                 }
                 crate::ast::StructEntryDecl::Dealloc(dealloc) => {
                     if proper.dealloc.is_some() {
-                        self.error(CompilerError::new(
+                        self.diagnostics.borrow_mut().error(CompilerError::new(
                             dealloc.loc,
                             Error::DuplicatedStructMember("dealloc".to_owned()),
                         ));
@@ -400,7 +398,7 @@ impl<'a> CompilerCore<'a> {
                     match entry_decl {
                         crate::ast::StructEntryDecl::Field(field_decl) => {
                             if field_decl.name.starts_with("__") {
-                                self.error(CompilerError::new(
+                                self.diagnostics.borrow_mut().error(CompilerError::new(
                                     field_decl.loc,
                                     Error::ReservedIdentifier(field_decl.name.clone()),
                                 ));
@@ -415,7 +413,7 @@ impl<'a> CompilerCore<'a> {
             }
             TopLevelDecl::Function(fd) => {
                 if fd.decl.name.starts_with("__") {
-                    self.error(CompilerError::new(
+                    self.diagnostics.borrow_mut().error(CompilerError::new(
                         fd.decl.loc,
                         Error::ReservedIdentifier(fd.decl.name.clone()),
                     ));
@@ -426,7 +424,7 @@ impl<'a> CompilerCore<'a> {
             }
             TopLevelDecl::Extern(fd) => {
                 if fd.decl.name.starts_with("__") {
-                    self.error(CompilerError::new(
+                    self.diagnostics.borrow_mut().error(CompilerError::new(
                         fd.loc,
                         Error::ReservedIdentifier(fd.decl.name.clone()),
                     ));
@@ -437,7 +435,7 @@ impl<'a> CompilerCore<'a> {
             }
             TopLevelDecl::Alias(ad) => {
                 if ad.name.starts_with("__") {
-                    self.error(CompilerError::new(
+                    self.diagnostics.borrow_mut().error(CompilerError::new(
                         ad.loc,
                         Error::ReservedIdentifier(ad.name.clone()),
                     ));
@@ -453,7 +451,7 @@ impl<'a> CompilerCore<'a> {
     fn import(&self, id: &crate::ast::ImportDecl, bom: &BillOfMaterials) {
         for sd in &bom.structs {
             if sd.import(self, &self.globals).is_none() {
-                self.error(CompilerError::new(
+                self.diagnostics.borrow_mut().error(CompilerError::new(
                     id.loc,
                     Error::ImportFailed(sd.name.clone()),
                 ));
@@ -462,7 +460,7 @@ impl<'a> CompilerCore<'a> {
 
         for ta in &bom.aliases {
             if ta.import(self, &self.globals).is_none() {
-                self.error(CompilerError::new(
+                self.diagnostics.borrow_mut().error(CompilerError::new(
                     id.loc,
                     Error::ImportFailed(ta.user_facing_name.clone()),
                 ));
@@ -471,7 +469,7 @@ impl<'a> CompilerCore<'a> {
 
         for gv in &bom.variables {
             if gv.import(self, &self.globals).is_none() {
-                self.error(CompilerError::new(
+                self.diagnostics.borrow_mut().error(CompilerError::new(
                     id.loc,
                     Error::ImportFailed(gv.user_facing_name.clone()),
                 ));
@@ -480,7 +478,7 @@ impl<'a> CompilerCore<'a> {
 
         for ef in &bom.functions {
             if ef.import(self, &self.globals).is_none() {
-                self.error(CompilerError::new(
+                self.diagnostics.borrow_mut().error(CompilerError::new(
                     id.loc,
                     Error::ImportFailed(ef.user_facing_name.clone()),
                 ));
@@ -494,7 +492,7 @@ impl<'a> CompilerCore<'a> {
                 if let Some(structure) = tb.is_val_or_ref_basic_type(bst) {
                     if let Some(sdef) = tb.struct_by_name(structure) {
                         if il.import(self, &sdef).is_none() {
-                            self.error(CompilerError::new(
+                            self.diagnostics.borrow_mut().error(CompilerError::new(
                                 id.loc,
                                 Error::ImportFailed(format!("impl {}", struct_descriptor)),
                             ));
@@ -552,13 +550,15 @@ impl<'a> CompilerCore<'a> {
                                         }
                                     }
                                 } else {
-                                    self.error(CompilerError::new(
+                                    self.diagnostics.borrow_mut().error(CompilerError::new(
                                         sd.loc,
                                         Error::InvalidExpression,
                                     ));
                                 }
                             } else {
-                                self.error(CompilerError::new(sd.loc, Error::InvalidExpression));
+                                self.diagnostics
+                                    .borrow_mut()
+                                    .error(CompilerError::new(sd.loc, Error::InvalidExpression));
                             }
                         }
                         crate::ast::TopLevelDecl::Alias(ad) => {
@@ -571,7 +571,9 @@ impl<'a> CompilerCore<'a> {
                                     self.bom.borrow_mut().aliases.push(bom_entry);
                                 }
                             } else {
-                                self.error(CompilerError::new(ad.loc, Error::InvalidExpression));
+                                self.diagnostics
+                                    .borrow_mut()
+                                    .error(CompilerError::new(ad.loc, Error::InvalidExpression));
                             }
                         }
                         crate::ast::TopLevelDecl::Implementation(id) => {
@@ -581,13 +583,13 @@ impl<'a> CompilerCore<'a> {
                                     if let Some(struct_info) = tb.struct_by_name(sty) {
                                         tb.build_impl(&self.globals, &struct_info, id);
                                     } else {
-                                        self.error(CompilerError::new(
+                                        self.diagnostics.borrow_mut().error(CompilerError::new(
                                             id.loc,
                                             Error::TypeNotFound(id.of.clone()),
                                         ));
                                     }
                                 } else {
-                                    self.error(CompilerError::new(
+                                    self.diagnostics.borrow_mut().error(CompilerError::new(
                                         id.loc,
                                         Error::UnexpectedType(Some("structure".to_owned())),
                                     ));
@@ -602,7 +604,7 @@ impl<'a> CompilerCore<'a> {
                             if let Some(bom) = BillOfMaterials::load(bom_path.as_path()) {
                                 self.import(id, &bom);
                             } else {
-                                self.error(CompilerError::new(
+                                self.diagnostics.borrow_mut().error(CompilerError::new(
                                     tld.loc,
                                     Error::InternalError(String::from("unable to find BOM")),
                                 ));
@@ -611,21 +613,21 @@ impl<'a> CompilerCore<'a> {
                         crate::ast::TopLevelDecl::Variable(gvd) => {
                             let vd = &gvd.decl;
                             if vd.val.is_some() {
-                                self.error(CompilerError::new(
+                                self.diagnostics.borrow_mut().error(CompilerError::new(
                                     gvd.loc,
                                     Error::InternalError(String::from(
                                         "globals cannot be initialized",
                                     )),
                                 ));
                             } else if !vd.rw {
-                                self.error(CompilerError::new(
+                                self.diagnostics.borrow_mut().error(CompilerError::new(
                                     gvd.loc,
                                     Error::InternalError(String::from(
                                         "globals cannot be read-only",
                                     )),
                                 ));
                             } else if vd.ty.is_none() {
-                                self.error(CompilerError::new(
+                                self.diagnostics.borrow_mut().error(CompilerError::new(
                                     gvd.loc,
                                     Error::InternalError(String::from(
                                         "globals must be explicitly typed",
@@ -665,7 +667,7 @@ impl<'a> CompilerCore<'a> {
                                         self.bom.borrow_mut().variables.push(bom_entry);
                                     }
                                 } else {
-                                    self.error(CompilerError::new(
+                                    self.diagnostics.borrow_mut().error(CompilerError::new(
                                         gvd.loc,
                                         Error::TypeNotFound(vd.ty.as_ref().unwrap().clone()),
                                     ));
@@ -696,7 +698,7 @@ impl<'a> CompilerCore<'a> {
                     start: err.location.offset,
                     end: err.location.offset + 1,
                 };
-                self.error(CompilerError::new(
+                self.diagnostics.borrow_mut().error(CompilerError::new(
                     loc,
                     Error::ParseError(err.expected.to_string()),
                 ));
@@ -802,121 +804,7 @@ impl<'a> CompilerCore<'a> {
             .insert(sd.name.clone(), sd.clone());
     }
 
-    pub fn error(&self, err: CompilerError) {
-        self.diagnostics
-            .borrow_mut()
-            .push(CompilerDiagnostic::Error(err))
-    }
-
-    pub fn warning(&self, warn: CompilerWarning) {
-        if self.options.warn_as_err {
-            let err = CompilerError {
-                loc: warn.loc,
-                err: Error::WarningAsError(warn.warn),
-            };
-            self.diagnostics
-                .borrow_mut()
-                .push(CompilerDiagnostic::Error(err));
-        } else {
-            self.diagnostics
-                .borrow_mut()
-                .push(CompilerDiagnostic::Warning(warn))
-        }
-    }
-
-    pub fn errors(&self) -> Vec<CompilerError> {
-        self.diagnostics
-            .borrow()
-            .iter()
-            .filter(|cd| matches!(cd, CompilerDiagnostic::Error(_)))
-            .map(|cd| match cd {
-                CompilerDiagnostic::Error(err) => err.clone(),
-                _ => panic!(""),
-            })
-            .collect()
-    }
-
-    pub fn warnings(&self) -> Vec<CompilerWarning> {
-        self.diagnostics
-            .borrow()
-            .iter()
-            .filter(|cd| matches!(cd, CompilerDiagnostic::Warning(_)))
-            .map(|cd| match cd {
-                CompilerDiagnostic::Warning(warn) => warn.clone(),
-                _ => panic!(""),
-            })
-            .collect()
-    }
-
     pub fn success(&self) -> bool {
-        self.errors().is_empty()
-    }
-
-    fn run_through_diags(&self, writer: &mut dyn WriteColor) {
-        #[allow(clippy::let_unit_value)]
-        let file_id = ();
-        let config = codespan_reporting::term::Config::default();
-
-        for diag in self.diagnostics.borrow().iter() {
-            let diagnostic = match diag {
-                CompilerDiagnostic::Error(err) => Diagnostic::error()
-                    .with_message(format!("{}", err.err))
-                    .with_labels(vec![Label::primary(file_id, err.loc.start..err.loc.end)]),
-                CompilerDiagnostic::Warning(warn) => Diagnostic::warning()
-                    .with_message(format!("{}", warn.warn))
-                    .with_labels(vec![Label::primary(file_id, warn.loc.start..warn.loc.end)]),
-            };
-
-            codespan_reporting::term::emit(writer, &config, &self.source.diag_file, &diagnostic)
-                .expect("<io error>");
-        }
-    }
-
-    pub fn display_diagnostics(&self) {
-        let writer = StandardStream::stderr(ColorChoice::Always);
-        self.run_through_diags(&mut writer.lock());
-    }
-
-    pub fn diagnostics_to_string(&self) -> String {
-        #[derive(Default)]
-        struct StringStream {
-            s: String,
-        }
-        impl std::io::Write for StringStream {
-            fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-                if let Ok(str) = String::from_utf8(buf.to_vec()) {
-                    self.s = format!("{}{}", self.s, str);
-                    Ok(str.len())
-                } else {
-                    Err(std::io::Error::from(std::io::ErrorKind::InvalidData))
-                }
-            }
-
-            fn flush(&mut self) -> std::io::Result<()> {
-                Ok(())
-            }
-        }
-        impl WriteColor for StringStream {
-            fn supports_color(&self) -> bool {
-                false
-            }
-
-            fn set_color(
-                &mut self,
-                _: &codespan_reporting::term::termcolor::ColorSpec,
-            ) -> std::io::Result<()> {
-                Ok(())
-            }
-
-            fn reset(&mut self) -> std::io::Result<()> {
-                Ok(())
-            }
-        }
-
-        let mut writer = StringStream::default();
-
-        self.run_through_diags(&mut writer);
-
-        writer.s
+        self.diagnostics.borrow().ok()
     }
 }

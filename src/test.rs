@@ -223,7 +223,7 @@ mod test {
         let iwell = iw::CompilerCore::new(&llvm, &source, Default::default());
         iwell.compile();
 
-        return iwell.errors();
+        return iwell.diagnostics.borrow().errors();
     }
 
     #[test]

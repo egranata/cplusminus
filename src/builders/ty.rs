@@ -464,7 +464,7 @@ impl<'a> TypeBuilder<'a> {
                 self.llvm_type_by_descriptor(&self.iw.globals, &fd.underlying_type)
             {
                 if is_val && field_ty == BasicTypeEnum::StructType(st_ty) {
-                    self.iw.error(CompilerError::new(
+                    self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                         TokenSpan::origin(),
                         Error::RecursiveTypeForbidden(fd.name.clone()),
                     ));
@@ -472,7 +472,7 @@ impl<'a> TypeBuilder<'a> {
                 }
 
                 if is_val && self.is_refcounted_basic_type(field_ty).is_some() {
-                    self.iw.error(CompilerError::new(
+                    self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                         TokenSpan::origin(),
                         Error::RefTypeInValTypeForbidden,
                     ));
@@ -485,7 +485,7 @@ impl<'a> TypeBuilder<'a> {
                     ty: field_ty,
                 });
             } else {
-                self.iw.error(CompilerError::new(
+                self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                     TokenSpan::origin(),
                     Error::TypeNotFound(fd.underlying_type.clone()),
                 ));
@@ -525,7 +525,7 @@ impl<'a> TypeBuilder<'a> {
         let is_val = sd.ms == MemoryStrategy::ByValue;
 
         if is_val && sd.init.is_some() {
-            self.iw.error(CompilerError::new(
+            self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                 sd.init.as_ref().unwrap().loc,
                 Error::InitDisallowedInValueTypes,
             ));
@@ -584,7 +584,7 @@ impl<'a> TypeBuilder<'a> {
         for fd in &sd_fields {
             if let Some(field_ty) = self.llvm_type_by_descriptor(&self.iw.globals, &fd.ty) {
                 if is_val && field_ty == BasicTypeEnum::StructType(st_ty) {
-                    self.iw.error(CompilerError::new(
+                    self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                         fd.loc,
                         Error::RecursiveTypeForbidden(fd.name.clone()),
                     ));
@@ -593,6 +593,8 @@ impl<'a> TypeBuilder<'a> {
 
                 if is_val && self.is_refcounted_basic_type(field_ty).is_some() {
                     self.iw
+                        .diagnostics
+                        .borrow_mut()
                         .error(CompilerError::new(fd.loc, Error::RefTypeInValTypeForbidden));
                     return None;
                 }
@@ -603,7 +605,7 @@ impl<'a> TypeBuilder<'a> {
                     ty: field_ty,
                 });
             } else {
-                self.iw.error(CompilerError::new(
+                self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                     fd.loc,
                     Error::TypeNotFound(fd.ty.clone()),
                 ));
@@ -617,6 +619,8 @@ impl<'a> TypeBuilder<'a> {
         if let Some(init) = &sd.init {
             if self.build_init(scope, st_ty, init, sd.export).is_none() {
                 self.iw
+                    .diagnostics
+                    .borrow_mut()
                     .error(CompilerError::new(init.loc, Error::InvalidExpression));
                 return None;
             }
@@ -628,6 +632,8 @@ impl<'a> TypeBuilder<'a> {
                 .is_none()
             {
                 self.iw
+                    .diagnostics
+                    .borrow_mut()
                     .error(CompilerError::new(dealloc.loc, Error::InvalidExpression));
                 return None;
             }
@@ -746,10 +752,13 @@ impl<'a> TypeBuilder<'a> {
         let fb = FunctionBuilder::new(self.iw.clone());
         let mut decls: Vec<FunctionDecl> = vec![];
         let export = if id.export && !sd.export {
-            self.iw.warning(CompilerWarning::new(
-                id.loc,
-                crate::err::Warning::ExportImplIgnored,
-            ));
+            self.iw
+                .diagnostics
+                .borrow_mut()
+                .warning(CompilerWarning::new(
+                    id.loc,
+                    crate::err::Warning::ExportImplIgnored,
+                ));
             false
         } else {
             sd.export && id.export
@@ -766,6 +775,8 @@ impl<'a> TypeBuilder<'a> {
                 decls.push(decl.0);
             } else {
                 self.iw
+                    .diagnostics
+                    .borrow_mut()
                     .error(CompilerError::new(method.loc, Error::InvalidExpression));
                 return;
             }

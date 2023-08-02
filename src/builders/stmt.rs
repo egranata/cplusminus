@@ -88,13 +88,15 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                 }
                 builder.position_at_end(bb_els);
             } else {
-                self.iw.error(CompilerError::new(
+                self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                     node.cond.loc,
                     Error::UnexpectedType(Some("boolean".to_owned())),
                 ));
             }
         } else {
             self.iw
+                .diagnostics
+                .borrow_mut()
                 .error(CompilerError::new(node.cond.loc, Error::InvalidExpression));
         }
     }
@@ -102,10 +104,13 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
     fn warn_on_unwritten_locals(&self, vc: &ScopeObject) {
         vc.variables.values(|vi| {
             if vi.rw && !*vi.written.borrow() {
-                self.iw.warning(CompilerWarning::new(
-                    vi.loc,
-                    Warning::MutableValueNeverWrittenTo(vi.name.clone()),
-                ));
+                self.iw
+                    .diagnostics
+                    .borrow_mut()
+                    .warning(CompilerWarning::new(
+                        vi.loc,
+                        Warning::MutableValueNeverWrittenTo(vi.name.clone()),
+                    ));
             }
         });
     }
@@ -124,15 +129,18 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
         match &node.payload {
             TypeAlias(tld) => {
                 if self.tb.alias(locals, &tld.name, &tld.ty).is_none() {
-                    self.iw.error(CompilerError::new(
+                    self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                         tld.loc,
                         Error::TypeNotFound(tld.ty.clone()),
                     ));
                 } else if tld.export {
-                    self.iw.warning(CompilerWarning::new(
-                        tld.loc,
-                        Warning::ExportInLocalDeclUnused,
-                    ));
+                    self.iw
+                        .diagnostics
+                        .borrow_mut()
+                        .warning(CompilerWarning::new(
+                            tld.loc,
+                            Warning::ExportInLocalDeclUnused,
+                        ));
                 }
             }
             Function(tld) => {
@@ -145,12 +153,17 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                     .commit();
                 if fb.compile(locals, tld.as_ref(), opts).is_none() {
                     self.iw
+                        .diagnostics
+                        .borrow_mut()
                         .error(CompilerError::new(tld.decl.loc, Error::InvalidExpression));
                 } else if tld.export {
-                    self.iw.warning(CompilerWarning::new(
-                        tld.decl.loc,
-                        Warning::ExportInLocalDeclUnused,
-                    ));
+                    self.iw
+                        .diagnostics
+                        .borrow_mut()
+                        .warning(CompilerWarning::new(
+                            tld.decl.loc,
+                            Warning::ExportInLocalDeclUnused,
+                        ));
                 }
             }
             Block(block) => {
@@ -165,6 +178,8 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                     builder.build_unconditional_branch(bb.brek);
                 } else {
                     self.iw
+                        .diagnostics
+                        .borrow_mut()
                         .error(CompilerError::new(node.loc, Error::BreakOutsideOfLoop));
                 }
             }
@@ -173,6 +188,8 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                     builder.build_unconditional_branch(bb.cont);
                 } else {
                     self.iw
+                        .diagnostics
+                        .borrow_mut()
                         .error(CompilerError::new(node.loc, Error::ContinueOutsideOfLoop));
                 }
             }
@@ -182,13 +199,13 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                         let msg = String::from(
                             "no return value for void function (maybe forgot a ret clause?)",
                         );
-                        self.iw.error(CompilerError::new(
+                        self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                             node.loc,
                             Error::UnexpectedType(Some(msg)),
                         ));
                     } else {
                         let msg = String::from("value being returned");
-                        self.iw.error(CompilerError::new(
+                        self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                             node.loc,
                             Error::UnexpectedType(Some(msg)),
                         ));
@@ -223,13 +240,15 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                             .unwrap();
                             let msg =
                                 format!("{ret_type}, which is not the type of this expression",);
-                            self.iw.error(CompilerError::new(
+                            self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                                 node.loc,
                                 Error::UnexpectedType(Some(msg)),
                             ));
                         }
                     } else {
                         self.iw
+                            .diagnostics
+                            .borrow_mut()
                             .error(CompilerError::new(expr.loc, Error::InvalidExpression));
                     }
                 }
@@ -239,7 +258,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                     if self.tb.is_refcounted_basic_type(value.get_type()).is_some() {
                         insert_decref_if_refcounted(&self.iw, builder, value);
                     } else {
-                        self.iw.error(CompilerError::new(
+                        self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                             node.loc,
                             Error::TypeNotRefcounted(TypeBuilder::descriptor_by_llvm_type(
                                 value.get_type(),
@@ -250,7 +269,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
             }
             VarDecl(var) => {
                 if var.ty.is_none() && var.val.is_none() {
-                    self.iw.error(CompilerError::new(
+                    self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                         node.loc,
                         Error::UnresolvedVariableDeclaration,
                     ));
@@ -268,11 +287,15 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                         v
                     } else {
                         self.iw
+                            .diagnostics
+                            .borrow_mut()
                             .error(CompilerError::new(val.loc, Error::InvalidExpression));
                         return;
                     }
                 } else if !var.rw {
                     self.iw
+                        .diagnostics
+                        .borrow_mut()
                         .error(CompilerError::new(node.loc, Error::LetMustBeInitialized));
                     return;
                 } else if let Some(decl_ty) = self
@@ -281,7 +304,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                 {
                     decl_ty.const_zero()
                 } else {
-                    self.iw.error(CompilerError::new(
+                    self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                         node.loc,
                         Error::TypeNotFound(var.ty.clone().unwrap()),
                     ));
@@ -293,7 +316,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                     if let Some(t) = maybe_type {
                         t
                     } else {
-                        self.iw.error(CompilerError::new(
+                        self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                             node.loc,
                             Error::TypeNotFound(var_ty.clone()),
                         ));
@@ -306,7 +329,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                 if value.get_type() != decl_ty {
                     let val_ty_td = TypeBuilder::descriptor_by_llvm_type(value.get_type()).unwrap();
                     let decl_ty_td = TypeBuilder::descriptor_by_llvm_type(decl_ty).unwrap();
-                    self.iw.error(CompilerError::new(
+                    self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                         node.loc,
                         Error::InvalidTypeSpecifier(decl_ty_td, val_ty_td),
                     ));
@@ -356,6 +379,8 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                             );
                             if new_val.is_none() {
                                 self.iw
+                                    .diagnostics
+                                    .borrow_mut()
                                     .error(CompilerError::new(expr.loc, Error::InvalidExpression));
                                 return;
                             }
@@ -370,20 +395,23 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                                 builder.build_store(pv.ptr, new_value);
                                 pv.mark_written();
                             } else {
-                                self.iw.error(CompilerError::new(
+                                self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                                     node.loc,
                                     Error::UnexpectedType(None),
                                 ));
                             }
                         } else {
-                            self.iw.error(CompilerError::new(
+                            self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                                 node.loc,
                                 Error::ReadOnlyIdentifier(String::from(name)),
                             ))
                         }
                     }
                     Err(err) => {
-                        self.iw.error(CompilerError::new(node.loc, err));
+                        self.iw
+                            .diagnostics
+                            .borrow_mut()
+                            .error(CompilerError::new(node.loc, err));
                     }
                 }
             }
@@ -416,7 +444,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                     .build_expr(builder, fd, wh.cond.as_ref(), locals, None)
                 {
                     if !TypeBuilder::is_boolean_basic(ec.get_type()) {
-                        return self.iw.error(CompilerError::new(
+                        return self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                             wh.cond.loc,
                             Error::UnexpectedType(Some("boolean".to_owned())),
                         ));
@@ -434,6 +462,8 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                     builder.position_at_end(bb_after);
                 } else {
                     self.iw
+                        .diagnostics
+                        .borrow_mut()
                         .error(CompilerError::new(wh.cond.loc, Error::InvalidExpression))
                 }
             }
@@ -452,7 +482,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                     .build_expr(builder, fd, wh.cond.as_ref(), locals, None)
                 {
                     if !TypeBuilder::is_boolean_basic(ec.get_type()) {
-                        return self.iw.error(CompilerError::new(
+                        return self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                             wh.cond.loc,
                             Error::UnexpectedType(Some("boolean".to_owned())),
                         ));
@@ -498,6 +528,8 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                     }
                 } else {
                     self.iw
+                        .diagnostics
+                        .borrow_mut()
                         .error(CompilerError::new(wh.cond.loc, Error::InvalidExpression))
                 }
             }
@@ -515,13 +547,15 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                         builder.build_call(llvmtrap.unwrap(), &[], "");
                         builder.position_at_end(bb_ok);
                     } else {
-                        self.iw.error(CompilerError::new(
+                        self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                             expr.loc,
                             Error::UnexpectedType(Some("boolean".to_owned())),
                         ));
                     }
                 } else {
                     self.iw
+                        .diagnostics
+                        .borrow_mut()
                         .error(CompilerError::new(expr.loc, Error::InvalidExpression))
                 }
             }

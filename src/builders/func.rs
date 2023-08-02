@@ -316,7 +316,7 @@ impl<'a> FunctionBuilder<'a> {
 
         for arg in args {
             if seen_args.contains_key(&arg.name) {
-                self.iw.error(CompilerError::new(
+                self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                     arg.loc,
                     Error::DuplicateArgumentName(arg.name.clone()),
                 ));
@@ -347,6 +347,8 @@ impl<'a> FunctionBuilder<'a> {
             Some(func)
         } else {
             self.iw
+                .diagnostics
+                .borrow_mut()
                 .error(CompilerError::new(fd.loc, Error::UnexpectedType(None)));
             None
         }
@@ -362,6 +364,8 @@ impl<'a> FunctionBuilder<'a> {
             Some(func)
         } else {
             self.iw
+                .diagnostics
+                .borrow_mut()
                 .error(CompilerError::new(fd.decl.loc, Error::UnexpectedType(None)));
             None
         }
@@ -392,10 +396,13 @@ impl<'a> FunctionBuilder<'a> {
         if opts.extrn {
             for arg in &func.args {
                 if arg.explicit_rw {
-                    self.iw.warning(CompilerWarning::new(
-                        arg.loc,
-                        Warning::MutabilityArgInExternFunction,
-                    ));
+                    self.iw
+                        .diagnostics
+                        .borrow_mut()
+                        .warning(CompilerWarning::new(
+                            arg.loc,
+                            Warning::MutabilityArgInExternFunction,
+                        ));
                 }
             }
         }

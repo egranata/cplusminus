@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub mod diags;
+
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -97,7 +99,7 @@ fn run_compiler_machinery<'a>(
     let input = Input::from_file(src);
     let iwell = CompilerCore::new(llvm, &input, options.clone());
     let ok = iwell.compile();
-    iwell.display_diagnostics();
+    iwell.diagnostics.borrow().display_diagnostics();
 
     if ok {
         if options.optimize {
@@ -128,15 +130,15 @@ pub fn run_jit(src: &Path, options: &CompilerOptions) -> CompilationResult<u64, 
             if let Some(main) = main {
                 let ret = unsafe { main.call() };
                 rst = CompilationResult::ok(ret);
-                rst.add_diagnostics(src, &iwell.diagnostics_to_string());
+                rst.add_diagnostics(src, &iwell.diagnostics.borrow().diagnostics_to_string());
             } else {
                 rst = CompilationResult::err("main function not found");
-                rst.add_diagnostics(src, &iwell.diagnostics_to_string());
+                rst.add_diagnostics(src, &iwell.diagnostics.borrow().diagnostics_to_string());
             }
         }
         (false, iwell) => {
             rst = CompilationResult::err("compilation error");
-            rst.add_diagnostics(src, &iwell.diagnostics_to_string());
+            rst.add_diagnostics(src, &iwell.diagnostics.borrow().diagnostics_to_string());
         }
     };
     rst
@@ -162,10 +164,16 @@ pub fn build_aout(
                     object_files.push(tmp_file.path().to_path_buf());
                     iwell.dump(tmp_file.path());
                     tempfiles.push(tmp_file);
-                    rst.add_diagnostics(src.as_path(), &iwell.diagnostics_to_string());
+                    rst.add_diagnostics(
+                        src.as_path(),
+                        &iwell.diagnostics.borrow().diagnostics_to_string(),
+                    );
                 }
                 (false, iwell) => {
-                    rst.add_diagnostics(src.as_path(), &iwell.diagnostics_to_string());
+                    rst.add_diagnostics(
+                        src.as_path(),
+                        &iwell.diagnostics.borrow().diagnostics_to_string(),
+                    );
                     rst.into_err("compilation error");
                     return rst;
                 }
@@ -213,7 +221,7 @@ pub fn build_objects(sources: &[PathBuf], options: CompilerOptions) -> Result<()
                     iwell.dump(dst.as_path());
                 }
                 (false, iwell) => {
-                    return Err(iwell.diagnostics_to_string());
+                    return Err(iwell.diagnostics.borrow().diagnostics_to_string());
                 }
             };
         }
