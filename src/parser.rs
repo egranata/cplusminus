@@ -94,6 +94,9 @@ peg::parser! {
         rule ident() -> String =
         s:$([c if is_valid_ident_first(c)] [c if is_valid_ident_next(c)]*) {s.to_owned()}
 
+        // matches an optional trailing comma in a list and does nothing with it
+        rule dummy_comma() = (_() "," _())?
+
         rule typename_ident() -> TypeDescriptor
         = i:ident() { TypeDescriptor::Name(i.clone()) }
         rule typename_ptr() -> TypeDescriptor =
@@ -101,12 +104,12 @@ peg::parser! {
         rule typename_arr() -> TypeDescriptor =
         "[" n:integer_number() "]" t:typename() { TypeDescriptor::Array(Box::new(t),n as usize) }
         rule typename_func() -> TypeDescriptor =
-        "fn" _ "(" _ at:typename()**"," _ ")" _ rt:function_ret()? {
+        "fn" _ "(" _ at:typename()**"," dummy_comma() ")" _ rt:function_ret()? {
             let ftd = FunctionTypeDescriptor::new(at, rt.map(Box::new), false);
             TypeDescriptor::Function(ftd)
         }
         rule typename_tuple() -> TypeDescriptor =
-        "{" _ at:typename()**"," _ "}" { TypeDescriptor::Tuple(at) }
+        "{" _ at:typename()**"," dummy_comma() "}" { TypeDescriptor::Tuple(at) }
         rule typename() -> TypeDescriptor =
         _ t:(typename_func() / typename_tuple() / typename_ident() / typename_ptr() / typename_arr()) _ {t} / expected!("name of a type")
 
@@ -136,7 +139,7 @@ peg::parser! {
         }
 
         rule value_type_alloc_entries() -> AllocInitializer =
-        _ "{" _ p:value_type_alloc_entry()**"," _ "}" { AllocInitializer::ByFieldList(p) }
+        _ "{" _ p:value_type_alloc_entry()**"," dummy_comma() "}" { AllocInitializer::ByFieldList(p) }
 
         rule ref_type_alloc_entries() -> AllocInitializer =
         _ "(" _ p:func_call_args() _ ")" { AllocInitializer::ByInit(p) }
@@ -258,7 +261,7 @@ peg::parser! {
         }
 
         rule init_decl() -> StructEntryDecl =
-        _ start:position!() _ "init" _ "(" _ args:func_arg()**"," _ ")" _ body:block() end:position!() _ {
+        _ start:position!() _ "init" _ "(" _ args:func_arg()**"," dummy_comma() ")" _ body:block() end:position!() _ {
             let init = InitDecl { loc:TokenSpan{start, end}, args, body };
             StructEntryDecl::Init(init)
         }
@@ -275,7 +278,7 @@ peg::parser! {
         _ s:$("ref" / "val") __() { s == "ref" }
 
         rule struct_decl() -> TopLevelDeclaration =
-        _ start:position!() export:export_attribute() rd:ref_val_decl()? "type" __() n:ident() _ "{" _ f:(struct_entry()**",") _ "}" end:position!() _ {
+        _ start:position!() export:export_attribute() rd:ref_val_decl()? "type" __() n:ident() _ "{" _ f:(struct_entry()**",") dummy_comma() "}" end:position!() _ {
             let ms = if rd.unwrap_or(true) { crate::codegen::structure::MemoryStrategy::ByReference } else { crate::codegen::structure::MemoryStrategy::ByValue };
             let sd = RawStructDecl { loc:TokenSpan{start,end}, name:n, ms, entries:f, export };
             TopLevelDeclaration::structure(sd.loc, sd)
@@ -345,7 +348,7 @@ peg::parser! {
         _ "ret" _ ty:typename() _ { ty }
 
         rule extern_function() -> TopLevelDeclaration =
-        _ start:position!() export:export_attribute() "extern" __() v:vararg_attribute() "func" __() name:ident() "(" _ args:func_arg()**"," _ ")" _ ty:function_ret()? _ ";" _ end:position!() _ {
+        _ start:position!() export:export_attribute() "extern" __() v:vararg_attribute() "func" __() name:ident() "(" _ args:func_arg()**"," dummy_comma() ")" _ ty:function_ret()? _ ";" _ end:position!() _ {
             let arg_types: Vec<TypeDescriptor> = args.iter().map(|arg| arg.ty.clone()).collect();
             let ftd = FunctionTypeDescriptor::new(arg_types, ty.map(Box::new), v);
             let td = TypeDescriptor::Function(ftd);
@@ -355,7 +358,7 @@ peg::parser! {
         }
 
         rule inner_function_def() -> FunctionDefinition =
-        _ start:position!() export:export_attribute() "func" __() name:ident() "(" _ args:func_arg()**"," _ ")" _ ty:function_ret()? decl_end:position!() _ body:block() end:position!() _ {
+        _ start:position!() export:export_attribute() "func" __() name:ident() "(" _ args:func_arg()**"," dummy_comma() ")" _ ty:function_ret()? decl_end:position!() _ body:block() end:position!() _ {
             let arg_types: Vec<TypeDescriptor> = args.iter().map(|arg| arg.ty.clone()).collect();
             let ftd = FunctionTypeDescriptor::new(arg_types, ty.map(Box::new), false);
             let td = TypeDescriptor::Function(ftd);
@@ -415,7 +418,7 @@ peg::parser! {
         }
 
         rule func_call_args() -> Vec<Expression> =
-        top_level_expr()**","
+        es:top_level_expr()**"," dummy_comma() {es}
 
         pub rule source_file() -> Vec<TopLevelDeclaration> =
         (struct_decl() / function() / extern_function() / typealias_tld() / import_decl_toplevel() / implementation() / var_decl_toplevel())* / expected!("function or structure")
