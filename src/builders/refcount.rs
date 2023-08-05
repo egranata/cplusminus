@@ -117,7 +117,6 @@ fn build_incref_api<'a>(
     m: &Module<'a>,
     c: &'a Context,
     __refcount_t: StructType<'a>,
-    options: &CompilerOptions,
 ) -> FunctionValue<'a> {
     let void = c.void_type();
     let int64 = c.i64_type();
@@ -134,19 +133,6 @@ fn build_incref_api<'a>(
 
     builder.position_at_end(entry);
     let arg0 = incref_f.get_nth_param(0).unwrap().into_pointer_value();
-    if options.instrument_refcount {
-        let fmt_string = builder
-            .build_global_string_ptr("incref(%p)\n", "")
-            .as_pointer_value();
-        builder.build_call(
-            m.get_function("printf").unwrap(),
-            &[
-                inkwell::values::BasicMetadataValueEnum::PointerValue(fmt_string),
-                inkwell::values::BasicMetadataValueEnum::PointerValue(arg0),
-            ],
-            "",
-        );
-    }
     let is_null = builder.build_int_compare(
         inkwell::IntPredicate::EQ,
         c.i64_type().const_zero(),
@@ -162,20 +148,6 @@ fn build_incref_api<'a>(
         int64.const_int(1, false),
         "__rc_plus_1",
     );
-    if options.instrument_refcount {
-        let fmt_string = builder
-            .build_global_string_ptr("  incref(%p) -> %llx\n", "")
-            .as_pointer_value();
-        builder.build_call(
-            m.get_function("printf").unwrap(),
-            &[
-                inkwell::values::BasicMetadataValueEnum::PointerValue(fmt_string),
-                inkwell::values::BasicMetadataValueEnum::PointerValue(arg0),
-                inkwell::values::BasicMetadataValueEnum::IntValue(__rc_plus_1),
-            ],
-            "",
-        );
-    }
     builder.build_store(__rc, __rc_plus_1);
     builder.build_unconditional_branch(exit);
 
@@ -189,7 +161,6 @@ fn build_getref_api<'a>(
     m: &Module<'a>,
     c: &'a Context,
     __refcount_t: StructType<'a>,
-    options: &CompilerOptions,
 ) -> FunctionValue<'a> {
     let int64 = c.i64_type();
     let arg_ty = BasicMetadataTypeEnum::PointerType(__refcount_t.ptr_type(Default::default()));
@@ -208,19 +179,6 @@ fn build_getref_api<'a>(
     let ret_alloca = builder.build_alloca(int64, "ret");
     builder.build_store(ret_alloca, int64.const_zero());
     let arg0 = getref_f.get_nth_param(0).unwrap().into_pointer_value();
-    if options.instrument_refcount {
-        let fmt_string = builder
-            .build_global_string_ptr("getref(%p)\n", "")
-            .as_pointer_value();
-        builder.build_call(
-            m.get_function("printf").unwrap(),
-            &[
-                inkwell::values::BasicMetadataValueEnum::PointerValue(fmt_string),
-                inkwell::values::BasicMetadataValueEnum::PointerValue(arg0),
-            ],
-            "",
-        );
-    }
     let is_null = builder.build_int_compare(
         inkwell::IntPredicate::EQ,
         c.i64_type().const_zero(),
@@ -232,20 +190,6 @@ fn build_getref_api<'a>(
     builder.position_at_end(do_fetch);
     let __rc = builder.build_pointer_cast(arg0, int64.ptr_type(Default::default()), "");
     let __rc = builder.build_load(__rc, "__rc").into_int_value();
-    if options.instrument_refcount {
-        let fmt_string = builder
-            .build_global_string_ptr("  getref(%p) -> %llx\n", "")
-            .as_pointer_value();
-        builder.build_call(
-            m.get_function("printf").unwrap(),
-            &[
-                inkwell::values::BasicMetadataValueEnum::PointerValue(fmt_string),
-                inkwell::values::BasicMetadataValueEnum::PointerValue(arg0),
-                inkwell::values::BasicMetadataValueEnum::IntValue(__rc),
-            ],
-            "",
-        );
-    }
     builder.build_store(ret_alloca, __rc);
     builder.build_unconditional_branch(exit);
 
@@ -259,7 +203,6 @@ fn build_decref_api<'a>(
     m: &Module<'a>,
     c: &'a Context,
     __refcount_t: StructType<'a>,
-    options: &CompilerOptions,
 ) -> FunctionValue<'a> {
     let void = c.void_type();
     let int64 = c.i64_type();
@@ -280,19 +223,6 @@ fn build_decref_api<'a>(
 
     builder.position_at_end(entry);
     let arg0 = decref_f.get_nth_param(0).unwrap().into_pointer_value();
-    if options.instrument_refcount {
-        let fmt_string = builder
-            .build_global_string_ptr("decref(%p)\n", "")
-            .as_pointer_value();
-        builder.build_call(
-            m.get_function("printf").unwrap(),
-            &[
-                inkwell::values::BasicMetadataValueEnum::PointerValue(fmt_string),
-                inkwell::values::BasicMetadataValueEnum::PointerValue(arg0),
-            ],
-            "",
-        );
-    }
     let is_null = builder.build_int_compare(
         inkwell::IntPredicate::EQ,
         c.i64_type().const_zero(),
@@ -314,37 +244,10 @@ fn build_decref_api<'a>(
 
     builder.position_at_end(do_decrease);
     let __rc_minus_1 = builder.build_int_sub(__rc_value, one, "__rc_minus_1");
-    if options.instrument_refcount {
-        let fmt_string = builder
-            .build_global_string_ptr("  decref(%p) -> %llx\n", "")
-            .as_pointer_value();
-        builder.build_call(
-            m.get_function("printf").unwrap(),
-            &[
-                inkwell::values::BasicMetadataValueEnum::PointerValue(fmt_string),
-                inkwell::values::BasicMetadataValueEnum::PointerValue(arg0),
-                inkwell::values::BasicMetadataValueEnum::IntValue(__rc_minus_1),
-            ],
-            "",
-        );
-    }
     builder.build_store(__rc, __rc_minus_1);
     builder.build_unconditional_branch(exit);
 
     builder.position_at_end(free_mem);
-    if options.instrument_refcount {
-        let fmt_string = builder
-            .build_global_string_ptr("  decref(%p) -> free\n", "")
-            .as_pointer_value();
-        builder.build_call(
-            m.get_function("printf").unwrap(),
-            &[
-                inkwell::values::BasicMetadataValueEnum::PointerValue(fmt_string),
-                inkwell::values::BasicMetadataValueEnum::PointerValue(arg0),
-            ],
-            "",
-        );
-    }
     let dealloc_f = builder.build_struct_gep(arg0, 1, "").unwrap();
     let dealloc_f = builder.build_load(dealloc_f, "").into_pointer_value();
     let dealloc_f = CallableValue::try_from(dealloc_f).unwrap();
@@ -379,25 +282,11 @@ fn build_refcount_prototye_apis<'a>(m: &Module<'a>, c: &'a Context) -> Refcounti
     }
 }
 
-fn build_refcount_impl_apis<'a>(
-    m: &Module<'a>,
-    c: &'a Context,
-    options: &CompilerOptions,
-) -> Refcounting<'a> {
-    if options.instrument_refcount {
-        let i32 = c.i32_type();
-        let char_ptr = c.i8_type().ptr_type(Default::default());
-        let printf_ty = i32.fn_type(
-            &[inkwell::types::BasicMetadataTypeEnum::PointerType(char_ptr)],
-            true,
-        );
-        let _ = m.add_function("printf", printf_ty, None);
-    }
-
+fn build_refcount_impl_apis<'a>(m: &Module<'a>, c: &'a Context) -> Refcounting<'a> {
     let __refcount_t = build_refcount_type(c);
-    let __incref_f = build_incref_api(m, c, __refcount_t, options);
-    let __getref_f = build_getref_api(m, c, __refcount_t, options);
-    let __decref_f = build_decref_api(m, c, __refcount_t, options);
+    let __incref_f = build_incref_api(m, c, __refcount_t);
+    let __getref_f = build_getref_api(m, c, __refcount_t);
+    let __decref_f = build_decref_api(m, c, __refcount_t);
 
     Refcounting {
         refcount_type: __refcount_t,
@@ -413,7 +302,7 @@ pub fn build_refcount_apis<'a>(
     options: &CompilerOptions,
 ) -> Refcounting<'a> {
     match options.out {
-        crate::iw::OutputMode::Jit => build_refcount_impl_apis(m, c, options),
+        crate::iw::OutputMode::Jit => build_refcount_impl_apis(m, c),
         crate::iw::OutputMode::Binary => build_refcount_prototye_apis(m, c),
     }
 }

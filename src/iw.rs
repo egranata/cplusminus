@@ -44,7 +44,7 @@ use crate::{
         scope::{Scope, ScopeObject, VarInfo},
         ty::TypeBuilder,
     },
-    err::{CompilerError, Error},
+    err::{CompilerError, CompilerWarning, Error, Warning},
     parser::cpm::source_file,
 };
 
@@ -262,6 +262,7 @@ impl<'a> CompilerCore<'a> {
         };
         new.fill_default_types();
         new.forbid_32bit_targets();
+        new.no_rc_instrument_for_jit();
         new
     }
 
@@ -270,6 +271,16 @@ impl<'a> CompilerCore<'a> {
             self.diagnostics
                 .borrow_mut()
                 .error(CompilerError::unbound(Error::ThirtyTwoBitUnsupported));
+        }
+    }
+
+    fn no_rc_instrument_for_jit(&self) {
+        if self.options.instrument_refcount && self.options.out == OutputMode::Jit {
+            self.diagnostics
+                .borrow_mut()
+                .warning(CompilerWarning::unbound(
+                    Warning::CannotInstrumentJitRefcount,
+                ));
         }
     }
 

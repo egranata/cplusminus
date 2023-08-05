@@ -154,6 +154,7 @@ pub enum Warning {
     MutableValueNeverWrittenTo(String),
     ExportInLocalDeclUnused,
     ExportImplIgnored,
+    CannotInstrumentJitRefcount,
 }
 
 impl Display for Warning {
@@ -172,6 +173,12 @@ impl Display for Warning {
                 write!(
                     f,
                     "this type is not exported; export of its impls is ignored"
+                )
+            }
+            Warning::CannotInstrumentJitRefcount => {
+                write!(
+                    f,
+                    "instrumenting refcounting API not supported when in JIT mode"
                 )
             }
         }
