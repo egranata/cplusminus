@@ -84,6 +84,35 @@ fn add_attributes<'a>(c: &'a Context, f: FunctionValue<'a>) -> FunctionValue<'a>
     f
 }
 
+fn build_incref_prototype<'a>(m: &Module<'a>, c: &'a Context) -> FunctionValue<'a> {
+    let void = c.void_type();
+    let int64 = c.i64_type();
+    let refcount_t = int64.ptr_type(Default::default());
+    let arg_ty = BasicMetadataTypeEnum::PointerType(refcount_t);
+    let incref_t = void.fn_type(&[arg_ty], false);
+
+    m.add_function("__incref_f", incref_t, Some(Linkage::External))
+}
+
+fn build_decref_prototype<'a>(m: &Module<'a>, c: &'a Context) -> FunctionValue<'a> {
+    let void = c.void_type();
+    let int64 = c.i64_type();
+    let refcount_t = int64.ptr_type(Default::default());
+    let arg_ty = BasicMetadataTypeEnum::PointerType(refcount_t);
+    let incref_t = void.fn_type(&[arg_ty], false);
+
+    m.add_function("__decref_f", incref_t, Some(Linkage::External))
+}
+
+fn build_getref_prototype<'a>(m: &Module<'a>, c: &'a Context) -> FunctionValue<'a> {
+    let int64 = c.i64_type();
+    let refcount_t = int64.ptr_type(Default::default());
+    let arg_ty = BasicMetadataTypeEnum::PointerType(refcount_t);
+    let incref_t = int64.fn_type(&[arg_ty], false);
+
+    m.add_function("__getref_f", incref_t, Some(Linkage::External))
+}
+
 fn build_incref_api<'a>(
     m: &Module<'a>,
     c: &'a Context,
@@ -336,7 +365,21 @@ pub struct Refcounting<'a> {
     pub decref_func: FunctionValue<'a>,
 }
 
-pub fn build_refcount_apis<'a>(
+fn build_refcount_prototye_apis<'a>(m: &Module<'a>, c: &'a Context) -> Refcounting<'a> {
+    let __refcount_t = build_refcount_type(c);
+    let __incref_f = build_incref_prototype(m, c);
+    let __getref_f = build_getref_prototype(m, c);
+    let __decref_f = build_decref_prototype(m, c);
+
+    Refcounting {
+        refcount_type: __refcount_t,
+        incref_func: __incref_f,
+        getref_func: __getref_f,
+        decref_func: __decref_f,
+    }
+}
+
+fn build_refcount_impl_apis<'a>(
     m: &Module<'a>,
     c: &'a Context,
     options: &CompilerOptions,
@@ -361,6 +404,17 @@ pub fn build_refcount_apis<'a>(
         incref_func: __incref_f,
         getref_func: __getref_f,
         decref_func: __decref_f,
+    }
+}
+
+pub fn build_refcount_apis<'a>(
+    m: &Module<'a>,
+    c: &'a Context,
+    options: &CompilerOptions,
+) -> Refcounting<'a> {
+    match options.out {
+        crate::iw::OutputMode::Jit => build_refcount_impl_apis(m, c, options),
+        crate::iw::OutputMode::Binary => build_refcount_prototye_apis(m, c),
     }
 }
 

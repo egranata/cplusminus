@@ -144,11 +144,15 @@ pub fn run_jit(src: &Path, options: &CompilerOptions) -> CompilationResult<u64, 
     rst
 }
 
+const REFCOUNT_SOURCE_CODE: &str = include_str!("../lib/refcount.c");
+
 pub fn build_aout(
     sources: &[PathBuf],
     target: PathBuf,
     options: CompilerOptions,
 ) -> CompilationResult<(), String> {
+    use std::io::Write;
+
     let mut rst = CompilationResult::ok(());
 
     let mut tempfiles: Vec<NamedTempFile> = vec![];
@@ -183,6 +187,13 @@ pub fn build_aout(
         }
     }
 
+    let refcount_tmp_file = tempfile::Builder::new()
+        .suffix(".c")
+        .tempfile()
+        .expect("<io error>");
+    write!(refcount_tmp_file.as_file(), "{}", REFCOUNT_SOURCE_CODE).expect("<io error>");
+    object_files.push(refcount_tmp_file.path().to_path_buf());
+
     let mut clang = Command::new("clang");
     for objf in &object_files {
         clang.arg(objf.as_os_str().to_str().unwrap());
@@ -194,6 +205,10 @@ pub fn build_aout(
         .arg("-fPIC")
         .arg("-o")
         .arg(target.as_os_str().to_str().unwrap());
+
+    if options.instrument_refcount {
+        clang.arg("-DINSTRUMENT_REFCOUNT");
+    }
 
     let process = clang.spawn();
     if let Ok(mut child) = process {

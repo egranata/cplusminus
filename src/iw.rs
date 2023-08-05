@@ -107,6 +107,12 @@ impl Input {
     }
 }
 
+#[derive(Clone, Debug, Copy, Eq, PartialEq)]
+pub enum OutputMode {
+    Jit,
+    Binary,
+}
+
 #[derive(Clone)]
 pub struct CompilerOptions {
     pub triple: String,
@@ -117,6 +123,7 @@ pub struct CompilerOptions {
     pub dump_bom: bool,
     pub optimize: bool,
     pub debug: bool,
+    pub out: OutputMode,
 }
 
 impl Default for CompilerOptions {
@@ -130,6 +137,7 @@ impl Default for CompilerOptions {
             dump_bom: false,
             optimize: false,
             debug: false,
+            out: OutputMode::Jit,
         }
     }
 }
@@ -301,12 +309,10 @@ impl<'a> CompilerCore<'a> {
 
     fn fill_globals(m: &Module<'a>, c: &'a Context) {
         let bt = c.bool_type();
-        let i64 = c.i64_type();
         let void = c.void_type();
 
         let itstrue = BasicValueEnum::IntValue(bt.const_int(1, false));
         let itsfalse = BasicValueEnum::IntValue(bt.const_int(0, false));
-        let itszero = BasicValueEnum::IntValue(i64.const_zero());
 
         CompilerCore::make_global(
             m,
@@ -324,14 +330,6 @@ impl<'a> CompilerCore<'a> {
             Linkage::Internal,
             true,
         );
-        CompilerCore::make_global(
-            m,
-            "g_FreedObjects",
-            itszero.get_type(),
-            Some(itszero),
-            Linkage::Internal,
-            false,
-        );
 
         let trap_type = void.fn_type(&[], false);
         m.add_function("llvm.trap", trap_type, Some(Linkage::Internal));
@@ -342,6 +340,25 @@ impl<'a> CompilerCore<'a> {
         c: &'a Context,
         options: &CompilerOptions,
     ) -> Refcounting<'a> {
+        let i64 = c.i64_type();
+
+        CompilerCore::make_global(
+            m,
+            "g_FreedObjects",
+            BasicTypeEnum::IntType(i64),
+            if options.out == OutputMode::Jit {
+                Some(BasicValueEnum::IntValue(i64.const_zero()))
+            } else {
+                None
+            },
+            if options.out == OutputMode::Jit {
+                Linkage::Internal
+            } else {
+                Linkage::External
+            },
+            false,
+        );
+
         crate::builders::refcount::build_refcount_apis(m, c, options)
     }
 

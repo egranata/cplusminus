@@ -28,7 +28,7 @@ pub mod parser;
 
 use std::path::PathBuf;
 
-use iw::CompilerOptions;
+use iw::{CompilerOptions, OutputMode};
 
 use clap::Parser;
 #[derive(Clone, Parser, Debug)]
@@ -67,6 +67,11 @@ impl Args {
             dump_bom: self.bom,
             optimize: self.optimize,
             debug: self.debug,
+            out: if self.inputs.len() == 1 && self.output.is_none() {
+                OutputMode::Jit
+            } else {
+                OutputMode::Binary
+            },
         }
     }
 }
@@ -74,15 +79,15 @@ impl Args {
 pub fn main() {
     let args = Args::parse();
 
-    let options = args.to_codegen_options();
     let inputs: Vec<PathBuf> = args.inputs.iter().map(PathBuf::from).collect();
+    let options = args.to_codegen_options();
 
     if args.optimize && args.debug {
         eprintln!("cannot generate debug info in optimized builds");
         std::process::exit(1);
     }
 
-    if inputs.len() == 1 && args.output.is_none() {
+    if options.out == OutputMode::Jit {
         let jit_result = driver::run_jit(&inputs[0], &options);
         match jit_result.result {
             Ok(ret) => println!("main returned {ret}"),
