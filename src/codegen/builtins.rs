@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::collections::HashMap;
+
 use inkwell::{
     context::Context,
-    types::{FloatType, IntType, VoidType},
+    types::{BasicTypeEnum, FloatType, IntType, VoidType},
     values::{FloatValue, IntValue},
 };
 
@@ -68,5 +70,24 @@ impl<'a> BuiltinTypes<'a> {
 
     pub fn flt_n(&self, val: f64, i: FloatType<'a>) -> FloatValue<'a> {
         i.const_float(val)
+    }
+
+    pub fn builtin_types_map(&self) -> HashMap<String, BasicTypeEnum<'a>> {
+        let ret = HashMap::from([
+            (String::from("bool"), BasicTypeEnum::IntType(self.bool)),
+            (String::from("byte"), BasicTypeEnum::IntType(self.byte)),
+            (String::from("int32"), BasicTypeEnum::IntType(self.int32)),
+            (String::from("int64"), BasicTypeEnum::IntType(self.int64)),
+            (
+                String::from("float32"),
+                BasicTypeEnum::FloatType(self.float32),
+            ),
+            (
+                String::from("float64"),
+                BasicTypeEnum::FloatType(self.float64),
+            ),
+        ]);
+
+        ret
     }
 }

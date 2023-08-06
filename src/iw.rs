@@ -233,20 +233,9 @@ impl<'a> CompilerCore<'a> {
     }
 
     fn fill_default_types(&self) {
-        use BasicTypeEnum::*;
-
-        self.globals
-            .insert_alias("byte", IntType(self.builtins.byte), true);
-        self.globals
-            .insert_alias("int32", IntType(self.builtins.int32), true);
-        self.globals
-            .insert_alias("int64", IntType(self.builtins.int64), true);
-        self.globals
-            .insert_alias("float64", FloatType(self.builtins.float64), true);
-        self.globals
-            .insert_alias("float32", FloatType(self.builtins.float32), true);
-        self.globals
-            .insert_alias("bool", IntType(self.builtins.bool), true);
+        for (n, t) in self.builtins.builtin_types_map().iter() {
+            self.globals.insert_alias(n.as_str(), *t, true);
+        }
     }
 
     pub fn make_global(
