@@ -14,14 +14,10 @@
 
 use std::cmp::max;
 
-use either::Either;
 use inkwell::{
     builder::Builder,
     types::{BasicTypeEnum, FloatType, FunctionType, IntType, StructType},
-    values::{
-        BasicMetadataValueEnum, BasicValueEnum, CallableValue, FloatValue, FunctionValue, IntValue,
-        PointerValue,
-    },
+    values::{BasicMetadataValueEnum, BasicValueEnum, FloatValue, IntValue, PointerValue},
     FloatPredicate, IntPredicate,
 };
 
@@ -34,7 +30,7 @@ use crate::{
         },
         ty::TypeBuilder,
     },
-    codegen::structure::Method,
+    codegen::{callable::Callable, structure::Method},
     err::{CompilerError, Error},
     iw::CompilerCore,
 };
@@ -53,74 +49,6 @@ enum FunctionCallArgument<'a> {
     Value(BasicMetadataValueEnum<'a>),
 }
 
-struct FunctionCallData<'a> {
-    dest: CallableValue<'a>,
-    dest_src: Either<FunctionValue<'a>, PointerValue<'a>>,
-    argc: usize,
-    vararg: bool,
-}
-
-impl<'a> Clone for FunctionCallData<'a> {
-    fn clone(&self) -> Self {
-        let dest_clone: CallableValue<'a> = match self.dest_src {
-            Either::Left(f) => CallableValue::from(f),
-            Either::Right(p) => CallableValue::try_from(p).unwrap(),
-        };
-
-        Self {
-            dest: dest_clone,
-            dest_src: self.dest_src,
-            argc: self.argc,
-            vararg: self.vararg,
-        }
-    }
-}
-
-impl<'a> FunctionCallData<'a> {
-    fn from_function(f: FunctionValue<'a>) -> Self {
-        Self {
-            dest: CallableValue::from(f),
-            dest_src: Either::Left(f),
-            argc: f.count_params() as usize,
-            vararg: f.get_type().is_var_arg(),
-        }
-    }
-
-    fn their_type(&self) -> FunctionType<'a> {
-        match self.dest_src {
-            Either::Left(fv) => fv.get_type(),
-            Either::Right(fp) => fp.get_type().get_element_type().into_function_type(),
-        }
-    }
-
-    fn from_pointer(p: PointerValue<'a>) -> Option<Self> {
-        if let Ok(dest) = CallableValue::try_from(p) {
-            let argc = p
-                .get_type()
-                .get_element_type()
-                .into_function_type()
-                .count_param_types() as usize;
-            let vararg = p
-                .get_type()
-                .get_element_type()
-                .into_function_type()
-                .is_var_arg();
-            Some(Self {
-                dest,
-                dest_src: Either::Right(p),
-                argc,
-                vararg,
-            })
-        } else {
-            None
-        }
-    }
-
-    fn check_arg_size_match(&self, args: &[BasicMetadataValueEnum]) -> bool {
-        args.len() == self.argc || self.vararg
-    }
-}
-
 impl<'a, 'b> ExpressionBuilder<'a, 'b> {
     pub fn new(iw: CompilerCore<'a>, exit: &'b FunctionExitData<'a>) -> Self {
         Self {
@@ -135,19 +63,19 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         &self,
         node: &Expression,
         builder: &Builder<'a>,
-        info: &FunctionCallData<'a>,
+        info: &Callable<'a>,
         args: &[BasicMetadataValueEnum<'a>],
     ) -> Option<BasicValueEnum<'a>> {
-        if !info.check_arg_size_match(args) {
+        if !info.typecheck_call(args) {
             self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                 node.loc,
-                Error::ArgCountMismatch(info.argc, args.len()),
+                Error::ArgCountMismatch(info.argc(), args.len()),
             ));
             return None;
         }
 
         if let Some(obj) = builder
-            .build_call(info.clone().dest, args, "")
+            .build_call(info.callee(), args, "")
             .try_as_basic_value()
             .left()
         {
@@ -749,9 +677,9 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 None
             }
             FunctionCall(id, args) => {
-                let mut fv: Option<FunctionCallData<'a>> = None;
+                let mut fv: Option<Callable<'a>> = None;
                 if let Some(fbyname) = locals.find_function(id, true) {
-                    fv = Some(FunctionCallData::from_function(fbyname));
+                    fv = Some(Callable::from_function(fbyname));
                 } else {
                     let candidate_expr = Expression {
                         loc: node.loc,
@@ -761,7 +689,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                         self.build_expr(builder, fd, &candidate_expr, locals, type_hint)
                     {
                         if value.get_type().get_element_type().is_function_type() {
-                            fv = FunctionCallData::from_pointer(value);
+                            fv = Callable::from_pointer(value);
                         }
                     }
                 }
@@ -780,7 +708,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     .map(|arg| FunctionCallArgument::Expr(arg.clone()))
                     .collect();
                 return if let Some(args) =
-                    self.build_function_call_args(builder, fd, locals, &f_args, fv.their_type())
+                    self.build_function_call_args(builder, fd, locals, &f_args, fv.fn_type())
                 {
                     self.build_function_call(node, builder, &fv, &args)
                 } else {
@@ -858,7 +786,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                         &f_args,
                         method_func.get_type(),
                     ) {
-                        let info = FunctionCallData::from_function(method_func);
+                        let info = Callable::from_function(method_func);
                         self.build_function_call(node, builder, &info, &args)
                     } else {
                         None
