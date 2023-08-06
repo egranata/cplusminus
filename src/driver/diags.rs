@@ -58,17 +58,6 @@ impl Diagnostics {
         true
     }
 
-    pub fn errors(&self) -> Vec<CompilerError> {
-        let mut ret = Vec::<CompilerError>::new();
-        for diag in &self.data {
-            if let CompilerDiagnostic::Error(err) = diag {
-                ret.push(err.clone());
-            }
-        }
-
-        ret
-    }
-
     fn run_through_diags(&self, writer: &mut dyn codespan_reporting::term::termcolor::WriteColor) {
         use codespan_reporting::diagnostic::Diagnostic;
         use codespan_reporting::diagnostic::Label;
