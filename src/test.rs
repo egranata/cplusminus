@@ -194,7 +194,6 @@ mod test {
     use inkwell::{context::Context, execution_engine::JitFunction};
 
     use crate::{
-        err::CompilerError,
         iw::{self, Input},
         jit,
     };
@@ -215,15 +214,6 @@ mod test {
         } else {
             return None;
         }
-    }
-
-    fn helper_compile_errors(program: &str) -> Vec<CompilerError> {
-        let llvm = Context::create();
-        let source = Input::from_string(program);
-        let iwell = iw::CompilerCore::new(&llvm, &source, Default::default());
-        iwell.compile();
-
-        return iwell.diagnostics.borrow().errors();
     }
 
     #[test]
@@ -1789,25 +1779,6 @@ func main() ret int64 {
     }
 
     #[test]
-    fn test_err_reserved_field_name() {
-        assert_ne!(
-            0,
-            helper_compile_errors(
-                "
-type foo {
-    __field: byte
-}
-
-func main() ret int32 {
-    return 0 as int32;
-}
-"
-            )
-            .len()
-        );
-    }
-
-    #[test]
     fn test_alloc_stress() {
         assert_eq!(
             500,
@@ -2305,26 +2276,6 @@ func main() ret int64 {
     }
 
     #[test]
-    fn test_recursive_val_type_disallowed() {
-        assert_ne!(
-            0,
-            helper_compile_errors(
-                "
-val type foo {
-    f: foo 
-}
-
-func main() ret int64 {
-    let f = alloc foo;
-    return 0;
-}
-"
-            )
-            .len()
-        );
-    }
-
-    #[test]
     fn test_indirect_recursive_val_type_allowed() {
         assert_eq!(
             0,
@@ -2473,29 +2424,6 @@ func main() ret int64 {
     }
 
     #[test]
-    fn test_no_ref_in_val_type() {
-        assert_ne!(
-            0,
-            helper_compile_errors(
-                "
-ref type foo {
-    x: bool
-}
-
-val type bar {
-    x: foo
-}
-
-func main() ret int64 {
-    return 0;
-}
-"
-            )
-            .len()
-        );
-    }
-
-    #[test]
     fn test_val_type_alloc_init() {
         assert_eq!(
             247,
@@ -2635,115 +2563,6 @@ func main() ret int64 {
 "
             )
             .unwrap()
-        );
-    }
-
-    #[test]
-    fn test_ref_type_init_declared_not_used() {
-        assert_ne!(
-            0,
-            helper_compile_errors(
-                "
-ref type ord_pair {
-    max: int64,
-    min: int64,
-    init(x: int64, y: int64) {
-        if (x > y) {
-            self.max = x;
-            self.min = y;
-        } else {
-            self.max = y;
-            self.min = y;
-        };
-    }
-}
-
-func main() ret int64 {
-    let p1 = alloc ord_pair;
-    let p2 = alloc ord_pair;
-    return p1.max + p2.min;
-}
-"
-            )
-            .len()
-        );
-    }
-
-    #[test]
-    fn test_ref_type_init_used_not_declared() {
-        assert_ne!(
-            0,
-            helper_compile_errors(
-                "
-ref type ord_pair {
-    max: int64,
-    min: int64,
-}
-
-func main() ret int64 {
-    let p1 = alloc ord_pair(3);
-    let p2 = alloc ord_pair(2,5);
-    return p1.max + p2.min;
-}
-"
-            )
-            .len()
-        );
-    }
-
-    #[test]
-    fn test_val_type_init_declared() {
-        assert_ne!(
-            0,
-            helper_compile_errors(
-                "
-val type ord_pair {
-    max: int64,
-    min: int64,
-    init(x: int64, y: int64) {
-        if (x > y) {
-            self.max = x;
-            self.min = y;
-        } else {
-            self.max = y;
-            self.min = y;
-        };
-    }
-}
-
-func main() ret int64 {
-    let p1 = alloc ord_pair;
-    let p2 = alloc ord_pair(3,4);
-    return p1.max + p2.min;
-}
-"
-            )
-            .len()
-        );
-    }
-
-    #[test]
-    fn test_val_type_dealloc_declared() {
-        assert_ne!(
-            0,
-            helper_compile_errors(
-                "
-val type ord_pair {
-    max: int64,
-    min: int64,
-    dealloc {
-        let x = 1;
-    }
-}
-
-func main() ret int64 {
-    let p1 = alloc ord_pair;
-    let p2 = alloc ord_pair(3,4);
-    return p1.max + p2.min;
-}
-"
-            )
-            .len()
         );
     }
 

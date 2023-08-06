@@ -1,0 +1,10 @@
+{
+    "source_files": [
+        "test.cpm"
+    ],
+    "bom": false,
+    "diags": [
+        "identifier __field is reserved",
+        "test.cpm:16:5"
+    ]
+}

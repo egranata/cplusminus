@@ -1,0 +1,11 @@
+{
+    "source_files": [
+        "test.cpm"
+    ],
+    "bom": false,
+    "diags": [
+        "this type provides init, which must be called when allocating",
+        "test.cpm:30:14",
+        "test.cpm:31:14"
+    ]
+}

@@ -35,6 +35,7 @@ pub enum Error {
     ReservedIdentifier(String),
     DuplicatedStructMember(String),
     InitDisallowedInValueTypes,
+    DeallocDisallowedInValueTypes,
     InitMustBeUsed,
     WarningAsError(Warning),
     InvalidTypeSpecifier(TypeDescriptor, TypeDescriptor),
@@ -102,8 +103,8 @@ impl Display for Error {
             Error::DuplicatedStructMember(name) => {
                 write!(f, "member {name} has already been defined for this type")
             }
-            Error::InitDisallowedInValueTypes => {
-                write!(f, "init is only permitted for reference types")
+            Error::InitDisallowedInValueTypes | Error::DeallocDisallowedInValueTypes => {
+                write!(f, "this declaration is only permitted for reference types")
             }
             Error::InitMustBeUsed => {
                 write!(

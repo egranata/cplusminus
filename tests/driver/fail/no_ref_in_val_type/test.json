@@ -1,0 +1,10 @@
+{
+    "source_files": [
+        "test.cpm"
+    ],
+    "bom": false,
+    "diags": [
+        "ref type field of val type is not implemented",
+        "test.cpm:20:5"
+    ]
+}

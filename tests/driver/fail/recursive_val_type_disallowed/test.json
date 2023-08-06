@@ -1,0 +1,10 @@
+{
+    "source_files": [
+        "test.cpm"
+    ],
+    "bom": false,
+    "diags": [
+        "field f would cause this type to be recursive",
+        "test.cpm:16:5"
+    ]
+}

@@ -532,6 +532,14 @@ impl<'a> TypeBuilder<'a> {
             return None;
         }
 
+        if is_val && sd.dealloc.is_some() {
+            self.iw.diagnostics.borrow_mut().error(CompilerError::new(
+                sd.dealloc.as_ref().unwrap().loc,
+                Error::DeallocDisallowedInValueTypes,
+            ));
+            return None;
+        }
+
         let st_ty = self.iw.context.opaque_struct_type(&sd.name);
 
         let var_ty = if is_rc {
