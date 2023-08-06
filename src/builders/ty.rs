@@ -804,8 +804,8 @@ impl<'a> TypeBuilder<'a> {
         expr: BasicValueEnum<'a>,
         ty: BasicTypeEnum<'a>,
     ) -> Option<BasicValueEnum<'a>> {
-        use BasicTypeEnum::{IntType, PointerType};
-        use BasicValueEnum::{IntValue, PointerValue};
+        use BasicTypeEnum::{FloatType, IntType, PointerType};
+        use BasicValueEnum::{FloatValue, IntValue, PointerValue};
 
         let expr_ty = expr.get_type();
         if expr_ty == ty {
@@ -842,6 +842,22 @@ impl<'a> TypeBuilder<'a> {
             return Some(PointerValue(builder.build_pointer_cast(
                 expr.into_pointer_value(),
                 dest_ptr,
+                "",
+            )));
+        }
+
+        if let (IntType(_), FloatType(dest_flt)) = (expr_ty, ty) {
+            return Some(FloatValue(builder.build_signed_int_to_float(
+                expr.into_int_value(),
+                dest_flt,
+                "",
+            )));
+        }
+
+        if let (FloatType(_), IntType(dest_int)) = (expr_ty, ty) {
+            return Some(IntValue(builder.build_float_to_signed_int(
+                expr.into_float_value(),
+                dest_int,
                 "",
             )));
         }
