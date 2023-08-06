@@ -17,8 +17,8 @@ use inkwell::{
     module::{Linkage, Module},
     passes::{PassManager, PassManagerBuilder},
     targets::{Target, TargetMachine, TargetTriple},
-    types::{BasicTypeEnum, FloatType, IntType, VoidType},
-    values::{BasicValueEnum, FloatValue, FunctionValue, GlobalValue, IntValue},
+    types::BasicTypeEnum,
+    values::{BasicValueEnum, FunctionValue, GlobalValue},
 };
 use peg::{error::ParseError, str::LineCol};
 use std::{
@@ -44,6 +44,7 @@ use crate::{
         scope::{Scope, ScopeObject, VarInfo},
         ty::TypeBuilder,
     },
+    codegen::builtins::BuiltinTypes,
     err::{CompilerError, CompilerWarning, Error, Warning},
     parser::cpm::source_file,
 };
@@ -152,59 +153,6 @@ impl CompilerOptions {
             optimize: true,
             ..Default::default()
         }
-    }
-}
-
-#[derive(Clone, Copy)]
-pub struct BuiltinTypes<'a> {
-    pub bool: IntType<'a>,
-    pub byte: IntType<'a>,
-    pub int32: IntType<'a>,
-    pub int64: IntType<'a>,
-    pub float32: FloatType<'a>,
-    pub float64: FloatType<'a>,
-    pub void: VoidType<'a>,
-    pub default_int_type: IntType<'a>,
-    pub default_float_type: FloatType<'a>,
-}
-
-impl<'a> BuiltinTypes<'a> {
-    pub fn new(c: &'a Context) -> Self {
-        Self {
-            bool: c.bool_type(),
-            byte: c.i8_type(),
-            int32: c.i32_type(),
-            int64: c.i64_type(),
-            float32: c.f32_type(),
-            float64: c.f64_type(),
-            void: c.void_type(),
-            default_int_type: c.i64_type(),
-            default_float_type: c.f64_type(),
-        }
-    }
-
-    pub fn zero(&self, i: IntType<'a>) -> IntValue<'a> {
-        i.const_zero()
-    }
-
-    pub fn one(&self, i: IntType<'a>) -> IntValue<'a> {
-        self.n(1, i)
-    }
-
-    pub fn n(&self, val: u64, i: IntType<'a>) -> IntValue<'a> {
-        i.const_int(val, false)
-    }
-
-    pub fn flt_zero(&self, i: FloatType<'a>) -> FloatValue<'a> {
-        i.const_zero()
-    }
-
-    pub fn flt_one(&self, i: FloatType<'a>) -> FloatValue<'a> {
-        self.flt_n(1.0, i)
-    }
-
-    pub fn flt_n(&self, val: f64, i: FloatType<'a>) -> FloatValue<'a> {
-        i.const_float(val)
     }
 }
 
