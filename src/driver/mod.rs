@@ -21,6 +21,7 @@ use std::{
 };
 
 use inkwell::{context::Context, execution_engine::JitFunction};
+use rand::Rng;
 use tempfile::NamedTempFile;
 
 use crate::{
@@ -56,6 +57,10 @@ impl<TSuccess, TFailure> CompilationResult<TSuccess, TFailure> {
             result: Ok(s.into()),
             diagnostics: Default::default(),
         }
+    }
+
+    pub fn is_ok(&self) -> bool {
+        matches!(self.result, Ok(..))
     }
 
     pub fn err<T: Into<TFailure>>(f: T) -> Self {
@@ -119,6 +124,73 @@ fn run_compiler_machinery<'a>(
     }
 }
 
+pub fn run_multi_jit(
+    sources: &[PathBuf],
+    options: &CompilerOptions,
+) -> CompilationResult<u32, String> {
+    let mut rng = rand::thread_rng();
+    let n: u64 = rng.gen();
+    let n = format!("jit_{n}");
+
+    let mut aout_bld_path = tempfile::Builder::new();
+    aout_bld_path.prefix(&n).suffix(".out");
+    let aout_tmp_path = aout_bld_path.tempfile().expect("<io error>");
+    let aout_path_buf = aout_tmp_path
+        .path()
+        .to_path_buf()
+        .canonicalize()
+        .expect("<io error>");
+    let _ = aout_tmp_path.close();
+
+    let ret = run_multi_jit_impl(sources, &aout_path_buf, options);
+    let _ = std::fs::remove_file(aout_path_buf);
+    ret
+}
+
+fn run_multi_jit_impl(
+    sources: &[PathBuf],
+    target: &PathBuf,
+    options: &CompilerOptions,
+) -> CompilationResult<u32, String> {
+    let compile_result = build_aout(sources, target, options.clone());
+    match compile_result.result {
+        Ok(_) => {
+            let mut cmd = Command::new(target);
+            let child = cmd.spawn();
+            match child {
+                Ok(mut proc) => {
+                    let exit = proc.wait();
+                    match exit {
+                        Ok(ec) => {
+                            let ec = ec.code().unwrap() as u32;
+                            let mut cr = CompilationResult::<u32, String>::ok(ec);
+                            cr.set_diagnostics(compile_result.diagnostics);
+                            cr
+                        }
+                        Err(err) => {
+                            let err = format!("{err}");
+                            let mut cr = CompilationResult::<u32, String>::err(err);
+                            cr.set_diagnostics(compile_result.diagnostics);
+                            cr
+                        }
+                    }
+                }
+                Err(err) => {
+                    let err = format!("{err}");
+                    let mut cr = CompilationResult::<u32, String>::err(err);
+                    cr.set_diagnostics(compile_result.diagnostics);
+                    cr
+                }
+            }
+        }
+        Err(err) => {
+            let mut cr = CompilationResult::<u32, String>::err(err);
+            cr.set_diagnostics(compile_result.diagnostics);
+            cr
+        }
+    }
+}
+
 pub fn run_jit(src: &Path, options: &CompilerOptions) -> CompilationResult<u64, String> {
     let llvm = Context::create();
     let mut rst: CompilationResult<u64, String>;
@@ -148,7 +220,7 @@ const REFCOUNT_SOURCE_CODE: &str = include_str!("../lib/refcount.c");
 
 pub fn build_aout(
     sources: &[PathBuf],
-    target: PathBuf,
+    target: &Path,
     options: CompilerOptions,
 ) -> CompilationResult<(), String> {
     use std::io::Write;
@@ -202,6 +274,7 @@ pub fn build_aout(
         clang.arg(format!("-l{le}"));
     }
     clang
+        .arg("-lm")
         .arg("-fPIC")
         .arg("-o")
         .arg(target.as_os_str().to_str().unwrap());

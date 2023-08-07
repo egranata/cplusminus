@@ -54,6 +54,8 @@ struct Args {
     bom: bool,
     #[arg(short = 'g')]
     debug: bool,
+    #[arg(long = "jit")]
+    jit: bool,
 }
 
 impl Args {
@@ -67,7 +69,7 @@ impl Args {
             dump_bom: self.bom,
             optimize: self.optimize,
             debug: self.debug,
-            out: if self.inputs.len() == 1 && self.output.is_none() {
+            out: if self.jit || (self.inputs.len() == 1 && self.output.is_none()) {
                 OutputMode::Jit
             } else {
                 OutputMode::Binary
@@ -88,7 +90,7 @@ pub fn main() {
     }
 
     if options.out == OutputMode::Jit {
-        let jit_result = driver::run_jit(&inputs[0], &options);
+        let jit_result = driver::run_multi_jit(&inputs, &options);
         match jit_result.result {
             Ok(ret) => println!("main returned {ret}"),
             Err(msg) => println!("jit error: {msg}"),
@@ -97,6 +99,6 @@ pub fn main() {
         let _ = driver::build_objects(&inputs, options);
     } else {
         let output = PathBuf::from(args.output.unwrap());
-        let _ = driver::build_aout(&inputs, output, options);
+        let _ = driver::build_aout(&inputs, &output, options);
     }
 }

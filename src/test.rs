@@ -67,7 +67,7 @@ mod driver_tests {
         target: &PathBuf,
         options: &CompilerOptions,
     ) -> Result<(i32, crate::driver::CompilerDiagnostics), TestFailure> {
-        let cmplr = crate::driver::build_aout(sources, target.clone(), options.clone());
+        let cmplr = crate::driver::build_aout(sources, target, options.clone());
         if let Err(_) = cmplr.result {
             return Err(TestFailure::CompileFailure(cmplr.diagnostics));
         }
@@ -152,14 +152,16 @@ mod jit_tests {
 
     use super::TestFailure;
 
-    fn run_jit_source(program: &PathBuf, optimize: bool) -> Result<u64, TestFailure> {
+    fn run_jit_source(program: &PathBuf, optimize: bool) -> Result<u32, TestFailure> {
         let compiler_options = if optimize {
             CompilerOptions::unoptimized()
         } else {
             CompilerOptions::optimized()
         };
 
-        let result = crate::driver::run_jit(program, &compiler_options);
+        let sources: Vec<PathBuf> = vec![program.clone()];
+
+        let result = crate::driver::run_multi_jit(&sources, &compiler_options);
         return match result.result {
             Ok(ret) => Ok(ret),
             Err(msg) => Err(TestFailure::RuntimeJit(msg)),
