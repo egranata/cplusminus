@@ -26,6 +26,7 @@ func main() ret int64 {
     var arr = [1,10,100,1000];
     arr = increase0(arr);
     increase1(arr);
-    return arr[0] + arr[1];
+    assert (arr[0] + arr[1]) == 12;
+    return 0;
 }
 

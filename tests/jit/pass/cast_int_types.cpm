@@ -13,7 +13,12 @@
 (* limitations under the License. *)
         
 func main() ret int32 {
-    var a = 123 as int32;
-    return a;
+    var a: int64 = 123;
+    var i32 = a as int32;
+    assert i32 == 123;
+    var i8 = a as byte;
+    assert i8 == 123;
+
+    return 0;
 }
 

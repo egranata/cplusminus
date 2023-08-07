@@ -16,7 +16,7 @@ func foo() ret int32 {
     return 230;
 }
 
-func main() ret int64 {
+func main() ret int32 {
     let ch = foo();
     var n = 0;
     if (ch == 265) {
@@ -31,6 +31,7 @@ func main() ret int64 {
         n = n + 2;
     };
 
-    return n;
+    assert n == 102;
+    return 0;
 }
 

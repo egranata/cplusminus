@@ -26,10 +26,11 @@ func try(n: int64, f: fp, g: fp) ret int64 {
     return g(f(n));
 }
 
-func main() ret int64 {
+func main() ret int32 {
     var x = 5;
     let a = try(x, inc, double);
     let b = try(x, double, inc);
-    return a + b;
+    assert (a + b) == 23;
+    return 0;
 }
 

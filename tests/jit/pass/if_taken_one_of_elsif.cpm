@@ -19,7 +19,7 @@ func main() ret int64 {
     } elsif (3 > 5) {
         a = 5;
     } elsif (12 > 10) {
-        a = 22;
+        return 0;
     } elsif (7 > 12) {
         a = 8;
     } elsif (12 > 7) {

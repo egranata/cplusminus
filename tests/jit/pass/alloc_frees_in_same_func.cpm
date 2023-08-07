@@ -24,6 +24,6 @@ func foo() ret int64 {
 
 func main() ret int64 {
     foo();
-    return g_FreedObjects;
+    assert g_FreedObjects > 0;
+    return 0;
 }
-

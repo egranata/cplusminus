@@ -17,10 +17,15 @@ type pair {
     y: int64
 }
 
-func main() ret int64 {
+func main() ret int32 {
     let p = alloc pair;
     p.x = 3;
     p.y = 4;
-    return p.x + p.y + 1;
+
+    assert p.x == 3;
+    assert p.y == 4;
+    assert 7 == p.x + p.y;
+
+    return 0;
 }
 

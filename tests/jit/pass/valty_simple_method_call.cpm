@@ -23,10 +23,12 @@ impl pair {
     }
 }
 
-func main() ret int64 {
+func main() ret int32 {
     var p = alloc pair;
     p.x = 12;
     p.y = 13;
-    return p->add();
+    let n = p->add();
+    assert n == 25;
+    return 0;
 }
 

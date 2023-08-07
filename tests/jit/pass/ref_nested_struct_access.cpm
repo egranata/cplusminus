@@ -29,11 +29,12 @@ impl counters {
     }
 }
 
-func main() ret int64 {
+func main() ret int32 {
     let cc = alloc counters;
     cc->init();
     cc.c1.n = 12;
     cc.c2.n = 13;
-    return cc.c1.n + cc.c2.n;
+    assert (cc.c1.n + cc.c2.n) == 25;
+    return 0;
 }
 

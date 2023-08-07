@@ -16,6 +16,7 @@ func main() ret int64 {
     var a = 5;
     let b = 3;
     a = a + b;
-    return a;
+    assert a == 8;
+    return 0;
 }
 

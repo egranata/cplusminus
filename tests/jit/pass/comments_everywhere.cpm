@@ -45,7 +45,8 @@ func blah() ret int64 {
 (* this returns 120 *)
 func main() ret int64 {
     (* here's the number 120 *)
-    return 120;
+    let a = 120;
+    return 0;
 }
 
 

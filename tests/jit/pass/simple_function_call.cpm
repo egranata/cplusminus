@@ -17,6 +17,8 @@ func foo(x: int32, y: int32, z: int32) ret int32 {
 }
         
 func main() ret int32 {
-    return foo(3,4,6);
+    let n = foo(3,4,6);
+    assert n == 27;
+    return 0;
 }
 

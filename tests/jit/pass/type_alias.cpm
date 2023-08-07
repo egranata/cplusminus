@@ -16,6 +16,7 @@ type main_ret = int32;
 
 func main() ret main_ret {
     var mr: main_ret = 123 as main_ret;
-    return mr;
+    assert mr == 123;
+    return 0;
 }
 

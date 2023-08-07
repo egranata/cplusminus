@@ -15,8 +15,11 @@
 func main() ret int32 {
     var a = 1;
     if (12 > 3) {
-        a = 12;
+        a = 2;
+    } else {
+        assert false;
     };
-    return a as int32;
+
+    return 0;
 }
 

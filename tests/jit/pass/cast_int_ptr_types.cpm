@@ -16,6 +16,7 @@ func main() ret int64 {
     var a = "hello world";
     var b = a as int64;
     var c = b as *byte;
-    return b;
+    assert c != 0;
+    return 0;
 }
 

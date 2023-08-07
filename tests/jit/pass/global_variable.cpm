@@ -18,13 +18,14 @@ func increase() {
     counter = counter + 1;
 }
 
-func main() ret int64 {
+func main() ret int32 {
     increase();
     increase();
     increase();
     increase();
     increase();
 
-    return counter;
+    assert counter == 5;
+    return 0;
 }
 

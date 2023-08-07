@@ -23,6 +23,7 @@ func main() ret int64 {
     let pp = p;
     let qq = q;
     incref p;
-    return getref p;
+    assert (getref p) > 0;
+    return 0;
 }
 

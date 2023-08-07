@@ -13,7 +13,36 @@
 (* limitations under the License. *)
         
 func main() ret int32 {
-    let n: int32 = 0xAb12 as int32;
-    return n;
+    assert (3 + 4) == 7;
+    assert (4 - 3) == 1;
+
+    let n =            0b100110;
+    let m =            0b011101;
+    assert (n ^^ m) == 0b111011;
+    assert (n && m) == 0b000100;
+    assert (n || m) == 0b111111;
+    assert (48 / 4) == 12;
+
+    assert (2 == 3) == false;
+    assert (3 == 3) == true;
+
+    assert (2 != 3) == true;
+    assert (3 != 3) == false;
+
+    assert (2 >= 3) == false;
+    assert (3 >= 3) == true;
+    assert (3 >= 2) == true;
+
+    assert (2 <= 3) == true;
+    assert (3 <= 3) == true;
+    assert (3 <= 2) == false;
+
+    let a = 2;
+    let a = -a;
+    assert (a < 0);
+    let n = a + (-1);
+    assert (n < a);
+
+    return 0;
 }
 

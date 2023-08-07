@@ -14,6 +14,7 @@
         
 func main() ret int32 {
     let n: int32 = 7;
-    return n;
+    assert n == 7;
+    return 0;
 }
 

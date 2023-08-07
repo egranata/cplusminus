@@ -12,9 +12,10 @@
 (* See the License for the specific language governing permissions and *)
 (* limitations under the License. *)
         
-func main() ret int64 {
-    var a = 1;
+func main() ret int32 {
     var b: int64;
-    return a + b;
+    assert b == 0;
+
+    return 0;
 }
 

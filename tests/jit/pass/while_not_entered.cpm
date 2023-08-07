@@ -12,13 +12,14 @@
 (* See the License for the specific language governing permissions and *)
 (* limitations under the License. *)
         
-func main() ret int64 {
+func main() ret int32 {
     var x = 6;
     var a = 11;
     while (x>10) {
         x = x - 1;
         a = a + x;
     };
-    return a;
+    assert a == 11;
+    return 0;
 }
 

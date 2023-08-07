@@ -12,9 +12,11 @@
 (* See the License for the specific language governing permissions and *)
 (* limitations under the License. *)
         
-func main() ret int64 {
+func main() ret int32 {
     var ptr: *int32 = 0 as *int32;
     ptr = ptr + 1;
-    return ptr as int64;
+    let ptr = ptr as int64;
+    assert ptr >= 4;
+    return 0;
 }
 

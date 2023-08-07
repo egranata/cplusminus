@@ -36,6 +36,7 @@ func foo() ret int64 {
 
 func main() ret int64 {
     let n = foo();
-    return n + g_FreedObjects;
+    assert g_FreedObjects >= 1;
+    return 0;
 }
 

@@ -12,11 +12,11 @@
 (* See the License for the specific language governing permissions and *)
 (* limitations under the License. *)
         
-func main() ret int64 {
+func main() ret int32 {
     assert true;
     assert 3 > 0;
     assert 12 == 12;
 
-    return 1;
+    return 0;
 }
 

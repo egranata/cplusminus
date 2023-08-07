@@ -27,9 +27,11 @@ func foo() ret int64 {
     return p;
 }
 
-func main() ret int64 {
+func main() ret int32 {
     let n = foo();
     let n = n + g_FreedObjects;
-    return n;
+    assert 129 == n;
+    assert g_FreedObjects > 0;
+    return 0;
 }
 

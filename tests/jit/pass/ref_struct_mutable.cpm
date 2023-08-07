@@ -24,10 +24,11 @@ impl pair {
     }
 }
 
-func main() ret int64 {
+func main() ret int32 {
     let p = alloc pair;
     p.x = 12;
     p->foo();
-    return p.x;
+    assert p.x == 13;
+    return 0;
 }
 

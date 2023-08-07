@@ -20,12 +20,13 @@ func double(x: int64) ret int64 {
     return x + x;
 }
 
-func main() ret int64 {
+func main() ret int32 {
     var n = 5;
     var fp = inc;
     n = fp(n);
     fp = double;
     n = fp(n);
-    return n;
+    assert n == 12;
+    return 0;
 }
 

@@ -25,7 +25,9 @@ func foo() ret int64 {
     return 0;
 }
 
-func main() ret int64 {
-    return foo() + g_FreedObjects;
+func main() ret int32 {
+    let n = foo() + g_FreedObjects;
+    assert n == 2;
+    return 0;
 }
 

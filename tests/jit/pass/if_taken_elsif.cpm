@@ -21,6 +21,7 @@ func main() ret int64 {
     } else {
         a = 36;
     };
-    return a;
+    assert a == 22;
+    return 0;
 }
 

@@ -23,6 +23,7 @@ func bar() ret int64 {
 
 func main() ret int64 {
     bar();
-    return g_FreedObjects;
+    assert g_FreedObjects >= 1;
+    return 0;
 }
 

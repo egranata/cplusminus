@@ -19,8 +19,8 @@ func main() ret int64 {
         x = x - 1;
         a = a + x;
     } else {
-        a = 300;
+        return 0;
     };
-    return a;
+    return 11;
 }
 

@@ -19,7 +19,7 @@ type pair {
 
 impl pair {
     func add(n: int64, m: int64) ret pair {
-        var ret = alloc pair;
+        let ret = alloc pair;
         ret.x = self.x + n;
         ret.y = self.y + m;
         return ret;
@@ -34,12 +34,13 @@ func foo() ret int64 {
     return p.y - p.x;
 }
 
-func main() ret int64 {
+func main() ret int32 {
     var i = 0;
     while (i < 500) {
         if (foo() == 3) { i = i + 1; }
-        else { return i; };
+        else { return 1; };
     };
-    return i;
+
+    return 0;
 }
 

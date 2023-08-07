@@ -21,7 +21,8 @@ ref type pair {
     }
 }
 
-func main() ret int64 {
+func main() ret int32 {
     let p = alloc pair(12);
-    return p.y;
+    assert 12 == p.y;
+    return 0;
 }

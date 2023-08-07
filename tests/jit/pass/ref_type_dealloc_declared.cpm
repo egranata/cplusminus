@@ -21,9 +21,10 @@ ref type ord_pair {
     }
 }
 
-func main() ret int64 {
+func main() ret int32 {
     let p1 = alloc ord_pair{max:13,min:5};
     let p2 = alloc ord_pair{max:10,min:2};
-    return p1.max + p2.min;
+    assert 15 == p1.max + p2.min;
+    return 0;
 }
 

@@ -17,7 +17,8 @@ func foo(var n: int64) ret int64 {
     return n;
 }
 
-func main() ret int64 {
-    return foo(12);
+func main() ret int32 {
+    assert foo(12) == 13;
+    return 0;
 }
 

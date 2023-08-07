@@ -21,6 +21,8 @@ func main() ret int32 {
     num = num + digits[i];
     digits[7] = 10;
     num = num + digits[7];
-    return num as int32;
+    let num = num as int32;
+    assert num == 18;
+    return 0;
 }
 

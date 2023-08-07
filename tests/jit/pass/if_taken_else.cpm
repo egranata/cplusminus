@@ -15,10 +15,9 @@
 func main() ret int32 {
     var a = 1;
     if (12 > 34) {
-        a = 12;
+        return 12;
     } else {
-        a = 36;
+        return 0;
     };
-    return a as int32;
 }
 

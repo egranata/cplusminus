@@ -12,9 +12,11 @@
 (* See the License for the specific language governing permissions and *)
 (* limitations under the License. *)
         
-func main() ret int64 {
+func main() ret int32 {
     var num = 123;
     var addr = &num;
-    return addr as int64;
+    assert (addr as int64) != 0;
+
+    return 0;
 }
 

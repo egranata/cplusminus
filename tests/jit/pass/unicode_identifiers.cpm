@@ -18,9 +18,9 @@ func i_use_русский日本語मानक(x: int64) ret int64 {
     return n😃 - ✅;
 }
 
-func main() ret int64 {
+func main() ret int32 {
     let _𔔁 = 3;
     let $𔕰 = i_use_русский日本語मानक(_𔔁);
-    return $𔕰; 
+    return ($𔕰 - 1) as int32; 
 }
 

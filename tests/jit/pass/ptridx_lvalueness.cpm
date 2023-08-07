@@ -17,13 +17,14 @@ func foo(n: *int64) ret int64 {
     return 1;
 }
 
-func main() ret int64 {
+func main() ret int32 {
     var a = [123,2];
     foo(&a[0]);
     a[1] = 1;
     foo(&a[0]);
     a[1] = 6;
     foo(&a[0]);
-    return a[0];
+    assert 132 == a[0];
+    return 0;
 }
 

@@ -19,7 +19,8 @@ func main() ret int64 {
     } elsif (3 > 5) {
         return 5;
     } elsif (12 > 10) {
-        return 22;
+        (* this is the expected branch *)
+        return 0;
     } elsif (7 > 12) {
         return 8;
     } elsif (12 > 7) {

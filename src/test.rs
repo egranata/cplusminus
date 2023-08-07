@@ -172,7 +172,7 @@ mod jit_tests {
         for opt in &[false, true] {
             let result = run_jit_source(&program, *opt);
             if result.is_ok() {
-                assert!(result.unwrap() == 0);
+                assert_eq!(result.unwrap(), 0);
             } else {
                 eprintln!("test failure: {}", result.unwrap_err());
                 assert!(false);

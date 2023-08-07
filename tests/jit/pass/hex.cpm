@@ -13,6 +13,7 @@
 (* limitations under the License. *)
         
 func main() ret int32 {
-    return 0xAb12;
+    assert 43794 == 0xAb12;
+    return 0;
 }
 

@@ -16,7 +16,7 @@ val type wrapper {
     x: int64
 }
 
-func main() ret int64 {
+func main() ret int32 {
     let p = alloc wrapper;
     p.x = 123;
     let p = p.x;
@@ -24,6 +24,7 @@ func main() ret int64 {
     var p = p + 1;
     p = p + 1;
     let p = p + 2;
-    return p;
+    assert p == 128;
+    return 0;
 }
 

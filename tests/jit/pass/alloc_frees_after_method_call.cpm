@@ -38,6 +38,8 @@ func blah() ret int64 {
 }
 
 func main() ret int64 {
-    return blah() + g_FreedObjects;
-}        
+    assert blah() == 22;
+    assert g_FreedObjects > 0;
+    return 0;
+}
 
