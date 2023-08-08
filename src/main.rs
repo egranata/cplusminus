@@ -22,7 +22,6 @@ pub mod codegen;
 pub mod driver;
 pub mod err;
 pub mod iw;
-pub mod jit;
 pub mod mangler;
 pub mod parser;
 

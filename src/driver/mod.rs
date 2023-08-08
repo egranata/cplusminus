@@ -20,14 +20,11 @@ use std::{
     process::Command,
 };
 
-use inkwell::{context::Context, execution_engine::JitFunction};
+use inkwell::context::Context;
 use rand::Rng;
 use tempfile::NamedTempFile;
 
-use crate::{
-    iw::{CompilerCore, CompilerOptions, Input},
-    jit,
-};
+use crate::iw::{CompilerCore, CompilerOptions, Input};
 
 pub struct DriverOptions {
     pub inputs: Vec<PathBuf>,
@@ -189,31 +186,6 @@ fn run_multi_jit_impl(
             cr
         }
     }
-}
-
-pub fn run_jit(src: &Path, options: &CompilerOptions) -> CompilationResult<u64, String> {
-    let llvm = Context::create();
-    let mut rst: CompilationResult<u64, String>;
-    match run_compiler_machinery(src, &llvm, options) {
-        (true, iwell) => {
-            type MainFunc = unsafe extern "C" fn() -> u64;
-            let main: Option<JitFunction<MainFunc>> =
-                jit::get_runnable_function(&iwell, "main", options.optimize);
-            if let Some(main) = main {
-                let ret = unsafe { main.call() };
-                rst = CompilationResult::ok(ret);
-                rst.add_diagnostics(src, &iwell.diagnostics.borrow().diagnostics_to_string());
-            } else {
-                rst = CompilationResult::err("main function not found");
-                rst.add_diagnostics(src, &iwell.diagnostics.borrow().diagnostics_to_string());
-            }
-        }
-        (false, iwell) => {
-            rst = CompilationResult::err("compilation error");
-            rst.add_diagnostics(src, &iwell.diagnostics.borrow().diagnostics_to_string());
-        }
-    };
-    rst
 }
 
 const REFCOUNT_SOURCE_CODE: &str = include_str!("../lib/refcount.c");
