@@ -8,7 +8,11 @@ A few notes on how to make this process as easy and seamless as possible.
 
 ## Coding style
 
-I hate arguing over coding style, so I just automate it away. My local flow uses [precommit](https://pre-commit.com/) and I encourage you to use it as well. By default it will run `cargo format`, `cargo check` and `cargo clippy`. If those all pass, then you're golden. The same checks will happen at GitHub and if they fail, I will ask you to resubmit until they pass. Run them locally and spare yourself (and me) the trouble.
+I would rather much discuss the semantics of your contribution than the way it is formatted, so this project adopts automated checks.
+
+My local flow uses [precommit](https://pre-commit.com/) and I encourage you to use it as well.
+
+By default it will run `cargo format`, `cargo check` and `cargo clippy`. If those all pass, then you're golden. The same checks will happen at GitHub and if they fail, I will ask you to resubmit until they pass. Run them locally and spare yourself (and me) the trouble. If a `clippy` check doesn't make sense, you can add a marker to ignore it, but that is likely to lead to extra scrutiny if the issue isn't obvious.
 
 ## Licensing
 
@@ -16,14 +20,11 @@ This project is licensed under Apache 2.0. I ask that you submit patches under y
 
 ## Testing
 
-There are three testing styles in this project:
-- **inline unoptimized JIT tests**: these are the original test format, but unless you need to do interesting checks on the compiler's output (which nobody does anyway), they are discouraged;
-- **out of band JIT tests**: these are great for simple tests that can fail but won't bring the entire compiler down (e.g. no unreachable code, no failed asserts, ...); they will run with and without optimization;
-- **out of band driver tests**: these can compile multiple files, will eventually be able to link external libraries, and work really well to test things that can easily crash (LLVM edge cases, failed assertions, memory smashers); they are intended to run with and without optimization;
+There are two testing styles in this project:
+- **out of band JIT tests**: these are great for simple single file tests with no additional dependencies and which do not need to check for specific error messages or results and can simply return 0 to signal success; they will run with and without optimization;
+- **out of band driver tests**: these can compile multiple files, will eventually be able to link external libraries and validate error messages, and work really well to test things that can easily crash (LLVM edge cases, failed assertions, memory smashers); they are intended to run with and without optimization;
 
 When you submit a patch, make sure no tests break. Add tests for your work. If you can't add a test, this will make the patch subject to extra scrutiny before being merged.
-
-Ideally, there would only be two kinds of tests: the out of band JIT tests and the out of band driver tests. Patches to clean this up are welcome!
 
 ## Large-scale changes
 
