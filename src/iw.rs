@@ -307,7 +307,7 @@ impl<'a> CompilerCore<'a> {
             false,
         );
 
-        crate::builders::refcount::build_refcount_apis(m, c, options)
+        crate::builders::refcount::build_refcount_apis(m, c)
     }
 
     fn parse(&self) -> Result<Vec<TopLevelDeclaration>, ParseError<LineCol>> {

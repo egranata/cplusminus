@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use inkwell::{
-    attributes::Attribute,
     builder::Builder,
     context::Context,
     module::{Linkage, Module},
@@ -24,10 +23,7 @@ use inkwell::{
     },
 };
 
-use crate::{
-    iw::{CompilerCore, CompilerOptions},
-    mangler::mangle_special_method,
-};
+use crate::{iw::CompilerCore, mangler::mangle_special_method};
 
 use super::ty::TypeBuilder;
 
@@ -66,24 +62,6 @@ fn build_refcount_type(c: &Context) -> StructType<'_> {
     __refcount_t
 }
 
-fn add_attributes<'a>(c: &'a Context, f: FunctionValue<'a>) -> FunctionValue<'a> {
-    let optnone = Attribute::get_named_enum_kind_id("optnone");
-    let noinline = Attribute::get_named_enum_kind_id("noinline");
-    let optnone_attribute = c.create_type_attribute(optnone, c.void_type().into());
-    let noinline_attribute = c.create_type_attribute(noinline, c.void_type().into());
-
-    f.add_attribute(
-        inkwell::attributes::AttributeLoc::Function,
-        optnone_attribute,
-    );
-    f.add_attribute(
-        inkwell::attributes::AttributeLoc::Function,
-        noinline_attribute,
-    );
-
-    f
-}
-
 fn build_incref_prototype<'a>(m: &Module<'a>, c: &'a Context) -> FunctionValue<'a> {
     let void = c.void_type();
     let int64 = c.i64_type();
@@ -113,153 +91,6 @@ fn build_getref_prototype<'a>(m: &Module<'a>, c: &'a Context) -> FunctionValue<'
     m.add_function("__getref_f", incref_t, Some(Linkage::External))
 }
 
-fn build_incref_api<'a>(
-    m: &Module<'a>,
-    c: &'a Context,
-    __refcount_t: StructType<'a>,
-) -> FunctionValue<'a> {
-    let void = c.void_type();
-    let int64 = c.i64_type();
-    let arg_ty = BasicMetadataTypeEnum::PointerType(__refcount_t.ptr_type(Default::default()));
-    let incref_t = void.fn_type(&[arg_ty], false);
-
-    let incref_f = m.add_function("__incref_f", incref_t, Some(Linkage::Internal));
-    add_attributes(c, incref_f);
-    let builder = c.create_builder();
-
-    let entry = c.append_basic_block(incref_f, "entry");
-    let do_increase = c.append_basic_block(incref_f, "do_increase");
-    let exit = c.append_basic_block(incref_f, "exit");
-
-    builder.position_at_end(entry);
-    let arg0 = incref_f.get_nth_param(0).unwrap().into_pointer_value();
-    let is_null = builder.build_int_compare(
-        inkwell::IntPredicate::EQ,
-        c.i64_type().const_zero(),
-        builder.build_ptr_to_int(arg0, c.i64_type(), ""),
-        "",
-    );
-    builder.build_conditional_branch(is_null, exit, do_increase);
-
-    builder.position_at_end(do_increase);
-    let __rc = builder.build_pointer_cast(arg0, int64.ptr_type(Default::default()), "__rc");
-    let __rc_plus_1 = builder.build_int_add(
-        builder.build_load(__rc, "").into_int_value(),
-        int64.const_int(1, false),
-        "__rc_plus_1",
-    );
-    builder.build_store(__rc, __rc_plus_1);
-    builder.build_unconditional_branch(exit);
-
-    builder.position_at_end(exit);
-    builder.build_return(None);
-
-    incref_f
-}
-
-fn build_getref_api<'a>(
-    m: &Module<'a>,
-    c: &'a Context,
-    __refcount_t: StructType<'a>,
-) -> FunctionValue<'a> {
-    let int64 = c.i64_type();
-    let arg_ty = BasicMetadataTypeEnum::PointerType(__refcount_t.ptr_type(Default::default()));
-    let getref_t = int64.fn_type(&[arg_ty], false);
-
-    let getref_f = m.add_function("__getref_f", getref_t, Some(Linkage::Internal));
-    add_attributes(c, getref_f);
-    let builder = c.create_builder();
-
-    let entry = c.append_basic_block(getref_f, "entry");
-    let do_fetch = c.append_basic_block(getref_f, "do_fetch");
-    let exit = c.append_basic_block(getref_f, "exit");
-
-    builder.position_at_end(entry);
-    // this alloca is whitelisted because this function implements memory management
-    let ret_alloca = builder.build_alloca(int64, "ret");
-    builder.build_store(ret_alloca, int64.const_zero());
-    let arg0 = getref_f.get_nth_param(0).unwrap().into_pointer_value();
-    let is_null = builder.build_int_compare(
-        inkwell::IntPredicate::EQ,
-        c.i64_type().const_zero(),
-        builder.build_ptr_to_int(arg0, c.i64_type(), ""),
-        "",
-    );
-    builder.build_conditional_branch(is_null, exit, do_fetch);
-
-    builder.position_at_end(do_fetch);
-    let __rc = builder.build_pointer_cast(arg0, int64.ptr_type(Default::default()), "");
-    let __rc = builder.build_load(__rc, "__rc").into_int_value();
-    builder.build_store(ret_alloca, __rc);
-    builder.build_unconditional_branch(exit);
-
-    builder.position_at_end(exit);
-    builder.build_return(Some(&builder.build_load(ret_alloca, "rc")));
-
-    getref_f
-}
-
-fn build_decref_api<'a>(
-    m: &Module<'a>,
-    c: &'a Context,
-    __refcount_t: StructType<'a>,
-) -> FunctionValue<'a> {
-    let void = c.void_type();
-    let int64 = c.i64_type();
-    let arg_ty = BasicMetadataTypeEnum::PointerType(__refcount_t.ptr_type(Default::default()));
-    let decref_t = void.fn_type(&[arg_ty], false);
-
-    let decref_f = m.add_function("__decref_f", decref_t, Some(Linkage::Internal));
-    add_attributes(c, decref_f);
-    let builder = c.create_builder();
-
-    let one = int64.const_int(1, false);
-
-    let entry = c.append_basic_block(decref_f, "entry");
-    let check_refcnt = c.append_basic_block(decref_f, "check_refcnt");
-    let do_decrease = c.append_basic_block(decref_f, "do_decrease");
-    let free_mem = c.append_basic_block(decref_f, "free_mem");
-    let exit = c.append_basic_block(decref_f, "exit");
-
-    builder.position_at_end(entry);
-    let arg0 = decref_f.get_nth_param(0).unwrap().into_pointer_value();
-    let is_null = builder.build_int_compare(
-        inkwell::IntPredicate::EQ,
-        c.i64_type().const_zero(),
-        builder.build_ptr_to_int(arg0, c.i64_type(), ""),
-        "",
-    );
-    builder.build_conditional_branch(is_null, exit, check_refcnt);
-
-    builder.position_at_end(check_refcnt);
-    let __rc = builder.build_pointer_cast(arg0, int64.ptr_type(Default::default()), "__rc");
-    let __rc_value = builder.build_load(__rc, "").into_int_value();
-    let comp_zero = builder.build_int_compare(
-        inkwell::IntPredicate::EQ,
-        __rc_value,
-        int64.const_zero(),
-        "comp_zero",
-    );
-    builder.build_conditional_branch(comp_zero, free_mem, do_decrease);
-
-    builder.position_at_end(do_decrease);
-    let __rc_minus_1 = builder.build_int_sub(__rc_value, one, "__rc_minus_1");
-    builder.build_store(__rc, __rc_minus_1);
-    builder.build_unconditional_branch(exit);
-
-    builder.position_at_end(free_mem);
-    let dealloc_f = builder.build_struct_gep(arg0, 1, "").unwrap();
-    let dealloc_f = builder.build_load(dealloc_f, "").into_pointer_value();
-    let dealloc_f = CallableValue::try_from(dealloc_f).unwrap();
-    builder.build_call(dealloc_f, &[BasicMetadataValueEnum::PointerValue(arg0)], "");
-    builder.build_unconditional_branch(exit);
-
-    builder.position_at_end(exit);
-    builder.build_return(None);
-
-    decref_f
-}
-
 #[derive(Clone)]
 pub struct Refcounting<'a> {
     pub refcount_type: StructType<'a>,
@@ -282,29 +113,8 @@ fn build_refcount_prototye_apis<'a>(m: &Module<'a>, c: &'a Context) -> Refcounti
     }
 }
 
-fn build_refcount_impl_apis<'a>(m: &Module<'a>, c: &'a Context) -> Refcounting<'a> {
-    let __refcount_t = build_refcount_type(c);
-    let __incref_f = build_incref_api(m, c, __refcount_t);
-    let __getref_f = build_getref_api(m, c, __refcount_t);
-    let __decref_f = build_decref_api(m, c, __refcount_t);
-
-    Refcounting {
-        refcount_type: __refcount_t,
-        incref_func: __incref_f,
-        getref_func: __getref_f,
-        decref_func: __decref_f,
-    }
-}
-
-pub fn build_refcount_apis<'a>(
-    m: &Module<'a>,
-    c: &'a Context,
-    options: &CompilerOptions,
-) -> Refcounting<'a> {
-    match options.out {
-        crate::iw::OutputMode::Jit => build_refcount_impl_apis(m, c),
-        crate::iw::OutputMode::Binary => build_refcount_prototye_apis(m, c),
-    }
+pub fn build_refcount_apis<'a>(m: &Module<'a>, c: &'a Context) -> Refcounting<'a> {
+    build_refcount_prototye_apis(m, c)
 }
 
 pub fn alloc_refcounted_type<'a>(
