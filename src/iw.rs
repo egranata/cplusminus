@@ -468,195 +468,213 @@ impl<'a> CompilerCore<'a> {
         }
     }
 
+    fn sanitize_ast(&self, tlds: Vec<TopLevelDeclaration>) -> Vec<TopLevelDeclaration> {
+        let mut ret: Vec<TopLevelDeclaration> = vec![];
+        for tld in tlds {
+            if self.check_ast_decl(&tld.payload) {
+                ret.push(tld);
+            }
+        }
+
+        ret
+    }
+
+    fn declare_pass(&self, tlds: &[TopLevelDeclaration]) -> bool {
+        for tld in tlds {
+            match &tld.payload {
+                crate::ast::TopLevelDecl::Function(fd) => {
+                    let fb = FunctionBuilder::new(self.clone());
+                    let opts = FunctionBuilderOptions::default()
+                        .extrn(false)
+                        .global(true)
+                        .mangle(false)
+                        .export(fd.export)
+                        .commit();
+                    fb.declare(&self.globals, &fd.decl, opts);
+                }
+                crate::ast::TopLevelDecl::Extern(fd) => {
+                    let fb = FunctionBuilder::new(self.clone());
+                    let opts = FunctionBuilderOptions::default()
+                        .extrn(true)
+                        .global(true)
+                        .mangle(false)
+                        .export(false)
+                        .commit();
+                    if let Some(fv) = fb.declare(&self.globals, &fd.decl, opts) {
+                        if fd.export {
+                            let bom_entry = FunctionBomEntry::new(&fd.decl.name, fv);
+                            self.bom.borrow_mut().functions.push(bom_entry);
+                        }
+                    }
+                }
+                crate::ast::TopLevelDecl::Structure(sd) => {
+                    let ty = TypeBuilder::new(self.clone());
+                    if let Some(psd) = self.fixup_struct_decl(sd) {
+                        if let Some(st) = ty.build_structure_from_decl(&self.globals, &psd) {
+                            if let Some(strct) = ty.struct_by_name(st) {
+                                if psd.export {
+                                    let bom_entry = StructBomEntry::new(&strct);
+                                    self.bom.borrow_mut().structs.push(bom_entry);
+                                }
+                            }
+                        } else {
+                            self.diagnostics
+                                .borrow_mut()
+                                .error(CompilerError::new(sd.loc, Error::InvalidExpression));
+                        }
+                    } else {
+                        self.diagnostics
+                            .borrow_mut()
+                            .error(CompilerError::new(sd.loc, Error::InvalidExpression));
+                    }
+                }
+                crate::ast::TopLevelDecl::Alias(ad) => {
+                    let ty = TypeBuilder::new(self.clone());
+                    if let Some(uty) = ty.alias(&self.globals, &ad.name, &ad.ty) {
+                        if ad.export {
+                            // we just generated this from a descriptor, assume roundtrip is safe
+                            let utd = TypeBuilder::descriptor_by_llvm_type(uty).unwrap();
+                            let bom_entry = AliasBomEntry::new(&ad.name, &utd);
+                            self.bom.borrow_mut().aliases.push(bom_entry);
+                        }
+                    } else {
+                        self.diagnostics
+                            .borrow_mut()
+                            .error(CompilerError::new(ad.loc, Error::InvalidExpression));
+                    }
+                }
+                crate::ast::TopLevelDecl::Implementation(id) => {
+                    let tb = TypeBuilder::new(self.clone());
+                    if let Some(ty) = tb.llvm_type_by_descriptor(&self.globals, &id.of) {
+                        if let Some(sty) = tb.is_val_or_ref_basic_type(ty) {
+                            if let Some(struct_info) = tb.struct_by_name(sty) {
+                                tb.build_impl(&self.globals, &struct_info, id);
+                            } else {
+                                self.diagnostics.borrow_mut().error(CompilerError::new(
+                                    id.loc,
+                                    Error::TypeNotFound(id.of.clone()),
+                                ));
+                            }
+                        } else {
+                            self.diagnostics.borrow_mut().error(CompilerError::new(
+                                id.loc,
+                                Error::UnexpectedType(Some("structure".to_owned())),
+                            ));
+                        }
+                    }
+                }
+                crate::ast::TopLevelDecl::Import(id) => {
+                    let bom_path = self
+                        .source
+                        .file_in_input_path(&id.path)
+                        .unwrap_or(PathBuf::from(&id.path));
+                    if let Some(bom) = BillOfMaterials::load(bom_path.as_path()) {
+                        self.import(id, &bom);
+                    } else {
+                        self.diagnostics.borrow_mut().error(CompilerError::new(
+                            tld.loc,
+                            Error::InternalError(String::from("unable to find BOM")),
+                        ));
+                    }
+                }
+                crate::ast::TopLevelDecl::Variable(gvd) => {
+                    let vd = &gvd.decl;
+                    if vd.val.is_some() {
+                        self.diagnostics.borrow_mut().error(CompilerError::new(
+                            gvd.loc,
+                            Error::InternalError(String::from("globals cannot be initialized")),
+                        ));
+                    } else if !vd.rw {
+                        self.diagnostics.borrow_mut().error(CompilerError::new(
+                            gvd.loc,
+                            Error::InternalError(String::from("globals cannot be read-only")),
+                        ));
+                    } else if vd.ty.is_none() {
+                        self.diagnostics.borrow_mut().error(CompilerError::new(
+                            gvd.loc,
+                            Error::InternalError(String::from("globals must be explicitly typed")),
+                        ));
+                    } else {
+                        let tb = TypeBuilder::new(self.clone());
+                        if let Some(var_type) =
+                            tb.llvm_type_by_descriptor(&self.globals, vd.ty.as_ref().unwrap())
+                        {
+                            let global = CompilerCore::make_global(
+                                &self.module,
+                                &vd.name,
+                                var_type,
+                                Some(TypeBuilder::zero_for_type(var_type)),
+                                if gvd.export {
+                                    Linkage::External
+                                } else {
+                                    Linkage::Internal
+                                },
+                                false,
+                            );
+
+                            let vi = VarInfo::new(
+                                tld.loc,
+                                vd.name.clone(),
+                                global.as_pointer_value(),
+                                true,
+                            );
+                            self.globals.insert_variable(&vd.name, vi, true);
+
+                            if gvd.export {
+                                let bom_entry = VariableBomEntry::new(
+                                    global.get_name().to_str().unwrap(),
+                                    vd.ty.as_ref().unwrap(),
+                                );
+                                self.bom.borrow_mut().variables.push(bom_entry);
+                            }
+                        } else {
+                            self.diagnostics.borrow_mut().error(CompilerError::new(
+                                gvd.loc,
+                                Error::TypeNotFound(vd.ty.as_ref().unwrap().clone()),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+
+        self.success()
+    }
+
+    fn define_pass(&self, tlds: &[TopLevelDeclaration]) -> bool {
+        for tld in tlds {
+            match &tld.payload {
+                crate::ast::TopLevelDecl::Function(fd) => {
+                    let fb = FunctionBuilder::new(self.clone());
+                    fb.build(&self.globals, fd);
+                }
+
+                crate::ast::TopLevelDecl::Alias(..)
+                | crate::ast::TopLevelDecl::Extern(..)
+                | crate::ast::TopLevelDecl::Implementation(..)
+                | crate::ast::TopLevelDecl::Import(..)
+                | crate::ast::TopLevelDecl::Structure(..)
+                | crate::ast::TopLevelDecl::Variable(..) => {}
+            }
+        }
+
+        self.success()
+    }
+
+    fn compile_tlds(&self, tlds: &[TopLevelDeclaration]) -> bool {
+        if self.declare_pass(tlds) {
+            self.define_pass(tlds)
+        } else {
+            false
+        }
+    }
+
     pub fn compile(&self) -> bool {
         let parsed = self.parse();
         match parsed {
             Ok(tlds) => {
-                for tld in &tlds {
-                    if !self.check_ast_decl(&tld.payload) {
-                        continue;
-                    }
-
-                    match &tld.payload {
-                        crate::ast::TopLevelDecl::Function(fd) => {
-                            let fb = FunctionBuilder::new(self.clone());
-                            let opts = FunctionBuilderOptions::default()
-                                .extrn(false)
-                                .global(true)
-                                .mangle(false)
-                                .export(fd.export)
-                                .commit();
-                            fb.declare(&self.globals, &fd.decl, opts);
-                        }
-                        crate::ast::TopLevelDecl::Extern(fd) => {
-                            let fb = FunctionBuilder::new(self.clone());
-                            let opts = FunctionBuilderOptions::default()
-                                .extrn(true)
-                                .global(true)
-                                .mangle(false)
-                                .export(false)
-                                .commit();
-                            if let Some(fv) = fb.declare(&self.globals, &fd.decl, opts) {
-                                if fd.export {
-                                    let bom_entry = FunctionBomEntry::new(&fd.decl.name, fv);
-                                    self.bom.borrow_mut().functions.push(bom_entry);
-                                }
-                            }
-                        }
-                        crate::ast::TopLevelDecl::Structure(sd) => {
-                            let ty = TypeBuilder::new(self.clone());
-                            if let Some(psd) = self.fixup_struct_decl(sd) {
-                                if let Some(st) = ty.build_structure_from_decl(&self.globals, &psd)
-                                {
-                                    if let Some(strct) = ty.struct_by_name(st) {
-                                        if psd.export {
-                                            let bom_entry = StructBomEntry::new(&strct);
-                                            self.bom.borrow_mut().structs.push(bom_entry);
-                                        }
-                                    }
-                                } else {
-                                    self.diagnostics.borrow_mut().error(CompilerError::new(
-                                        sd.loc,
-                                        Error::InvalidExpression,
-                                    ));
-                                }
-                            } else {
-                                self.diagnostics
-                                    .borrow_mut()
-                                    .error(CompilerError::new(sd.loc, Error::InvalidExpression));
-                            }
-                        }
-                        crate::ast::TopLevelDecl::Alias(ad) => {
-                            let ty = TypeBuilder::new(self.clone());
-                            if let Some(uty) = ty.alias(&self.globals, &ad.name, &ad.ty) {
-                                if ad.export {
-                                    // we just generated this from a descriptor, assume roundtrip is safe
-                                    let utd = TypeBuilder::descriptor_by_llvm_type(uty).unwrap();
-                                    let bom_entry = AliasBomEntry::new(&ad.name, &utd);
-                                    self.bom.borrow_mut().aliases.push(bom_entry);
-                                }
-                            } else {
-                                self.diagnostics
-                                    .borrow_mut()
-                                    .error(CompilerError::new(ad.loc, Error::InvalidExpression));
-                            }
-                        }
-                        crate::ast::TopLevelDecl::Implementation(id) => {
-                            let tb = TypeBuilder::new(self.clone());
-                            if let Some(ty) = tb.llvm_type_by_descriptor(&self.globals, &id.of) {
-                                if let Some(sty) = tb.is_val_or_ref_basic_type(ty) {
-                                    if let Some(struct_info) = tb.struct_by_name(sty) {
-                                        tb.build_impl(&self.globals, &struct_info, id);
-                                    } else {
-                                        self.diagnostics.borrow_mut().error(CompilerError::new(
-                                            id.loc,
-                                            Error::TypeNotFound(id.of.clone()),
-                                        ));
-                                    }
-                                } else {
-                                    self.diagnostics.borrow_mut().error(CompilerError::new(
-                                        id.loc,
-                                        Error::UnexpectedType(Some("structure".to_owned())),
-                                    ));
-                                }
-                            }
-                        }
-                        crate::ast::TopLevelDecl::Import(id) => {
-                            let bom_path = self
-                                .source
-                                .file_in_input_path(&id.path)
-                                .unwrap_or(PathBuf::from(&id.path));
-                            if let Some(bom) = BillOfMaterials::load(bom_path.as_path()) {
-                                self.import(id, &bom);
-                            } else {
-                                self.diagnostics.borrow_mut().error(CompilerError::new(
-                                    tld.loc,
-                                    Error::InternalError(String::from("unable to find BOM")),
-                                ));
-                            }
-                        }
-                        crate::ast::TopLevelDecl::Variable(gvd) => {
-                            let vd = &gvd.decl;
-                            if vd.val.is_some() {
-                                self.diagnostics.borrow_mut().error(CompilerError::new(
-                                    gvd.loc,
-                                    Error::InternalError(String::from(
-                                        "globals cannot be initialized",
-                                    )),
-                                ));
-                            } else if !vd.rw {
-                                self.diagnostics.borrow_mut().error(CompilerError::new(
-                                    gvd.loc,
-                                    Error::InternalError(String::from(
-                                        "globals cannot be read-only",
-                                    )),
-                                ));
-                            } else if vd.ty.is_none() {
-                                self.diagnostics.borrow_mut().error(CompilerError::new(
-                                    gvd.loc,
-                                    Error::InternalError(String::from(
-                                        "globals must be explicitly typed",
-                                    )),
-                                ));
-                            } else {
-                                let tb = TypeBuilder::new(self.clone());
-                                if let Some(var_type) = tb
-                                    .llvm_type_by_descriptor(&self.globals, vd.ty.as_ref().unwrap())
-                                {
-                                    let global = CompilerCore::make_global(
-                                        &self.module,
-                                        &vd.name,
-                                        var_type,
-                                        Some(TypeBuilder::zero_for_type(var_type)),
-                                        if gvd.export {
-                                            Linkage::External
-                                        } else {
-                                            Linkage::Internal
-                                        },
-                                        false,
-                                    );
-
-                                    let vi = VarInfo::new(
-                                        tld.loc,
-                                        vd.name.clone(),
-                                        global.as_pointer_value(),
-                                        true,
-                                    );
-                                    self.globals.insert_variable(&vd.name, vi, true);
-
-                                    if gvd.export {
-                                        let bom_entry = VariableBomEntry::new(
-                                            global.get_name().to_str().unwrap(),
-                                            vd.ty.as_ref().unwrap(),
-                                        );
-                                        self.bom.borrow_mut().variables.push(bom_entry);
-                                    }
-                                } else {
-                                    self.diagnostics.borrow_mut().error(CompilerError::new(
-                                        gvd.loc,
-                                        Error::TypeNotFound(vd.ty.as_ref().unwrap().clone()),
-                                    ));
-                                }
-                            }
-                        }
-                    }
-                }
-
-                for tld in &tlds {
-                    match &tld.payload {
-                        crate::ast::TopLevelDecl::Function(fd) => {
-                            let fb = FunctionBuilder::new(self.clone());
-                            fb.build(&self.globals, fd);
-                        }
-
-                        crate::ast::TopLevelDecl::Alias(..)
-                        | crate::ast::TopLevelDecl::Extern(..)
-                        | crate::ast::TopLevelDecl::Implementation(..)
-                        | crate::ast::TopLevelDecl::Import(..)
-                        | crate::ast::TopLevelDecl::Structure(..)
-                        | crate::ast::TopLevelDecl::Variable(..) => {}
-                    }
-                }
+                let tlds = self.sanitize_ast(tlds);
+                self.compile_tlds(&tlds)
             }
             Err(err) => {
                 let loc = TokenSpan {
@@ -667,10 +685,9 @@ impl<'a> CompilerCore<'a> {
                     loc,
                     Error::ParseError(err.expected.to_string()),
                 ));
+                false
             }
-        };
-
-        self.success()
+        }
     }
 
     pub fn run_passes(&self) {

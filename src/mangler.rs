@@ -25,7 +25,7 @@ pub enum SpecialMemberFunction {
     BuiltinDeallocator,
 }
 
-const CPM_MANGLE_PREFIX: char = 'X';
+const CPM_MANGLE_PREFIX: &str = "__X";
 
 pub fn mangle_special_method(self_decl: StructType<'_>, func: SpecialMemberFunction) -> String {
     assert!(!TypeBuilder::is_tuple_type(self_decl));

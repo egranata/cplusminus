@@ -1,0 +1,10 @@
+{
+    "source_files": [
+        "test.cpm"
+    ],
+    "bom": false,
+    "diags": [
+        "identifier __X__7wrapper__3get is reserved",
+        "test.cpm:15:1"
+    ]
+}
