@@ -356,60 +356,30 @@ impl<'a> CompilerCore<'a> {
         Some(proper)
     }
 
-    fn check_ast_decl(&self, tld: &TopLevelDecl) -> bool {
-        match tld {
-            TopLevelDecl::Structure(sd) => {
-                for entry_decl in &sd.entries {
-                    match entry_decl {
-                        crate::ast::StructEntryDecl::Field(field_decl) => {
-                            if field_decl.name.starts_with("__") {
-                                self.diagnostics.borrow_mut().error(CompilerError::new(
-                                    field_decl.loc,
-                                    Error::ReservedIdentifier(field_decl.name.clone()),
-                                ));
-                                return false;
-                            }
+    fn check_ast_decl(&self, tld: &TopLevelDeclaration) -> bool {
+        let allowed = tld.name().map_or(true, |name| !name.starts_with("__"));
+        if !allowed {
+            self.diagnostics.borrow_mut().error(CompilerError::new(
+                tld.loc,
+                Error::ReservedIdentifier(tld.name().unwrap()),
+            ));
+            false
+        } else {
+            if let TopLevelDecl::Structure(st) = &tld.payload {
+                for entry in &st.entries {
+                    if let crate::ast::StructEntryDecl::Field(f) = entry {
+                        if f.name.starts_with("__") {
+                            self.diagnostics.borrow_mut().error(CompilerError::new(
+                                f.loc,
+                                Error::ReservedIdentifier(f.name.clone()),
+                            ));
+                            return false;
                         }
-                        crate::ast::StructEntryDecl::Init(..)
-                        | crate::ast::StructEntryDecl::Dealloc(..) => {}
                     }
                 }
-                true
             }
-            TopLevelDecl::Function(fd) => {
-                if fd.decl.name.starts_with("__") {
-                    self.diagnostics.borrow_mut().error(CompilerError::new(
-                        fd.decl.loc,
-                        Error::ReservedIdentifier(fd.decl.name.clone()),
-                    ));
-                    false
-                } else {
-                    true
-                }
-            }
-            TopLevelDecl::Extern(fd) => {
-                if fd.decl.name.starts_with("__") {
-                    self.diagnostics.borrow_mut().error(CompilerError::new(
-                        fd.loc,
-                        Error::ReservedIdentifier(fd.decl.name.clone()),
-                    ));
-                    false
-                } else {
-                    true
-                }
-            }
-            TopLevelDecl::Alias(ad) => {
-                if ad.name.starts_with("__") {
-                    self.diagnostics.borrow_mut().error(CompilerError::new(
-                        ad.loc,
-                        Error::ReservedIdentifier(ad.name.clone()),
-                    ));
-                    false
-                } else {
-                    true
-                }
-            }
-            _ => true,
+
+            allowed
         }
     }
 
@@ -471,7 +441,7 @@ impl<'a> CompilerCore<'a> {
     fn sanitize_ast(&self, tlds: Vec<TopLevelDeclaration>) -> Vec<TopLevelDeclaration> {
         let mut ret: Vec<TopLevelDeclaration> = vec![];
         for tld in tlds {
-            if self.check_ast_decl(&tld.payload) {
+            if self.check_ast_decl(&tld) {
                 ret.push(tld);
             }
         }
