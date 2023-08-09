@@ -361,7 +361,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         node: &Expression,
         init: &Option<AllocInitializer>,
     ) -> Option<BasicValueEnum<'a>> {
-        let pv = alloc_refcounted_type(builder, &self.iw, ty);
+        let pv = alloc_refcounted_type(&self.iw, builder, ty);
         let temp_pv = self.exit.create_alloca(
             builder,
             pv.get_type(),

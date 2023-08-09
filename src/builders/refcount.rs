@@ -118,8 +118,8 @@ pub fn build_refcount_apis<'a>(m: &Module<'a>, c: &'a Context) -> Refcounting<'a
 }
 
 pub fn alloc_refcounted_type<'a>(
-    builder: &Builder<'a>,
     iw: &CompilerCore<'a>,
+    builder: &Builder<'a>,
     ty: StructType<'a>,
 ) -> PointerValue<'a> {
     let malloc = builder.build_malloc(ty, "").unwrap();
@@ -151,8 +151,8 @@ pub fn alloc_refcounted_type<'a>(
 }
 
 fn insert_incref_call<'a>(
-    builder: &Builder<'a>,
     iw: &CompilerCore<'a>,
+    builder: &Builder<'a>,
     val: PointerValue<'a>,
 ) -> PointerValue<'a> {
     let incref_f = iw.refcnt.incref_func;
@@ -169,15 +169,15 @@ pub fn insert_incref_if_refcounted<'a>(
     let tb = TypeBuilder::new(iw.clone());
 
     if tb.is_refcounted_basic_type(val.get_type()).is_some() {
-        insert_incref_call(builder, iw, val.into_pointer_value());
+        insert_incref_call(iw, builder, val.into_pointer_value());
     }
 
     val
 }
 
 fn insert_decref_call<'a>(
-    builder: &Builder<'a>,
     iw: &CompilerCore<'a>,
+    builder: &Builder<'a>,
     val: PointerValue<'a>,
 ) -> PointerValue<'a> {
     let decref_f = iw.refcnt.decref_func;
@@ -194,7 +194,7 @@ pub fn insert_decref_if_refcounted<'a>(
     let tb = TypeBuilder::new(iw.clone());
 
     if tb.is_refcounted_basic_type(val.get_type()).is_some() {
-        insert_decref_assume_refcounted(iw, builder, val);
+        insert_decref_call(iw, builder, val.into_pointer_value());
     }
 
     val
@@ -205,13 +205,13 @@ pub fn insert_decref_assume_refcounted<'a>(
     builder: &Builder<'a>,
     val: BasicValueEnum<'a>,
 ) -> BasicValueEnum<'a> {
-    insert_decref_call(builder, iw, val.into_pointer_value());
+    insert_decref_call(iw, builder, val.into_pointer_value());
     val
 }
 
 fn insert_getref_call<'a>(
-    builder: &Builder<'a>,
     iw: &CompilerCore<'a>,
+    builder: &Builder<'a>,
     val: PointerValue<'a>,
 ) -> IntValue<'a> {
     let getref_f = iw.refcnt.getref_func;
@@ -228,7 +228,7 @@ pub fn insert_getref_if_refcounted<'a>(
     let tb = TypeBuilder::new(iw.clone());
 
     if tb.is_refcounted_basic_type(val.get_type()).is_some() {
-        return Some(insert_getref_call(builder, iw, val.into_pointer_value()));
+        return Some(insert_getref_call(iw, builder, val.into_pointer_value()));
     }
 
     None
