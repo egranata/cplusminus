@@ -8,7 +8,7 @@ build = "build.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
-serde = { version = "<=1.0.171", features = ["derive"] }
+serde = { version = "1.0.171", features = ["derive"] }
 serde_json = "1.0.103"
 
 [dependencies]
@@ -19,7 +19,7 @@ glob = "0.3.1"
 inkwell = { version = "0.2.0", features = ["llvm14-0"] }
 peg = "0.8.1"
 rand = "0.8.5"
-serde = { version = "<=1.0.171", features = ["derive"] }
+serde = { version = "1.0.171", features = ["derive"] }
 serde_json = "1.0.103"
 tempfile = "3.6.0"
 unic-emoji-char = "0.9.0"
