@@ -58,15 +58,15 @@ fn build_jit_tests(indir: &Path, outdir: &Path, pass: bool) {
     build_jit_test_code(func_to_call, indir, &outfile_path);
 }
 
+#[derive(Deserialize)]
+struct DriverTestConfig {
+    source_files: Vec<String>,
+    bom: bool,
+    diags: Option<Vec<String>>,
+}
+
 #[allow(clippy::format_in_format_args)]
 fn build_driver_test_code(func_to_call: &str, indir: &Path, outfile_path: &Path) {
-    #[derive(Deserialize)]
-    struct DriverTestConfig {
-        source_files: Vec<String>,
-        bom: bool,
-        diags: Option<Vec<String>>,
-    }
-
     let mut outfile_handle = File::create(outfile_path).unwrap();
     status_msg(format!(
         "building tests from {} into {}\n",
@@ -92,8 +92,8 @@ fn build_driver_test_code(func_to_call: &str, indir: &Path, outfile_path: &Path)
                 entry_path.display()
             );
         }
-        let test_descriptor: DriverTestConfig =
-            serde_json::from_reader(File::open(test_json_path).unwrap()).unwrap();
+        let test_json_str = std::fs::read_to_string(test_json_path).unwrap();
+        let test_descriptor: DriverTestConfig = serde_json::from_str(&test_json_str).unwrap();
         let diags = test_descriptor.diags.map(|diags| {
             diags
                 .iter()
