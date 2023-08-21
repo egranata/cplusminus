@@ -29,10 +29,12 @@ typedef struct {
 #define PRINT_POINTER printf("%s(%p)\n", __FUNCTION__, object)
 #define PRINT_REFCOUNT printf("%s(%p)->rc == %" PRIu64 "\n", __FUNCTION__, object, object->rc)
 #define PRINT(s) printf("%s(%p): %s\n", __FUNCTION__, object, s)
+#define PRINT_COUNTER printf("%s(%p): g_FreedObjects = %" PRIu64 "\n", __FUNCTION__, object, g_FreedObjects)
 #else
 #define PRINT_POINTER
 #define PRINT_REFCOUNT
 #define PRINT(s)
+#define PRINT_COUNTER
 #endif
 
 void __incref_f(refcount_t* object) {
@@ -58,6 +60,7 @@ PRINT_POINTER;
             PRINT("dealloc");
             (*object->sys_dealloc)(object);
             g_FreedObjects += 1;
+            PRINT_COUNTER;
         } else {
             object->rc -= 1;
             PRINT_REFCOUNT;

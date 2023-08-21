@@ -68,7 +68,11 @@ impl Args {
             dump_bom: self.bom,
             optimize: self.optimize,
             debug: self.debug,
-            out: OutputMode::Binary,
+            out: if self.jit || (self.inputs.len() == 1 && self.output.is_none()) {
+                OutputMode::Jit
+            } else {
+                OutputMode::Binary
+            },
         }
     }
 }

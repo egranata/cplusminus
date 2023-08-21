@@ -29,9 +29,8 @@ func foo() ret int64 {
 
 func main() ret int32 {
     let n = foo();
-    let n = n + g_FreedObjects;
-    assert 129 == n;
-    assert g_FreedObjects > 0;
+    assert n == 128;
+    assert g_FreedObjects == 1;
     return 0;
 }
 

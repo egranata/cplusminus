@@ -264,12 +264,6 @@ pub fn build_dealloc<'a>(
     iw: &CompilerCore<'a>,
     ty: StructType<'a>,
 ) -> FunctionValue<'a> {
-    let g_freed_objects = iw
-        .module
-        .get_global("g_FreedObjects")
-        .unwrap()
-        .as_pointer_value();
-
     let this_type = iw.refcnt.refcount_type.ptr_type(Default::default());
     let func_type = iw
         .builtins
@@ -337,13 +331,6 @@ pub fn build_dealloc<'a>(
     }
 
     builder.build_free(arg0);
-
-    let val_g_freed_objects = builder
-        .build_load(g_freed_objects, "g_FreedObjects")
-        .into_int_value();
-    let val_plus_one =
-        builder.build_int_add(val_g_freed_objects, iw.builtins.one(iw.builtins.int64), "");
-    builder.build_store(g_freed_objects, val_plus_one);
     builder.build_return(None);
 
     func

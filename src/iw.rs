@@ -194,7 +194,7 @@ impl<'a> CompilerCore<'a> {
             .expect("unable to create a target machine");
 
         CompilerCore::fill_globals(&module, context);
-        let refcnt = CompilerCore::fill_refcounting(&module, context, &options);
+        let refcnt = CompilerCore::fill_refcounting(&module, context);
         let metadata = Metadata::build(context);
         let new = Self {
             context,
@@ -286,27 +286,15 @@ impl<'a> CompilerCore<'a> {
         m.add_function("llvm.trap", trap_type, Some(Linkage::Internal));
     }
 
-    fn fill_refcounting(
-        m: &Module<'a>,
-        c: &'a Context,
-        options: &CompilerOptions,
-    ) -> Refcounting<'a> {
+    fn fill_refcounting(m: &Module<'a>, c: &'a Context) -> Refcounting<'a> {
         let i64 = c.i64_type();
 
         CompilerCore::make_global(
             m,
             "g_FreedObjects",
             BasicTypeEnum::IntType(i64),
-            if options.out == OutputMode::Jit {
-                Some(BasicValueEnum::IntValue(i64.const_zero()))
-            } else {
-                None
-            },
-            if options.out == OutputMode::Jit {
-                Linkage::Internal
-            } else {
-                Linkage::External
-            },
+            None,
+            Linkage::AvailableExternally,
             false,
         );
 
