@@ -53,10 +53,13 @@ fn build_refcount_type(c: &Context) -> StructType<'_> {
     let dealloc_f_ty = void
         .fn_type(&[BasicMetadataTypeEnum::PointerType(refcount_ptr)], false)
         .ptr_type(Default::default());
+    let i64 = c.i64_type();
+    let i64_ptr = i64.ptr_type(Default::default());
     let fields = [
-        BasicTypeEnum::IntType(c.i64_type()),
+        BasicTypeEnum::IntType(i64),
         BasicTypeEnum::PointerType(dealloc_f_ty),
         BasicTypeEnum::PointerType(dealloc_f_ty),
+        BasicTypeEnum::PointerType(i64_ptr),
     ];
     __refcount_t.set_body(&fields, false);
     __refcount_t
@@ -132,6 +135,7 @@ pub fn alloc_refcounted_type<'a>(
 
     let sys_dealloc_f = find_sys_dealloc_for_type(iw, ty);
     let usr_dealloc_f = find_usr_dealloc_for_type(iw, ty);
+    let metadata_ptr = iw.metadata.find_metadata_for_type(iw, ty);
     let as_decref = builder.build_pointer_cast(
         malloc,
         iw.refcnt.refcount_type.ptr_type(Default::default()),
@@ -146,6 +150,8 @@ pub fn alloc_refcounted_type<'a>(
         let usr_dealloc_gep = builder.build_struct_gep(as_decref, 2, "").unwrap();
         builder.build_store(usr_dealloc_gep, udf.as_global_value().as_pointer_value());
     }
+    let metadata_gep = builder.build_struct_gep(as_decref, 3, "").unwrap();
+    builder.build_store(metadata_gep, metadata_ptr.unwrap());
 
     malloc
 }
@@ -234,7 +240,10 @@ pub fn insert_getref_if_refcounted<'a>(
     None
 }
 
-fn find_sys_dealloc_for_type<'a>(iw: &CompilerCore<'a>, ty: StructType<'a>) -> FunctionValue<'a> {
+pub fn find_sys_dealloc_for_type<'a>(
+    iw: &CompilerCore<'a>,
+    ty: StructType<'a>,
+) -> FunctionValue<'a> {
     let name = mangle_special_method(
         ty,
         crate::mangler::SpecialMemberFunction::BuiltinDeallocator,

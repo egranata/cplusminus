@@ -495,7 +495,7 @@ impl<'a> TypeBuilder<'a> {
         &self,
         scope: &Scope<'a>,
         sd: &ProperStructDecl,
-    ) -> Option<StructType> {
+    ) -> Option<StructType<'a>> {
         let ms = sd.ms;
         let is_rc = sd.ms == MemoryStrategy::ByReference;
         let is_val = sd.ms == MemoryStrategy::ByValue;
@@ -558,6 +558,14 @@ impl<'a> TypeBuilder<'a> {
                 FieldDecl {
                     loc: sd.loc,
                     name: "__usr_dealloc".to_owned(),
+                    ty: TypeDescriptor::Name("int64".to_owned()),
+                },
+            );
+            sd_fields.insert(
+                3,
+                FieldDecl {
+                    loc: sd.loc,
+                    name: "__metadata_ptr".to_owned(),
                     ty: TypeDescriptor::Name("int64".to_owned()),
                 },
             );

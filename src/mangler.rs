@@ -37,7 +37,7 @@ pub fn mangle_special_method(self_decl: StructType<'_>, func: SpecialMemberFunct
         SpecialMemberFunction::BuiltinDeallocator => "dealloc",
     };
     format!(
-        "{}__{}{}_{}{}",
+        "{}S__{}{}_{}{}",
         CPM_MANGLE_PREFIX,
         type_name.len(),
         type_name,
@@ -48,7 +48,7 @@ pub fn mangle_special_method(self_decl: StructType<'_>, func: SpecialMemberFunct
 
 pub fn mangle_method_name(fd: &FunctionDefinition, self_name: &str) -> String {
     format!(
-        "{}__{}{}__{}{}",
+        "{}F__{}{}__{}{}",
         CPM_MANGLE_PREFIX,
         self_name.len(),
         self_name,
@@ -63,4 +63,10 @@ pub fn mangle_function_name(fd: &FunctionDecl) -> String {
     } else {
         format!("{}_{}{}", CPM_MANGLE_PREFIX, fd.name.len(), fd.name)
     }
+}
+
+pub fn mangle_metadata_symbol(ty: StructType<'_>) -> String {
+    let type_name = ty.get_name().unwrap().to_str().unwrap();
+
+    format!("{}M__{}{}", CPM_MANGLE_PREFIX, type_name.len(), type_name,)
 }

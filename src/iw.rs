@@ -44,7 +44,7 @@ use crate::{
         scope::{Scope, ScopeObject, VarInfo},
         ty::TypeBuilder,
     },
-    codegen::builtins::BuiltinTypes,
+    codegen::{builtins::BuiltinTypes, metadata::Metadata},
     err::{CompilerError, CompilerWarning, Error, Warning},
     parser::cpm::source_file,
 };
@@ -160,6 +160,7 @@ impl CompilerOptions {
 pub struct CompilerCore<'a> {
     pub context: &'a Context,
     pub refcnt: Refcounting<'a>,
+    pub metadata: Metadata<'a>,
     pub module: Rc<Module<'a>>,
     pub target: Rc<Target>,
     pub machine: Rc<TargetMachine>,
@@ -194,9 +195,11 @@ impl<'a> CompilerCore<'a> {
 
         CompilerCore::fill_globals(&module, context);
         let refcnt = CompilerCore::fill_refcounting(&module, context, &options);
+        let metadata = Metadata::build(context);
         let new = Self {
             context,
             refcnt,
+            metadata,
             module,
             target: Rc::from(target),
             machine: Rc::from(tm),
@@ -385,7 +388,9 @@ impl<'a> CompilerCore<'a> {
 
     fn import(&self, id: &crate::ast::ImportDecl, bom: &BillOfMaterials) {
         for sd in &bom.structs {
-            if sd.import(self, &self.globals).is_none() {
+            if let Some(ty) = sd.import(self, &self.globals) {
+                self.metadata.import_metadata_for_type(self, ty);
+            } else {
                 self.diagnostics.borrow_mut().error(CompilerError::new(
                     id.loc,
                     Error::ImportFailed(sd.name.clone()),
@@ -451,6 +456,8 @@ impl<'a> CompilerCore<'a> {
 
     fn declare_pass(&self, tlds: &[TopLevelDeclaration]) -> bool {
         for tld in tlds {
+            let tb: TypeBuilder<'a> = TypeBuilder::new(self.clone());
+
             match &tld.payload {
                 crate::ast::TopLevelDecl::Function(fd) => {
                     let fb = FunctionBuilder::new(self.clone());
@@ -478,10 +485,10 @@ impl<'a> CompilerCore<'a> {
                     }
                 }
                 crate::ast::TopLevelDecl::Structure(sd) => {
-                    let ty = TypeBuilder::new(self.clone());
                     if let Some(psd) = self.fixup_struct_decl(sd) {
-                        if let Some(st) = ty.build_structure_from_decl(&self.globals, &psd) {
-                            if let Some(strct) = ty.struct_by_name(st) {
+                        if let Some(st) = tb.build_structure_from_decl(&self.globals, &psd) {
+                            self.metadata.build_metadata_for_type(self, &tb, st);
+                            if let Some(strct) = tb.struct_by_name(st) {
                                 if psd.export {
                                     let bom_entry = StructBomEntry::new(&strct);
                                     self.bom.borrow_mut().structs.push(bom_entry);
@@ -499,8 +506,7 @@ impl<'a> CompilerCore<'a> {
                     }
                 }
                 crate::ast::TopLevelDecl::Alias(ad) => {
-                    let ty = TypeBuilder::new(self.clone());
-                    if let Some(uty) = ty.alias(&self.globals, &ad.name, &ad.ty) {
+                    if let Some(uty) = tb.alias(&self.globals, &ad.name, &ad.ty) {
                         if ad.export {
                             // we just generated this from a descriptor, assume roundtrip is safe
                             let utd = TypeBuilder::descriptor_by_llvm_type(uty).unwrap();
@@ -514,7 +520,6 @@ impl<'a> CompilerCore<'a> {
                     }
                 }
                 crate::ast::TopLevelDecl::Implementation(id) => {
-                    let tb = TypeBuilder::new(self.clone());
                     if let Some(ty) = tb.llvm_type_by_descriptor(&self.globals, &id.of) {
                         if let Some(sty) = tb.is_val_or_ref_basic_type(ty) {
                             if let Some(struct_info) = tb.struct_by_name(sty) {
@@ -564,45 +569,38 @@ impl<'a> CompilerCore<'a> {
                             gvd.loc,
                             Error::InternalError(String::from("globals must be explicitly typed")),
                         ));
-                    } else {
-                        let tb = TypeBuilder::new(self.clone());
-                        if let Some(var_type) =
-                            tb.llvm_type_by_descriptor(&self.globals, vd.ty.as_ref().unwrap())
-                        {
-                            let global = CompilerCore::make_global(
-                                &self.module,
-                                &vd.name,
-                                var_type,
-                                Some(TypeBuilder::zero_for_type(var_type)),
-                                if gvd.export {
-                                    Linkage::External
-                                } else {
-                                    Linkage::Internal
-                                },
-                                false,
-                            );
-
-                            let vi = VarInfo::new(
-                                tld.loc,
-                                vd.name.clone(),
-                                global.as_pointer_value(),
-                                true,
-                            );
-                            self.globals.insert_variable(&vd.name, vi, true);
-
+                    } else if let Some(var_type) =
+                        tb.llvm_type_by_descriptor(&self.globals, vd.ty.as_ref().unwrap())
+                    {
+                        let global = CompilerCore::make_global(
+                            &self.module,
+                            &vd.name,
+                            var_type,
+                            Some(TypeBuilder::zero_for_type(var_type)),
                             if gvd.export {
-                                let bom_entry = VariableBomEntry::new(
-                                    global.get_name().to_str().unwrap(),
-                                    vd.ty.as_ref().unwrap(),
-                                );
-                                self.bom.borrow_mut().variables.push(bom_entry);
-                            }
-                        } else {
-                            self.diagnostics.borrow_mut().error(CompilerError::new(
-                                gvd.loc,
-                                Error::TypeNotFound(vd.ty.as_ref().unwrap().clone()),
-                            ));
+                                Linkage::External
+                            } else {
+                                Linkage::Internal
+                            },
+                            false,
+                        );
+
+                        let vi =
+                            VarInfo::new(tld.loc, vd.name.clone(), global.as_pointer_value(), true);
+                        self.globals.insert_variable(&vd.name, vi, true);
+
+                        if gvd.export {
+                            let bom_entry = VariableBomEntry::new(
+                                global.get_name().to_str().unwrap(),
+                                vd.ty.as_ref().unwrap(),
+                            );
+                            self.bom.borrow_mut().variables.push(bom_entry);
                         }
+                    } else {
+                        self.diagnostics.borrow_mut().error(CompilerError::new(
+                            gvd.loc,
+                            Error::TypeNotFound(vd.ty.as_ref().unwrap().clone()),
+                        ));
                     }
                 }
             }

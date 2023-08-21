@@ -19,6 +19,7 @@ use std::{
 
 pub mod builtins;
 pub mod callable;
+pub mod metadata;
 pub mod structure;
 
 pub type MutableOf<T> = Rc<RefCell<T>>;
