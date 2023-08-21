@@ -19,9 +19,15 @@ uint64_t g_FreedObjects = 0;
 typedef void(*dealloc_f)(void* object);
 
 typedef struct {
+    const char* name;
+    dealloc_f sys_dealloc;
+} metadata_t;
+
+typedef struct {
     uint64_t rc;
     dealloc_f sys_dealloc;
     dealloc_f usr_dealloc;
+    metadata_t* metadata;
 } refcount_t;
 
 #ifdef INSTRUMENT_REFCOUNT
@@ -58,7 +64,7 @@ PRINT_POINTER;
     if (object) {
         if (object->rc == 0) {
             PRINT("dealloc");
-            (*object->sys_dealloc)(object);
+            (*object->metadata->sys_dealloc)(object);
             g_FreedObjects += 1;
             PRINT_COUNTER;
         } else {
