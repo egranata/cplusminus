@@ -1,0 +1,9 @@
+{
+    "source_files": [
+        "first.cpm",
+        "second.cpm",
+        "third.cpm",
+        "main.cpm"
+    ],
+    "bom": true
+}

@@ -430,14 +430,6 @@ impl<'a> TypeBuilder<'a> {
         let is_rc = sd.ms == MemoryStrategy::ByReference;
         let is_val = sd.ms == MemoryStrategy::ByValue;
 
-        // if is_val && sd.init.is_some() {
-        //     self.iw.error(CompilerError::new(
-        //         sd.init.as_ref().unwrap().loc,
-        //         Error::InitDisallowedInValueTypes,
-        //     ));
-        //     return None;
-        // }
-
         let st_ty = self.iw.context.opaque_struct_type(&sd.name);
 
         let var_ty = if is_rc {
@@ -453,7 +445,7 @@ impl<'a> TypeBuilder<'a> {
             ms,
             fields: Default::default(),
             methods: Default::default(),
-            export: false, // no need to re-export?
+            export: true, // export so impls can be added
         };
         self.iw.add_struct(&cdg_st);
 
@@ -495,22 +487,6 @@ impl<'a> TypeBuilder<'a> {
 
         st_ty.set_body(&fields, false);
         build_dealloc(self, &self.iw, st_ty);
-
-        // if let Some(init) = &sd.init {
-        //     if self.build_init(scope, st_ty, init).is_none() {
-        //         self.iw
-        //             .error(CompilerError::new(init.loc, Error::InvalidExpression));
-        //         return None;
-        //     }
-        // }
-
-        // if let Some(dealloc) = &sd.dealloc {
-        //     if self.build_usr_dealloc(scope, st_ty, dealloc).is_none() {
-        //         self.iw
-        //             .error(CompilerError::new(dealloc.loc, Error::InvalidExpression));
-        //         return None;
-        //     }
-        // }
 
         Some(st_ty)
     }
