@@ -25,8 +25,6 @@ typedef struct {
 
 typedef struct {
     uint64_t rc;
-    dealloc_f sys_dealloc;
-    dealloc_f usr_dealloc;
     metadata_t* metadata;
 } refcount_t;
 

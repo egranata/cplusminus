@@ -549,22 +549,6 @@ impl<'a> TypeBuilder<'a> {
                 1,
                 FieldDecl {
                     loc: sd.loc,
-                    name: "__sys_dealloc".to_owned(),
-                    ty: TypeDescriptor::Name("int64".to_owned()),
-                },
-            );
-            sd_fields.insert(
-                2,
-                FieldDecl {
-                    loc: sd.loc,
-                    name: "__usr_dealloc".to_owned(),
-                    ty: TypeDescriptor::Name("int64".to_owned()),
-                },
-            );
-            sd_fields.insert(
-                3,
-                FieldDecl {
-                    loc: sd.loc,
                     name: "__metadata_ptr".to_owned(),
                     ty: TypeDescriptor::Name("int64".to_owned()),
                 },
@@ -606,17 +590,6 @@ impl<'a> TypeBuilder<'a> {
         }
 
         st_ty.set_body(&fields, false);
-        build_dealloc(self, &self.iw, st_ty);
-
-        if let Some(init) = &sd.init {
-            if self.build_init(scope, st_ty, init, sd.export).is_none() {
-                self.iw
-                    .diagnostics
-                    .borrow_mut()
-                    .error(CompilerError::new(init.loc, Error::InvalidExpression));
-                return None;
-            }
-        }
 
         if let Some(dealloc) = &sd.dealloc {
             if self
@@ -630,6 +603,18 @@ impl<'a> TypeBuilder<'a> {
                 return None;
             }
         }
+
+        if let Some(init) = &sd.init {
+            if self.build_init(scope, st_ty, init, sd.export).is_none() {
+                self.iw
+                    .diagnostics
+                    .borrow_mut()
+                    .error(CompilerError::new(init.loc, Error::InvalidExpression));
+                return None;
+            }
+        }
+
+        build_dealloc(self, &self.iw, st_ty);
 
         Some(st_ty)
     }
