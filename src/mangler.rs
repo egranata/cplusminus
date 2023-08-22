@@ -27,6 +27,20 @@ pub enum SpecialMemberFunction {
 
 const CPM_MANGLE_PREFIX: &str = "__X";
 
+const CPM_SPECIAL_METHOD_PREFIX: char = 'S';
+const CPM_REGULAR_METHOD_PREFIX: char = 'D';
+const CPM_FREE_FUNCTION_PREFIX: char = 'F';
+const CPM_TYPE_METADATA_PREFIX: char = 'M';
+
+fn do_mangle(item_prefix: char, items: &[&str]) -> String {
+    let items: Vec<String> = items
+        .iter()
+        .map(|item| format!("{}{}", item.len(), item))
+        .collect();
+
+    format!("{}{}{}", CPM_MANGLE_PREFIX, item_prefix, items.join(""))
+}
+
 pub fn mangle_special_method(self_decl: StructType<'_>, func: SpecialMemberFunction) -> String {
     assert!(!TypeBuilder::is_tuple_type(self_decl));
 
@@ -36,37 +50,24 @@ pub fn mangle_special_method(self_decl: StructType<'_>, func: SpecialMemberFunct
         SpecialMemberFunction::UserDeallocator => "drop",
         SpecialMemberFunction::BuiltinDeallocator => "dealloc",
     };
-    format!(
-        "{}S__{}{}_{}{}",
-        CPM_MANGLE_PREFIX,
-        type_name.len(),
-        type_name,
-        func_name.len(),
-        func_name
-    )
+
+    do_mangle(CPM_SPECIAL_METHOD_PREFIX, &[type_name, func_name])
 }
 
 pub fn mangle_method_name(fd: &FunctionDefinition, self_name: &str) -> String {
-    format!(
-        "{}F__{}{}__{}{}",
-        CPM_MANGLE_PREFIX,
-        self_name.len(),
-        self_name,
-        fd.decl.name.len(),
-        fd.decl.name
-    )
+    do_mangle(CPM_REGULAR_METHOD_PREFIX, &[self_name, &fd.decl.name])
 }
 
 pub fn mangle_function_name(fd: &FunctionDecl) -> String {
     if fd.name.starts_with(CPM_MANGLE_PREFIX) {
         fd.name.to_string()
     } else {
-        format!("{}_{}{}", CPM_MANGLE_PREFIX, fd.name.len(), fd.name)
+        do_mangle(CPM_FREE_FUNCTION_PREFIX, &[&fd.name])
     }
 }
 
 pub fn mangle_metadata_symbol(ty: StructType<'_>) -> String {
     let type_name = ty.get_name().unwrap().to_str().unwrap();
 
-    format!("{}M__{}{}", CPM_MANGLE_PREFIX, type_name.len(), type_name,)
+    do_mangle(CPM_TYPE_METADATA_PREFIX, &[type_name])
 }
