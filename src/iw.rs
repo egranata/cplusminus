@@ -291,7 +291,7 @@ impl<'a> CompilerCore<'a> {
 
         CompilerCore::make_global(
             m,
-            "g_FreedObjects",
+            "__freed_objects",
             BasicTypeEnum::IntType(i64),
             None,
             Linkage::AvailableExternally,

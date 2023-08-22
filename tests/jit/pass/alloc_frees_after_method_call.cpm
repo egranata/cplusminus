@@ -39,7 +39,7 @@ func blah() ret int64 {
 
 func main() ret int64 {
     assert blah() == 22;
-    assert g_FreedObjects > 0;
+    assert __freed_objects > 0;
     return 0;
 }
 

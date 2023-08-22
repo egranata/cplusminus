@@ -40,6 +40,6 @@ func foo() ret int64 {
 
 func main() ret int64 {
     let n = foo();
-    assert g_FreedObjects >= 1;
+    assert __freed_objects >= 1;
     return 0;
 }

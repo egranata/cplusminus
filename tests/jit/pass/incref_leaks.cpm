@@ -24,6 +24,6 @@ func foo() ret int64 {
 
 func main() ret int64 {
     foo();
-    return g_FreedObjects;
+    return __freed_objects;
 }
 

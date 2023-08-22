@@ -30,7 +30,7 @@ func foo() ret int64 {
 func main() ret int32 {
     let n = foo();
     assert n == 128;
-    assert g_FreedObjects == 1;
+    assert __freed_objects == 1;
     return 0;
 }
 

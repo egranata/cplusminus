@@ -25,7 +25,7 @@ func foo() ret int64 {
 
 func main() ret int32 {
     foo();
-    assert g_FreedObjects > 0;
+    assert __freed_objects > 0;
     return 0;
 }
 

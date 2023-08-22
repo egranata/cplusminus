@@ -14,7 +14,7 @@
 
 #include <inttypes.h>
 
-uint64_t g_FreedObjects = 0;
+uint64_t __freed_objects = 0;
 
 typedef void(*dealloc_f)(void* object);
 
@@ -33,7 +33,7 @@ typedef struct {
 #define PRINT_POINTER printf("%s(%p)\n", __FUNCTION__, object)
 #define PRINT_REFCOUNT printf("%s(%p)->rc == %" PRIu64 "\n", __FUNCTION__, object, object->rc)
 #define PRINT(s) printf("%s(%p): %s\n", __FUNCTION__, object, s)
-#define PRINT_COUNTER printf("%s(%p): g_FreedObjects = %" PRIu64 "\n", __FUNCTION__, object, g_FreedObjects)
+#define PRINT_COUNTER printf("%s(%p): __freed_objects = %" PRIu64 "\n", __FUNCTION__, object, __freed_objects)
 #else
 #define PRINT_POINTER
 #define PRINT_REFCOUNT
@@ -63,7 +63,7 @@ PRINT_POINTER;
         if (object->rc == 0) {
             PRINT("dealloc");
             (*object->metadata->sys_dealloc)(object);
-            g_FreedObjects += 1;
+            __freed_objects += 1;
             PRINT_COUNTER;
         } else {
             object->rc -= 1;
