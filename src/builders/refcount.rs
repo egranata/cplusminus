@@ -73,6 +73,16 @@ fn build_allocref_prototype<'a>(m: &Module<'a>, c: &'a Context) -> FunctionValue
     m.add_function("__allocref_f", allocref_t, Some(Linkage::External))
 }
 
+fn build_deallocref_prototype<'a>(m: &Module<'a>, c: &'a Context) -> FunctionValue<'a> {
+    let void = c.void_type();
+    let int64 = c.i64_type();
+    let refcount_t = int64.ptr_type(Default::default());
+    let arg_ty = BasicMetadataTypeEnum::PointerType(refcount_t);
+    let deallocref_t = void.fn_type(&[arg_ty], false);
+
+    m.add_function("__deallocref_f", deallocref_t, Some(Linkage::External))
+}
+
 fn build_incref_prototype<'a>(m: &Module<'a>, c: &'a Context) -> FunctionValue<'a> {
     let void = c.void_type();
     let int64 = c.i64_type();
@@ -106,6 +116,7 @@ fn build_getref_prototype<'a>(m: &Module<'a>, c: &'a Context) -> FunctionValue<'
 pub struct Refcounting<'a> {
     pub refcount_type: StructType<'a>,
     pub allocref_func: FunctionValue<'a>,
+    pub deallocref_func: FunctionValue<'a>,
     pub incref_func: FunctionValue<'a>,
     pub getref_func: FunctionValue<'a>,
     pub decref_func: FunctionValue<'a>,
@@ -114,6 +125,7 @@ pub struct Refcounting<'a> {
 fn build_refcount_prototye_apis<'a>(m: &Module<'a>, c: &'a Context) -> Refcounting<'a> {
     let __refcount_t = build_refcount_type(c);
     let __allocref_f = build_allocref_prototype(m, c);
+    let __deallocref_f = build_deallocref_prototype(m, c);
     let __incref_f = build_incref_prototype(m, c);
     let __getref_f = build_getref_prototype(m, c);
     let __decref_f = build_decref_prototype(m, c);
@@ -121,6 +133,7 @@ fn build_refcount_prototye_apis<'a>(m: &Module<'a>, c: &'a Context) -> Refcounti
     Refcounting {
         refcount_type: __refcount_t,
         allocref_func: __allocref_f,
+        deallocref_func: __deallocref_f,
         incref_func: __incref_f,
         getref_func: __getref_f,
         decref_func: __decref_f,
@@ -310,7 +323,8 @@ pub fn build_dealloc<'a>(
         }
     }
 
-    builder.build_free(arg0);
+    let arg0_bmve = BasicMetadataValueEnum::PointerValue(arg0);
+    builder.build_call(iw.refcnt.deallocref_func, &[arg0_bmve], "");
     builder.build_return(None);
 
     func

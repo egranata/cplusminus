@@ -57,6 +57,14 @@ refcount_t* __allocref_f(metadata_t* metadata) {
     }
 }
 
+void __deallocref_f(refcount_t* object) {
+PRINT_POINTER;
+    if (object) {
+        memset(object, 0xAA, object->metadata->sz);
+        free(object);
+    }
+}
+
 void __incref_f(refcount_t* object) {
 PRINT_POINTER;
     if (object) {
