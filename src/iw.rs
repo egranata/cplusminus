@@ -418,7 +418,7 @@ impl<'a> CompilerCore<'a> {
             let struct_descriptor = TypeDescriptor::Name(il.struct_name.clone());
             if let Some(bst) = tb.llvm_type_by_descriptor(&self.globals, &struct_descriptor) {
                 if let Some(structure) = tb.is_val_or_ref_basic_type(bst) {
-                    if let Some(sdef) = tb.struct_by_name(structure) {
+                    if let Some(sdef) = tb.structure_by_llvm_type(structure) {
                         if il.import(self, &sdef).is_none() {
                             self.diagnostics.borrow_mut().error(CompilerError::new(
                                 id.loc,
@@ -476,7 +476,7 @@ impl<'a> CompilerCore<'a> {
                     if let Some(psd) = self.fixup_struct_decl(sd) {
                         if let Some(st) = tb.build_structure_from_decl(&self.globals, &psd) {
                             self.metadata.build_metadata_for_type(self, &tb, st);
-                            if let Some(strct) = tb.struct_by_name(st) {
+                            if let Some(strct) = tb.structure_by_llvm_type(st) {
                                 if psd.export {
                                     let bom_entry = StructBomEntry::new(&strct);
                                     self.bom.borrow_mut().structs.push(bom_entry);
@@ -510,7 +510,7 @@ impl<'a> CompilerCore<'a> {
                 crate::ast::TopLevelDecl::Implementation(id) => {
                     if let Some(ty) = tb.llvm_type_by_descriptor(&self.globals, &id.of) {
                         if let Some(sty) = tb.is_val_or_ref_basic_type(ty) {
-                            if let Some(struct_info) = tb.struct_by_name(sty) {
+                            if let Some(struct_info) = tb.structure_by_llvm_type(sty) {
                                 tb.build_impl(&self.globals, &struct_info, id);
                             } else {
                                 self.diagnostics.borrow_mut().error(CompilerError::new(

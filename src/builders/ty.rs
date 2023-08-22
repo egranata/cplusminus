@@ -619,7 +619,7 @@ impl<'a> TypeBuilder<'a> {
         Some(st_ty)
     }
 
-    pub fn struct_by_name(&self, st: StructType) -> Option<Structure<'a>> {
+    pub fn structure_by_llvm_type(&self, st: StructType) -> Option<Structure<'a>> {
         if TypeBuilder::is_tuple_type(st) {
             None
         } else {
@@ -629,7 +629,7 @@ impl<'a> TypeBuilder<'a> {
     }
 
     fn is_refcounted_type(&self, sty: StructType<'a>) -> bool {
-        if let Some(struc) = self.struct_by_name(sty) {
+        if let Some(struc) = self.structure_by_llvm_type(sty) {
             if struc.ms == MemoryStrategy::ByReference {
                 return true;
             }
@@ -639,7 +639,7 @@ impl<'a> TypeBuilder<'a> {
     }
 
     fn is_value_type(&self, sty: StructType<'a>) -> bool {
-        if let Some(struc) = self.struct_by_name(sty) {
+        if let Some(struc) = self.structure_by_llvm_type(sty) {
             if struc.ms == MemoryStrategy::ByValue {
                 return true;
             }

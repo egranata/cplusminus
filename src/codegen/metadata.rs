@@ -70,7 +70,7 @@ impl<'a> Metadata<'a> {
         tb: &TypeBuilder<'x>,
         ty: StructType<'a>,
     ) -> Option<GlobalValue<'a>> {
-        if let Some(sd) = tb.struct_by_name(ty) {
+        if let Some(sd) = tb.structure_by_llvm_type(ty) {
             let sys_dealloc = find_sys_dealloc_for_type(iw, ty)
                 .as_global_value()
                 .as_pointer_value();

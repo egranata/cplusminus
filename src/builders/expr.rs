@@ -304,7 +304,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         node: &Expression,
         init: &Option<AllocInitializer>,
     ) -> Option<BasicValueEnum<'a>> {
-        let struct_def = self.tb.struct_by_name(ty);
+        let struct_def = self.tb.structure_by_llvm_type(ty);
         struct_def.as_ref()?;
         let struct_def = struct_def.unwrap();
         let mut val = ty.const_zero();
@@ -372,7 +372,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         let ret = builder.build_load(temp_pv, "");
         self.exit.decref_on_exit(temp_pv);
 
-        let struct_def = self.tb.struct_by_name(ty);
+        let struct_def = self.tb.structure_by_llvm_type(ty);
         struct_def.as_ref()?;
         let struct_def = struct_def.unwrap();
 
@@ -728,7 +728,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     let mut matched = false;
 
                     if let Some(this_type) = self.tb.is_refcounted_basic_type(this.get_type()) {
-                        if let Some(let_this_decl) = self.tb.struct_by_name(this_type) {
+                        if let Some(let_this_decl) = self.tb.structure_by_llvm_type(this_type) {
                             if let Some(let_method_decl) = let_this_decl.method_by_name(&mc.name) {
                                 method_decl = Some(let_method_decl);
                                 this_arg = Some(BasicMetadataValueEnum::PointerValue(
@@ -744,7 +744,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                             }
                         }
                     } else if let Some(this_type) = self.tb.is_value_basic_type(this.get_type()) {
-                        if let Some(let_this_decl) = self.tb.struct_by_name(this_type) {
+                        if let Some(let_this_decl) = self.tb.structure_by_llvm_type(this_type) {
                             if let Some(let_method_decl) = let_this_decl.method_by_name(&mc.name) {
                                 method_decl = Some(let_method_decl);
                                 this_arg = Some(BasicMetadataValueEnum::StructValue(

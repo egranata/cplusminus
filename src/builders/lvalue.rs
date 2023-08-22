@@ -135,7 +135,7 @@ impl<'a, 'b> LvalueBuilder<'a, 'b> {
                 let pointee_type = pv.ptr.get_type().get_element_type();
 
                 if let Some(struct_type) = tb.is_refcounted_any_type(pointee_type) {
-                    if let Some(struct_def) = tb.struct_by_name(struct_type) {
+                    if let Some(struct_def) = tb.structure_by_llvm_type(struct_type) {
                         if let Some(idx) = struct_def.field_idx_by_name(field_name) {
                             let i32_0 = self.iw.builtins.zero(self.iw.builtins.int32);
                             let i32_idx = self.iw.builtins.n(idx as u64, self.iw.builtins.int32);
@@ -155,7 +155,7 @@ impl<'a, 'b> LvalueBuilder<'a, 'b> {
                         Err(Error::DotAccessInvalid)
                     }
                 } else if let Some(struct_type) = tb.is_value_any_type(pointee_type) {
-                    if let Some(struct_def) = tb.struct_by_name(struct_type) {
+                    if let Some(struct_def) = tb.structure_by_llvm_type(struct_type) {
                         if let Some(idx) = struct_def.field_idx_by_name(field_name) {
                             let gep = builder
                                 .build_struct_gep(pv.ptr, idx as u32, field_name)
