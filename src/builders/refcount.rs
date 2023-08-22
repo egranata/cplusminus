@@ -17,7 +17,9 @@ use inkwell::{
     context::Context,
     module::{Linkage, Module},
     types::{BasicMetadataTypeEnum, BasicTypeEnum, StructType},
-    values::{BasicMetadataValueEnum, BasicValueEnum, FunctionValue, IntValue, PointerValue},
+    values::{
+        AnyValue, BasicMetadataValueEnum, BasicValueEnum, FunctionValue, IntValue, PointerValue,
+    },
 };
 
 use crate::{iw::CompilerCore, mangler::mangle_special_method};
@@ -62,6 +64,15 @@ fn build_refcount_type(c: &Context) -> StructType<'_> {
     __refcount_t
 }
 
+fn build_allocref_prototype<'a>(m: &Module<'a>, c: &'a Context) -> FunctionValue<'a> {
+    let int64 = c.i64_type();
+    let refcount_t = int64.ptr_type(Default::default());
+    let arg_ty = BasicMetadataTypeEnum::PointerType(refcount_t);
+    let allocref_t = refcount_t.fn_type(&[arg_ty], false);
+
+    m.add_function("__allocref_f", allocref_t, Some(Linkage::External))
+}
+
 fn build_incref_prototype<'a>(m: &Module<'a>, c: &'a Context) -> FunctionValue<'a> {
     let void = c.void_type();
     let int64 = c.i64_type();
@@ -94,6 +105,7 @@ fn build_getref_prototype<'a>(m: &Module<'a>, c: &'a Context) -> FunctionValue<'
 #[derive(Clone)]
 pub struct Refcounting<'a> {
     pub refcount_type: StructType<'a>,
+    pub allocref_func: FunctionValue<'a>,
     pub incref_func: FunctionValue<'a>,
     pub getref_func: FunctionValue<'a>,
     pub decref_func: FunctionValue<'a>,
@@ -101,12 +113,14 @@ pub struct Refcounting<'a> {
 
 fn build_refcount_prototye_apis<'a>(m: &Module<'a>, c: &'a Context) -> Refcounting<'a> {
     let __refcount_t = build_refcount_type(c);
+    let __allocref_f = build_allocref_prototype(m, c);
     let __incref_f = build_incref_prototype(m, c);
     let __getref_f = build_getref_prototype(m, c);
     let __decref_f = build_decref_prototype(m, c);
 
     Refcounting {
         refcount_type: __refcount_t,
+        allocref_func: __allocref_f,
         incref_func: __incref_f,
         getref_func: __getref_f,
         decref_func: __decref_f,
@@ -122,24 +136,16 @@ pub fn alloc_refcounted_type<'a>(
     builder: &Builder<'a>,
     ty: StructType<'a>,
 ) -> PointerValue<'a> {
-    let malloc = builder.build_malloc(ty, "").unwrap();
-    let _ = builder.build_memset(
-        malloc,
-        1,
-        iw.builtins.zero(iw.builtins.byte),
-        ty.size_of().unwrap(),
-    );
-    let as_decref = builder.build_pointer_cast(
-        malloc,
-        iw.refcnt.refcount_type.ptr_type(Default::default()),
-        "",
-    );
+    let metadata_ptr = iw.metadata.find_metadata_for_type(iw, ty).unwrap();
+    let metadata_ptr = BasicMetadataValueEnum::PointerValue(metadata_ptr.as_pointer_value());
 
-    let metadata_ptr = iw.metadata.find_metadata_for_type(iw, ty);
-    let metadata_gep = builder.build_struct_gep(as_decref, 1, "").unwrap();
-    builder.build_store(metadata_gep, metadata_ptr.unwrap());
+    let ptr = builder
+        .build_call(iw.refcnt.allocref_func, &[metadata_ptr], "")
+        .as_any_value_enum()
+        .into_pointer_value();
+    let ptr = builder.build_pointer_cast(ptr, ty.ptr_type(Default::default()), "");
 
-    malloc
+    ptr
 }
 
 fn insert_incref_call<'a>(

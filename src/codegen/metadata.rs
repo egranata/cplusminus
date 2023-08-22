@@ -29,13 +29,15 @@ fn build_metadata_type(c: &Context) -> StructType<'_> {
     let metadata_ptr = __metadata_t.ptr_type(Default::default());
     let void = c.void_type();
     let byte = c.i8_type();
+    let i64 = c.i64_type();
     let string = byte.ptr_type(Default::default());
     let dealloc_f_ty = void
         .fn_type(&[BasicMetadataTypeEnum::PointerType(metadata_ptr)], false)
         .ptr_type(Default::default());
     let fields = [
-        BasicTypeEnum::PointerType(string),
+        BasicTypeEnum::PointerType(string),       // type name
         BasicTypeEnum::PointerType(dealloc_f_ty), // sys dealloc calls usr dealloc anyway
+        BasicTypeEnum::IntType(i64),              // size of type
     ];
     __metadata_t.set_body(&fields, false);
     __metadata_t
@@ -75,6 +77,7 @@ impl<'a> Metadata<'a> {
                 .as_global_value()
                 .as_pointer_value();
             let sys_dealloc = sys_dealloc.as_basic_value_enum();
+            let sizeof = ty.size_of().unwrap().as_basic_value_enum();
 
             let builder = iw.context.create_builder();
             let void_f = iw.builtins.void.fn_type(&[], false);
@@ -90,7 +93,9 @@ impl<'a> Metadata<'a> {
             name.set_unnamed_addr(false);
             name.set_unnamed_address(inkwell::values::UnnamedAddress::None);
             let name = name.as_pointer_value().as_basic_value_enum();
-            let value = self.metadata_type.const_named_struct(&[name, sys_dealloc]);
+            let value = self
+                .metadata_type
+                .const_named_struct(&[name, sys_dealloc, sizeof]);
             let symbol_name = mangle_metadata_symbol(ty);
             let meta = iw.module.add_global(self.metadata_type, None, &symbol_name);
             meta.set_initializer(&value);

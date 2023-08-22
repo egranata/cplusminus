@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <stdlib.h>
+#include <string.h>
 #include <inttypes.h>
 
 uint64_t __freed_objects = 0;
@@ -21,6 +23,7 @@ typedef void(*dealloc_f)(void* object);
 typedef struct {
     const char* name;
     dealloc_f sys_dealloc;
+    uint64_t sz;
 } metadata_t;
 
 typedef struct {
@@ -40,6 +43,19 @@ typedef struct {
 #define PRINT(s)
 #define PRINT_COUNTER
 #endif
+
+refcount_t* __allocref_f(metadata_t* metadata) {
+    if (metadata) {
+        refcount_t* object = malloc((size_t)metadata->sz);
+        if (object) {
+            memset(object, 0, (size_t)metadata->sz);
+            object->metadata = metadata;
+        }
+        return object;
+    } else {
+        return (refcount_t*)0;
+    }
+}
 
 void __incref_f(refcount_t* object) {
 PRINT_POINTER;
