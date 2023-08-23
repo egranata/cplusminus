@@ -13,8 +13,8 @@
 (* limitations under the License. *)
 
 func main() ret int64 {
-    var b0101 = 0b0101;
-    var x4 = 0x4;
-    var o1 = 0o1;
+    let b0101 = 0b0101;
+    let x4 = 0x4;
+    let o1 = 0o1;
     return b0101 - x4 - o1;
 }

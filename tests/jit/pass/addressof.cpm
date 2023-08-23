@@ -13,8 +13,8 @@
 (* limitations under the License. *)
         
 func main() ret int32 {
-    var num = 123;
-    var addr = &num;
+    let num = 123;
+    let addr = &num;
     assert (addr as int64) != 0;
 
     return 0;

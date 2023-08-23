@@ -24,7 +24,7 @@ impl pair {
 }
 
 func foo() ret int64 {
-    var p = alloc pair;
+    let p = alloc pair;
     return p->foo();
 }
 

@@ -13,8 +13,8 @@
 (* limitations under the License. *)
         
 func main() ret int32 {
-    var str = "Abc";
-    var chr = *str;
+    let str = "Abc";
+    let chr = *str;
     assert (chr as int64) == 65;
     return 0;
 }

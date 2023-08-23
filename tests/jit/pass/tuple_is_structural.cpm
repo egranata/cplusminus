@@ -16,7 +16,7 @@ type T = {int32, int32};
 
 func main() ret int64 {
     var a: T = {3 as int32, 4 as int32};
-    var b = {5 as int32, 2 as int32};
+    let b = {5 as int32, 2 as int32};
 
     a = b;
     return (a[0] - a[1] - a[1]) as int64 - 1;

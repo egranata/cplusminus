@@ -19,6 +19,6 @@ ref type foo {
 func main() ret int64 {
     let x = 0;
     return x;
-    var f = alloc foo{x: 12};
+    let f = alloc foo{x: 12};
     return 1;
 }

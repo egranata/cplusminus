@@ -18,12 +18,13 @@ type pair {
 }
 
 func foo() ret int64 {
-    var p = incref alloc pair;
+    let p = incref alloc pair;
     return 0;
 }
 
 func main() ret int64 {
     foo();
-    return __freed_objects;
+    assert __freed_objects == 0;
+    return 0;
 }
 

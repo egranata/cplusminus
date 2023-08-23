@@ -13,9 +13,9 @@
 (* limitations under the License. *)
         
 func main() ret int64 {
-    var a = "hello world";
-    var b = a as int64;
-    var c = b as *byte;
+    let a = "hello world";
+    let b = a as int64;
+    let c = b as *byte;
     assert c != 0;
     return 0;
 }

@@ -22,7 +22,7 @@ func bar(x: pair) ret int64 {
 }
 
 func foo() ret int64 {
-    var p = alloc pair;
+    let p = alloc pair;
     return bar(p);
 }
 
