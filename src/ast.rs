@@ -342,6 +342,19 @@ impl Expr {
 }
 
 #[derive(Clone, Debug)]
+pub struct VarDeclContent {
+    pub name: String,
+    pub ty: Option<TypeDescriptor>,
+    pub val: Option<Expression>,
+}
+
+#[derive(Clone, Debug)]
+pub struct MultiVarDecl {
+    pub rw: bool,
+    pub decls: Vec<VarDeclContent>,
+}
+
+#[derive(Clone, Debug)]
 pub struct VarDecl {
     pub name: String,
     pub ty: Option<TypeDescriptor>,
@@ -371,7 +384,7 @@ pub struct DoWhileStmt {
 
 #[derive(Clone, Debug)]
 pub enum Stmt {
-    VarDecl(VarDecl),
+    VarDecl(MultiVarDecl),
     Return(Option<Expression>),
     Assignment(Lvalue, Box<Expression>),
     If(IfStatement),

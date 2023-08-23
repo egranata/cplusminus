@@ -268,88 +268,92 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                 }
             }
             VarDecl(var) => {
-                if var.ty.is_none() && var.val.is_none() {
-                    self.iw.diagnostics.borrow_mut().error(CompilerError::new(
-                        node.loc,
-                        Error::UnresolvedVariableDeclaration,
-                    ));
-                    return;
-                }
-
-                let value = if let Some(val) = &var.val {
-                    let type_hint = if let Some(td) = var.ty.as_ref() {
-                        self.tb.llvm_type_by_descriptor(locals, td)
-                    } else {
-                        None
-                    };
-                    let maybe_val = self.eb.build_expr(builder, fd, val, locals, type_hint);
-                    if let Some(v) = maybe_val {
-                        v
-                    } else {
-                        self.iw
-                            .diagnostics
-                            .borrow_mut()
-                            .error(CompilerError::new(val.loc, Error::InvalidExpression));
-                        return;
-                    }
-                } else if !var.rw {
-                    self.iw
-                        .diagnostics
-                        .borrow_mut()
-                        .error(CompilerError::new(node.loc, Error::LetMustBeInitialized));
-                    return;
-                } else if let Some(decl_ty) = self
-                    .tb
-                    .llvm_type_by_descriptor(locals, var.ty.as_ref().unwrap())
-                {
-                    decl_ty.const_zero()
-                } else {
-                    self.iw.diagnostics.borrow_mut().error(CompilerError::new(
-                        node.loc,
-                        Error::TypeNotFound(var.ty.clone().unwrap()),
-                    ));
-                    return;
-                };
-
-                let decl_ty = if let Some(var_ty) = &var.ty {
-                    let maybe_type = self.tb.llvm_type_by_descriptor(locals, var_ty);
-                    if let Some(t) = maybe_type {
-                        t
-                    } else {
+                let rw = var.rw;
+                for var in &var.decls {
+                    if var.ty.is_none() && var.val.is_none() {
                         self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                             node.loc,
-                            Error::TypeNotFound(var_ty.clone()),
+                            Error::UnresolvedVariableDeclaration,
                         ));
                         return;
                     }
-                } else {
-                    value.get_type()
-                };
 
-                if value.get_type() != decl_ty {
-                    let val_ty_td = TypeBuilder::descriptor_by_llvm_type(value.get_type()).unwrap();
-                    let decl_ty_td = TypeBuilder::descriptor_by_llvm_type(decl_ty).unwrap();
-                    self.iw.diagnostics.borrow_mut().error(CompilerError::new(
-                        node.loc,
-                        Error::InvalidTypeSpecifier(decl_ty_td, val_ty_td),
-                    ));
-                    return;
+                    let value = if let Some(val) = &var.val {
+                        let type_hint = if let Some(td) = var.ty.as_ref() {
+                            self.tb.llvm_type_by_descriptor(locals, td)
+                        } else {
+                            None
+                        };
+                        let maybe_val = self.eb.build_expr(builder, fd, val, locals, type_hint);
+                        if let Some(v) = maybe_val {
+                            v
+                        } else {
+                            self.iw
+                                .diagnostics
+                                .borrow_mut()
+                                .error(CompilerError::new(val.loc, Error::InvalidExpression));
+                            return;
+                        }
+                    } else if !rw {
+                        self.iw
+                            .diagnostics
+                            .borrow_mut()
+                            .error(CompilerError::new(node.loc, Error::LetMustBeInitialized));
+                        return;
+                    } else if let Some(decl_ty) = self
+                        .tb
+                        .llvm_type_by_descriptor(locals, var.ty.as_ref().unwrap())
+                    {
+                        decl_ty.const_zero()
+                    } else {
+                        self.iw.diagnostics.borrow_mut().error(CompilerError::new(
+                            node.loc,
+                            Error::TypeNotFound(var.ty.clone().unwrap()),
+                        ));
+                        return;
+                    };
+
+                    let decl_ty = if let Some(var_ty) = &var.ty {
+                        let maybe_type = self.tb.llvm_type_by_descriptor(locals, var_ty);
+                        if let Some(t) = maybe_type {
+                            t
+                        } else {
+                            self.iw.diagnostics.borrow_mut().error(CompilerError::new(
+                                node.loc,
+                                Error::TypeNotFound(var_ty.clone()),
+                            ));
+                            return;
+                        }
+                    } else {
+                        value.get_type()
+                    };
+
+                    if value.get_type() != decl_ty {
+                        let val_ty_td =
+                            TypeBuilder::descriptor_by_llvm_type(value.get_type()).unwrap();
+                        let decl_ty_td = TypeBuilder::descriptor_by_llvm_type(decl_ty).unwrap();
+                        self.iw.diagnostics.borrow_mut().error(CompilerError::new(
+                            node.loc,
+                            Error::InvalidTypeSpecifier(decl_ty_td, val_ty_td),
+                        ));
+                        return;
+                    }
+
+                    let alloca = self.exit.create_alloca(
+                        builder,
+                        decl_ty,
+                        Some(&var.name),
+                        Some(crate::builders::func::AllocaInitialValue::Zero),
+                    );
+                    builder.build_store(alloca, value);
+                    insert_incref_if_refcounted(&self.iw, builder, value);
+                    self.exit.decref_on_exit(alloca);
+                    locals.insert_variable(
+                        &var.name,
+                        VarInfo::new(node.loc, var.name.clone(), alloca, rw),
+                        true,
+                    );
                 }
-
-                let alloca = self.exit.create_alloca(
-                    builder,
-                    decl_ty,
-                    Some(&var.name),
-                    Some(crate::builders::func::AllocaInitialValue::Zero),
-                );
-                builder.build_store(alloca, value);
-                insert_incref_if_refcounted(&self.iw, builder, value);
-                self.exit.decref_on_exit(alloca);
-                locals.insert_variable(
-                    &var.name,
-                    VarInfo::new(node.loc, var.name.clone(), alloca, var.rw),
-                    true,
-                );
             }
             Expression(e) => {
                 if let Some(obj) = self.eb.build_expr(builder, fd, e.as_ref(), locals, None) {

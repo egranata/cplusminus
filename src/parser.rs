@@ -215,13 +215,23 @@ peg::parser! {
         rule eq_assignment() -> Expression =
         _ "=" _ e:top_level_expr() _ { e }
 
+        rule var_decl_content() -> VarDeclContent =
+        _ i:ident() _ ty:type_decl()? _ e:eq_assignment()? _ {
+            VarDeclContent{name:i,ty,val:e}
+        }
+
+        rule multi_var_decl() -> MultiVarDecl =
+        rw:var_decl_rw_ro() decls:var_decl_content()++"," dummy_comma() {
+            MultiVarDecl {rw,decls}
+        }
+
         rule var_decl_body() -> VarDecl =
         rw:var_decl_rw_ro() __() i:ident() _ ty:type_decl()? _ e:eq_assignment()? {
             VarDecl{name:i,ty,val:e,rw}
         }
 
         rule var_decl_stmt() -> Statement =
-        start:position!() vd:var_decl_body() _ end:position!() {
+        start:position!() vd:multi_var_decl() _ end:position!() {
             Statement { loc:TokenSpan{start,end}, payload:Stmt::VarDecl(vd) }
         }
 
