@@ -442,14 +442,14 @@ pub enum TopLevelDecl {
 }
 
 impl TopLevelDecl {
-    pub fn name(&self) -> Option<String> {
+    pub fn names(&self) -> Vec<String> {
         match self {
-            TopLevelDecl::Function(f) => Some(f.decl.name.clone()),
-            TopLevelDecl::Extern(e) => Some(e.decl.name.clone()),
-            TopLevelDecl::Structure(s) => Some(s.name.clone()),
-            TopLevelDecl::Alias(a) => Some(a.name.clone()),
-            TopLevelDecl::Variable(v) => Some(v.decl.name.clone()),
-            TopLevelDecl::Implementation(..) | TopLevelDecl::Import(..) => None,
+            TopLevelDecl::Function(f) => vec![f.decl.name.clone()],
+            TopLevelDecl::Extern(e) => vec![e.decl.name.clone()],
+            TopLevelDecl::Structure(s) => vec![s.name.clone()],
+            TopLevelDecl::Alias(a) => vec![a.name.clone()],
+            TopLevelDecl::Variable(v) => vec![v.decl.name.clone()],
+            TopLevelDecl::Implementation(..) | TopLevelDecl::Import(..) => vec![],
         }
     }
 }
@@ -461,8 +461,8 @@ pub struct TopLevelDeclaration {
 }
 
 impl TopLevelDeclaration {
-    pub fn name(&self) -> Option<String> {
-        self.payload.name()
+    pub fn names(&self) -> Vec<String> {
+        self.payload.names()
     }
 
     pub fn function(l: TokenSpan, f: FunctionDefinition) -> Self {

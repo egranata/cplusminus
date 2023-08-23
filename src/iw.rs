@@ -348,30 +348,29 @@ impl<'a> CompilerCore<'a> {
     }
 
     fn check_ast_decl(&self, tld: &TopLevelDeclaration) -> bool {
-        let allowed = tld.name().map_or(true, |name| !name.starts_with("__"));
-        if !allowed {
+        let binding = &tld.names();
+        let forbidden = binding.iter().find(|item| item.starts_with("__"));
+        if let Some(name) = forbidden {
             self.diagnostics.borrow_mut().error(CompilerError::new(
                 tld.loc,
-                Error::ReservedIdentifier(tld.name().unwrap()),
+                Error::ReservedIdentifier(name.to_string()),
             ));
-            false
-        } else {
-            if let TopLevelDecl::Structure(st) = &tld.payload {
-                for entry in &st.entries {
-                    if let crate::ast::StructEntryDecl::Field(f) = entry {
-                        if f.name.starts_with("__") {
-                            self.diagnostics.borrow_mut().error(CompilerError::new(
-                                f.loc,
-                                Error::ReservedIdentifier(f.name.clone()),
-                            ));
-                            return false;
-                        }
+            return false;
+        } else if let TopLevelDecl::Structure(st) = &tld.payload {
+            for entry in &st.entries {
+                if let crate::ast::StructEntryDecl::Field(f) = entry {
+                    if f.name.starts_with("__") {
+                        self.diagnostics.borrow_mut().error(CompilerError::new(
+                            f.loc,
+                            Error::ReservedIdentifier(f.name.clone()),
+                        ));
+                        return false;
                     }
                 }
             }
-
-            allowed
         }
+
+        true
     }
 
     fn import(&self, id: &crate::ast::ImportDecl, bom: &BillOfMaterials) {
