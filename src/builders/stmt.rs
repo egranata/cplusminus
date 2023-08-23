@@ -540,16 +540,9 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
             Assert(expr) => {
                 if let Some(cond) = self.eb.build_expr(builder, fd, expr.as_ref(), locals, None) {
                     if TypeBuilder::is_boolean_basic(cond.get_type()) {
-                        let bb_check = self.iw.context.append_basic_block(func, "check");
-                        let bb_trap = self.iw.context.append_basic_block(func, "do_trap");
-                        let bb_ok = self.iw.context.append_basic_block(func, "ok");
-                        builder.build_unconditional_branch(bb_check);
-                        builder.position_at_end(bb_check);
-                        builder.build_conditional_branch(cond.into_int_value(), bb_ok, bb_trap);
-                        builder.position_at_end(bb_trap);
-                        let llvmtrap = self.iw.module.get_function("llvm.trap");
-                        builder.build_call(llvmtrap.unwrap(), &[], "");
-                        builder.position_at_end(bb_ok);
+                        self.iw
+                            .assertion
+                            .build_assertion(&self.iw, builder, expr.loc, cond);
                     } else {
                         self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                             expr.loc,

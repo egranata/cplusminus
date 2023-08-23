@@ -12,16 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{
-    cell::{OnceCell, RefCell},
-    rc::Rc,
-};
+#include <inttypes.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <stdio.h>
 
-pub mod assertion;
-pub mod builtins;
-pub mod callable;
-pub mod metadata;
-pub mod structure;
+static void fail() {
+#if __has_builtin(__builtin_trap)
+  __builtin_trap();
+#else
+  abort();
+#endif
+}
 
-pub type MutableOf<T> = Rc<RefCell<T>>;
-pub type OnceOf<T> = Rc<OnceCell<T>>;
+void __assert_f(uint32_t condition, const char* file, uint32_t line) {
+    if (condition == 0) {
+        fprintf(stderr, "error: assertion failed at %s:%" PRIu32 "\n", file, line);
+        fail();
+    }
+}

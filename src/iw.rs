@@ -44,7 +44,7 @@ use crate::{
         scope::{Scope, ScopeObject, VarInfo},
         ty::TypeBuilder,
     },
-    codegen::{builtins::BuiltinTypes, metadata::Metadata},
+    codegen::{assertion::Assertion, builtins::BuiltinTypes, metadata::Metadata},
     err::{CompilerError, CompilerWarning, Error, Warning},
     parser::cpm::source_file,
 };
@@ -161,6 +161,7 @@ pub struct CompilerCore<'a> {
     pub context: &'a Context,
     pub refcnt: Refcounting<'a>,
     pub metadata: Metadata<'a>,
+    pub assertion: Assertion<'a>,
     pub module: Rc<Module<'a>>,
     pub target: Rc<Target>,
     pub machine: Rc<TargetMachine>,
@@ -196,10 +197,12 @@ impl<'a> CompilerCore<'a> {
         CompilerCore::fill_globals(&module, context);
         let refcnt = CompilerCore::fill_refcounting(&module, context);
         let metadata = Metadata::build(context);
+        let assertion = Assertion::build(context, &module);
         let new = Self {
             context,
             refcnt,
             metadata,
+            assertion,
             module,
             target: Rc::from(target),
             machine: Rc::from(tm),

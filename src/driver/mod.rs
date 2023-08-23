@@ -189,6 +189,7 @@ fn run_multi_jit_impl(
 }
 
 const REFCOUNT_SOURCE_CODE: &str = include_str!("../lib/refcount.c");
+const ASSERT_SOURCE_CODE: &str = include_str!("../lib/assert.c");
 
 pub fn build_aout(
     sources: &[PathBuf],
@@ -237,6 +238,13 @@ pub fn build_aout(
         .expect("<io error>");
     write!(refcount_tmp_file.as_file(), "{}", REFCOUNT_SOURCE_CODE).expect("<io error>");
     object_files.push(refcount_tmp_file.path().to_path_buf());
+
+    let assert_tmp_file = tempfile::Builder::new()
+        .suffix(".c")
+        .tempfile()
+        .expect("<io error>");
+    write!(assert_tmp_file.as_file(), "{}", ASSERT_SOURCE_CODE).expect("<io error>");
+    object_files.push(assert_tmp_file.path().to_path_buf());
 
     let mut clang = Command::new("clang");
     for objf in &object_files {
