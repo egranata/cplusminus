@@ -16,18 +16,12 @@ use std::fmt::Display;
 
 #[derive(Clone, Debug)]
 enum TestFailure {
-    CompileFailure(crate::driver::CompilerDiagnostics),
-    RuntimeNoSpawn(String),
-    RuntimeNoExitCode,
     RuntimeJit(String),
 }
 
 impl Display for TestFailure {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TestFailure::CompileFailure(_) => write!(f, "compiler error"),
-            TestFailure::RuntimeNoSpawn(err) => write!(f, "program execution failed: {err}"),
-            TestFailure::RuntimeNoExitCode => write!(f, "program did not exit with a result"),
             TestFailure::RuntimeJit(err) => write!(f, "LLVM JIT error: {err}"),
         }
     }
@@ -45,11 +39,38 @@ impl Drop for FileToBeDropped {
 
 #[cfg(test)]
 mod driver_tests {
-    use std::path::PathBuf;
+    use std::{io::ErrorKind, path::PathBuf, process::Stdio};
 
     use crate::iw::CompilerOptions;
 
-    use super::TestFailure;
+    #[derive(Clone, Debug)]
+    struct RuntimeExit {
+        pub ec: Option<i32>,
+        pub stdout: String,
+        pub stderr: String,
+    }
+
+    #[derive(Clone, Debug)]
+    enum TestOutcome {
+        CompilationFailure,
+        RuntimeError(ErrorKind),
+        RuntimeComplete(RuntimeExit),
+    }
+
+    #[derive(Clone, Debug)]
+    struct DriverTestResult {
+        pub diags: crate::driver::CompilerDiagnostics,
+        pub outcome: TestOutcome,
+    }
+
+    impl DriverTestResult {
+        pub fn new(diags: &crate::driver::CompilerDiagnostics, outcome: TestOutcome) -> Self {
+            Self {
+                diags: diags.clone(),
+                outcome,
+            }
+        }
+    }
 
     fn remove_stale_files(dest: &PathBuf) {
         let container = dest.parent().unwrap().to_path_buf();
@@ -66,46 +87,41 @@ mod driver_tests {
         sources: &[PathBuf],
         target: &PathBuf,
         options: &CompilerOptions,
-    ) -> Result<(i32, crate::driver::CompilerDiagnostics), TestFailure> {
+    ) -> DriverTestResult {
         let cmplr = crate::driver::build_aout(sources, target, options.clone());
         if let Err(_) = cmplr.result {
-            return Err(TestFailure::CompileFailure(cmplr.diagnostics));
+            return DriverTestResult::new(&cmplr.diagnostics, TestOutcome::CompilationFailure);
         }
         let mut cmd = std::process::Command::new(target);
+        cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
         match cmd.spawn() {
-            Ok(mut child) => match child.wait() {
-                Ok(exit) => match exit.code() {
-                    Some(code) => return Ok((code, cmplr.diagnostics)),
-                    None => return Err(TestFailure::RuntimeNoExitCode),
-                },
-                Err(err) => {
-                    return Err(TestFailure::RuntimeNoSpawn(err.to_string()));
+            Ok(child) => {
+                let result = child.wait_with_output();
+                match result {
+                    Ok(output) => {
+                        let stdout = String::from_utf8(output.stdout).unwrap();
+                        let stderr = String::from_utf8(output.stderr).unwrap();
+                        let ec = output.status.code();
+                        let re = RuntimeExit { ec, stdout, stderr };
+                        return DriverTestResult::new(
+                            &cmplr.diagnostics,
+                            TestOutcome::RuntimeComplete(re),
+                        );
+                    }
+                    Err(err) => {
+                        return DriverTestResult::new(
+                            &cmplr.diagnostics,
+                            TestOutcome::RuntimeError(err.kind()),
+                        );
+                    }
                 }
-            },
+            }
             Err(err) => {
-                return Err(TestFailure::RuntimeNoSpawn(err.to_string()));
+                return DriverTestResult::new(
+                    &cmplr.diagnostics,
+                    TestOutcome::RuntimeError(err.kind()),
+                );
             }
-        }
-    }
-
-    fn expect_driver_pass(
-        sources: &[PathBuf],
-        target: &PathBuf,
-        options: &CompilerOptions,
-        diags: &Option<Vec<String>>,
-    ) {
-        let result = compile_run_temp(sources, target, options);
-        if result.is_ok() {
-            let (rc, compiler_diagnostics) = result.unwrap();
-            assert!(rc == 0);
-            if let Some(diags) = diags {
-                for diag in diags {
-                    assert!(find_string_in_map(&diag, &compiler_diagnostics));
-                }
-            }
-        } else {
-            eprintln!("test failure: {}", result.unwrap_err());
-            assert!(false);
         }
     }
 
@@ -119,24 +135,98 @@ mod driver_tests {
         return false;
     }
 
+    fn match_diags(expected_diags: &[String], actual_result: &DriverTestResult) {
+        for diag in expected_diags {
+            assert!(find_string_in_map(diag, &actual_result.diags));
+        }
+    }
+
+    fn match_stdout_stderr(
+        expected_stdout: &[String],
+        expected_stderr: &[String],
+        actual_result: &RuntimeExit,
+        matching: bool,
+    ) {
+        for stdout in expected_stdout {
+            assert!(actual_result.stdout.contains(stdout) == matching);
+        }
+        for stderr in expected_stderr {
+            assert!(actual_result.stderr.contains(stderr) == matching);
+        }
+    }
+
+    fn expect_driver_pass(
+        sources: &[PathBuf],
+        target: &PathBuf,
+        options: &CompilerOptions,
+        diags: &Option<Vec<String>>,
+        stdout_match: &Option<Vec<String>>,
+        stderr_match: &Option<Vec<String>>,
+    ) {
+        let run_result = compile_run_temp(sources, target, options);
+        if let Some(expected_diags) = diags {
+            match_diags(expected_diags, &run_result);
+        }
+        match run_result.outcome {
+            TestOutcome::CompilationFailure | TestOutcome::RuntimeError(..) => {
+                eprintln!("test failure: {:#?}", run_result.outcome);
+                assert!(false);
+            }
+            TestOutcome::RuntimeComplete(out) => {
+                assert!(out.ec.is_some());
+                assert!(out.ec.unwrap() == 0);
+
+                match_stdout_stderr(
+                    if stdout_match.is_some() {
+                        stdout_match.as_ref().unwrap()
+                    } else {
+                        &[]
+                    },
+                    if stderr_match.is_some() {
+                        stderr_match.as_ref().unwrap()
+                    } else {
+                        &[]
+                    },
+                    &out,
+                    true,
+                );
+            }
+        }
+    }
+
     #[allow(dead_code)]
     fn expect_driver_fail(
         sources: &[PathBuf],
         target: &PathBuf,
         options: &CompilerOptions,
         diags: &Option<Vec<String>>,
+        stdout_match: &Option<Vec<String>>,
+        stderr_match: &Option<Vec<String>>,
     ) {
-        let result = compile_run_temp(sources, target, options);
-        assert!(result.is_err());
-        match result.unwrap_err() {
-            TestFailure::CompileFailure(compiler_diagnostics) => {
-                if let Some(diags) = diags {
-                    for diag in diags {
-                        assert!(find_string_in_map(&diag, &compiler_diagnostics));
-                    }
-                }
+        let run_result = compile_run_temp(sources, target, options);
+        if let Some(expected_diags) = diags {
+            match_diags(expected_diags, &run_result);
+        }
+        match run_result.outcome {
+            TestOutcome::CompilationFailure | TestOutcome::RuntimeError(..) => {}
+            TestOutcome::RuntimeComplete(out) => {
+                assert!(out.ec.is_none() || out.ec.unwrap() != 0);
+
+                match_stdout_stderr(
+                    if stdout_match.is_some() {
+                        stdout_match.as_ref().unwrap()
+                    } else {
+                        &[]
+                    },
+                    if stderr_match.is_some() {
+                        stderr_match.as_ref().unwrap()
+                    } else {
+                        &[]
+                    },
+                    &out,
+                    true,
+                );
             }
-            _ => {}
         }
     }
 

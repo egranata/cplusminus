@@ -63,6 +63,28 @@ struct DriverTestConfig {
     source_files: Vec<String>,
     bom: bool,
     diags: Option<Vec<String>>,
+    stdout_match: Option<Vec<String>>,
+    stderr_match: Option<Vec<String>>,
+}
+
+fn opt_vec_to_opt_str(inp: &Option<Vec<String>>) -> Option<String> {
+    inp.as_ref().map(|x| {
+        x.iter()
+            .map(|x| format!("\"{x}\".to_string()"))
+            .collect::<Vec<String>>()
+            .join(",")
+    })
+}
+
+fn opt_str_to_opt_vec(os: &Option<String>, name: &str) -> String {
+    format!(
+        "     let {name}: Option<Vec<String>> = {};\n",
+        if let Some(s) = os {
+            format!("Some(vec![{s}])")
+        } else {
+            String::from("None")
+        }
+    )
 }
 
 #[allow(clippy::format_in_format_args)]
@@ -94,13 +116,10 @@ fn build_driver_test_code(func_to_call: &str, indir: &Path, outfile_path: &Path)
         }
         let test_json_str = std::fs::read_to_string(test_json_path).unwrap();
         let test_descriptor: DriverTestConfig = serde_json::from_str(&test_json_str).unwrap();
-        let diags = test_descriptor.diags.map(|diags| {
-            diags
-                .iter()
-                .map(|x| format!("\"{x}\".to_string()"))
-                .collect::<Vec<String>>()
-                .join(",")
-        });
+        let diags = opt_vec_to_opt_str(&test_descriptor.diags);
+        let stdout_match = opt_vec_to_opt_str(&test_descriptor.stdout_match);
+        let stderr_match = opt_vec_to_opt_str(&test_descriptor.stderr_match);
+
         let sources: Vec<PathBuf> = test_descriptor
             .source_files
             .iter()
@@ -124,21 +143,19 @@ fn build_driver_test_code(func_to_call: &str, indir: &Path, outfile_path: &Path)
             format!("    let sources: Vec<PathBuf> = vec![{sources}];\n")
         )
         .expect("<io error>");
-        if let Some(d) = diags {
-            write!(
-                outfile_handle,
-                "{}",
-                format!("    let diags: Option<Vec<String>> = Some(vec![{d}]);\n")
-            )
-            .expect("<io error>");
-        } else {
-            write!(
-                outfile_handle,
-                "{}",
-                format!("    let diags: Option<Vec<String>> = None;\n")
-            )
-            .expect("<io error>");
-        }
+        write!(outfile_handle, "{}", opt_str_to_opt_vec(&diags, "diags")).expect("<io error>");
+        write!(
+            outfile_handle,
+            "{}",
+            opt_str_to_opt_vec(&stdout_match, "stdout_match")
+        )
+        .expect("<io error>");
+        write!(
+            outfile_handle,
+            "{}",
+            opt_str_to_opt_vec(&stderr_match, "stderr_match")
+        )
+        .expect("<io error>");
         write!(
             outfile_handle,
             "{}",
@@ -155,7 +172,9 @@ fn build_driver_test_code(func_to_call: &str, indir: &Path, outfile_path: &Path)
         write!(
             outfile_handle,
             "{}",
-            format!("    {func_to_call}(&sources, &dest, &opts, &diags);")
+            format!(
+                "    {func_to_call}(&sources, &dest, &opts, &diags, &stdout_match, &stderr_match);"
+            )
         )
         .expect("<io error>");
         write!(
@@ -168,7 +187,9 @@ fn build_driver_test_code(func_to_call: &str, indir: &Path, outfile_path: &Path)
         write!(
             outfile_handle,
             "{}",
-            format!("    {func_to_call}(&sources, &dest, &opts, &diags);")
+            format!(
+                "    {func_to_call}(&sources, &dest, &opts, &diags, &stdout_match, &stderr_match);"
+            )
         )
         .expect("<io error>");
         write!(

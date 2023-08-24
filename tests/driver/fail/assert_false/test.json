@@ -2,5 +2,9 @@
     "source_files": [
         "test.cpm"
     ],
-    "bom": false
+    "bom": false,
+    "stderr_match": [
+        "error: assertion failed at",
+        "test.cpm:16"
+    ]
 }
