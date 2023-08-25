@@ -11,14 +11,19 @@
 (* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. *)
 (* See the License for the specific language governing permissions and *)
 (* limitations under the License. *)
-
-ref type ord_pair {
-    max: int64,
-    min: int64,
+        
+val type pair {
+    x: int32,
+    y: int64,
+    init(a: int32, b: int64) {
+        self.x = a;
+        self.y = b;
+    }
 }
 
-func main() ret int64 {
-    let p1 = alloc ord_pair(3);
-    let p2 = alloc ord_pair(2,5);
-    return p1.max + p2.min;
+func main() ret int32 {
+    let p = alloc pair(12,13);
+    assert p.x == 12;
+    assert p.y == 13;
+    return 0;
 }

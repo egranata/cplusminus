@@ -20,6 +20,8 @@ use inkwell::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::ast::TypeDescriptor;
+
 use super::MutableOf;
 
 #[derive(Clone, Debug)]
@@ -96,5 +98,14 @@ impl<'a> Structure<'a> {
             }
         }
         None
+    }
+
+    pub fn self_descriptor(&self) -> TypeDescriptor {
+        let self_td = TypeDescriptor::Name(self.name.clone());
+        if self.ms == MemoryStrategy::ByValue {
+            TypeDescriptor::Pointer(Box::new(self_td))
+        } else {
+            self_td
+        }
     }
 }

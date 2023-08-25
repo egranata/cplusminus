@@ -12,22 +12,18 @@
 (* See the License for the specific language governing permissions and *)
 (* limitations under the License. *)
 
-ref type ord_pair {
+ref type ref_pair {
     max: int64,
     min: int64,
-    init(x: int64, y: int64) {
-        if (x > y) {
-            self.max = x;
-            self.min = y;
-        } else {
-            self.max = y;
-            self.min = y;
-        };
-    }
 }
 
-func main() ret int64 {
-    let p1 = alloc ord_pair;
-    let p2 = alloc ord_pair;
-    return p1.max + p2.min;
+val type val_pair {
+    max: int64,
+    min: int64,
+}
+
+func main() ret int32 {
+    let p1 = alloc ref_pair(3);
+    let p2 = alloc val_pair(2,5);
+    return 0;
 }

@@ -5,7 +5,7 @@
     "bom": false,
     "diags": [
         "field init not found",
-        "test.cpm:21:14",
-        "test.cpm:22:14"
+        "test.cpm:26:14",
+        "test.cpm:27:14"
     ]
 }

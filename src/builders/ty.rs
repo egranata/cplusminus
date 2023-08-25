@@ -335,15 +335,15 @@ impl<'a> TypeBuilder<'a> {
     fn build_init(
         &self,
         scope: &Scope<'a>,
+        self_decl: &Structure<'a>,
         this_ty: StructType<'a>,
         init: &InitDecl,
         export: bool,
     ) -> Option<FunctionValue<'a>> {
-        let ty = TypeDescriptor::Name(this_ty.get_name().unwrap().to_str().unwrap().to_owned());
         let mut real_args = vec![FunctionArgument {
             loc: init.loc,
             name: String::from("self"),
-            ty,
+            ty: self_decl.self_descriptor(),
             rw: false,
             explicit_rw: false,
         }];
@@ -500,14 +500,6 @@ impl<'a> TypeBuilder<'a> {
         let is_rc = sd.ms == MemoryStrategy::ByReference;
         let is_val = sd.ms == MemoryStrategy::ByValue;
 
-        if is_val && sd.init.is_some() {
-            self.iw.diagnostics.borrow_mut().error(CompilerError::new(
-                sd.init.as_ref().unwrap().loc,
-                Error::InitDisallowedInValueTypes,
-            ));
-            return None;
-        }
-
         if is_val && sd.dealloc.is_some() {
             self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                 sd.dealloc.as_ref().unwrap().loc,
@@ -605,7 +597,10 @@ impl<'a> TypeBuilder<'a> {
         }
 
         if let Some(init) = &sd.init {
-            if self.build_init(scope, st_ty, init, sd.export).is_none() {
+            if self
+                .build_init(scope, &cdg_st, st_ty, init, sd.export)
+                .is_none()
+            {
                 self.iw
                     .diagnostics
                     .borrow_mut()

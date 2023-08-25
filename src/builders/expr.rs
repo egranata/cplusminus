@@ -307,11 +307,29 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         let struct_def = self.tb.structure_by_llvm_type(ty);
         struct_def.as_ref()?;
         let struct_def = struct_def.unwrap();
-        let mut val = ty.const_zero();
+        let val_alloca = self.exit.create_alloca(
+            builder,
+            ty,
+            Some("temp_alloc"),
+            Some(super::func::AllocaInitialValue::Zero),
+        );
 
         match init {
             Some(ai) => match ai {
                 AllocInitializer::ByFieldList(init_list) => {
+                    if self
+                        .tb
+                        .find_init_for_type(locals, struct_def.str_ty)
+                        .is_some()
+                    {
+                        self.iw
+                            .diagnostics
+                            .borrow_mut()
+                            .error(CompilerError::new(node.loc, Error::InitMustBeUsed));
+                        return None;
+                    }
+
+                    let mut val = builder.build_load(val_alloca, "").into_struct_value();
                     for fi in init_list {
                         if let Some(idx) = struct_def.field_idx_by_name(&fi.field) {
                             let type_hint = struct_def.field_type_by_name(&fi.field);
@@ -337,19 +355,52 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                             return None;
                         }
                     }
+                    builder.build_store(val_alloca, val);
                 }
-                AllocInitializer::ByInit(_) => {
-                    self.iw.diagnostics.borrow_mut().error(CompilerError::new(
-                        node.loc,
-                        Error::InitDisallowedInValueTypes,
-                    ));
-                    return None;
+                AllocInitializer::ByInit(args) => {
+                    if let Some(init_func) = self.tb.find_init_for_type(locals, struct_def.str_ty) {
+                        let their_type = init_func.get_type();
+                        let mut eval_args: Vec<FunctionCallArgument> =
+                            vec![FunctionCallArgument::Value(val_alloca.into())];
+                        args.iter().for_each(|arg| {
+                            eval_args.push(FunctionCallArgument::Expr(arg.clone()))
+                        });
+                        if let Some(call_args) = self
+                            .build_function_call_args(builder, fd, locals, &eval_args, their_type)
+                        {
+                            builder.build_call(init_func, &call_args, "");
+                        } else {
+                            self.iw
+                                .diagnostics
+                                .borrow_mut()
+                                .error(CompilerError::new(node.loc, Error::InvalidExpression));
+                            return None;
+                        }
+                    } else {
+                        self.iw.diagnostics.borrow_mut().error(CompilerError::new(
+                            node.loc,
+                            Error::FieldNotFound(String::from("init")),
+                        ));
+                        return None;
+                    }
                 }
             },
-            None => {}
+            None => {
+                if self
+                    .tb
+                    .find_init_for_type(locals, struct_def.str_ty)
+                    .is_some()
+                {
+                    self.iw
+                        .diagnostics
+                        .borrow_mut()
+                        .error(CompilerError::new(node.loc, Error::InitMustBeUsed));
+                    return None;
+                }
+            }
         }
 
-        return Some(BasicValueEnum::StructValue(val));
+        Some(builder.build_load(val_alloca, ""))
     }
 
     fn alloc_ref_type(

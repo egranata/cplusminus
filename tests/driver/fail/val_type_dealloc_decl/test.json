@@ -5,8 +5,6 @@
     "bom": false,
     "diags": [
         "this declaration is only permitted for reference types",
-        "test.cpm:17:5",
-        "this declaration is only permitted for reference types",
-        "test.cpm:24:5"
+        "test.cpm:17:5"
     ]
 }
