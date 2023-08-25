@@ -157,9 +157,17 @@ impl<'a, 'b> LvalueBuilder<'a, 'b> {
                 } else if let Some(struct_type) = tb.is_value_any_type(pointee_type) {
                     if let Some(struct_def) = tb.structure_by_llvm_type(struct_type) {
                         if let Some(idx) = struct_def.field_idx_by_name(field_name) {
-                            let gep = builder
-                                .build_struct_gep(pv.ptr, idx as u32, field_name)
-                                .unwrap();
+                            let gep = if pointee_type.is_pointer_type() {
+                                let i32_0 = self.iw.builtins.zero(self.iw.builtins.int32);
+                                let i32_idx =
+                                    self.iw.builtins.n(idx as u64, self.iw.builtins.int32);
+                                let load_pv = builder.build_load(pv.ptr, "").into_pointer_value();
+                                unsafe { builder.build_gep(load_pv, &[i32_0, i32_idx], field_name) }
+                            } else {
+                                builder
+                                    .build_struct_gep(pv.ptr, idx as u32, field_name)
+                                    .unwrap()
+                            };
                             return Ok(ResolvedLvalue {
                                 ptr: gep,
                                 rw: true,

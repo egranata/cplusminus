@@ -28,7 +28,7 @@ use crate::{
         FunctionArgument, FunctionDecl, FunctionDefinition, FunctionTypeDescriptor, TypeDescriptor,
     },
     bom::function::FunctionBomEntry,
-    codegen::structure::Structure,
+    codegen::structure::{MemoryStrategy, Structure},
     err::{CompilerError, CompilerWarning, Error, Warning},
     iw::CompilerCore,
     mangler::{mangle_function_name, mangle_method_name},
@@ -425,7 +425,11 @@ impl<'a> FunctionBuilder<'a> {
         export: bool,
     ) -> (FunctionDecl, Option<FunctionValue<'a>>) {
         let fqn = mangle_method_name(fd, &self_decl.name);
-        let self_tyd = TypeDescriptor::Name(self_decl.name.clone());
+        let self_tyd = if self_decl.ms == MemoryStrategy::ByValue {
+            TypeDescriptor::Pointer(Box::new(TypeDescriptor::Name(self_decl.name.clone())))
+        } else {
+            TypeDescriptor::Name(self_decl.name.clone())
+        };
         let self_arg = FunctionArgument {
             loc: fd.decl.loc,
             name: "self".to_owned(),

@@ -185,8 +185,8 @@ peg::parser! {
             x:(@) _ "/" _ y:@ { Expr::Division(Box::new(x), Box::new(y)) }
             x:(@) _ "%" _ y:@ { Expr::Modulo(Box::new(x), Box::new(y)) }
             --
-            this:(@) "->" name:ident() "(" args:func_call_args() ")" {
-                let mc = MethodCall{ this:Box::new(this), name, args };
+            this:lvalue() "->" name:ident() "(" args:func_call_args() ")" {
+                let mc = MethodCall{ this, name, args };
                 Expr::MethodCall(mc)
             }
             --

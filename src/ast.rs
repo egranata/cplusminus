@@ -114,7 +114,7 @@ pub struct FieldDecl {
 
 #[derive(Clone, Debug)]
 pub struct MethodCall {
-    pub this: Box<Expression>,
+    pub this: Lvalue,
     pub name: String,
     pub args: Vec<Expression>,
 }

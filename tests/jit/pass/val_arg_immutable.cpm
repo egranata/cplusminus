@@ -1,0 +1,44 @@
+(* Copyright 2023 Enrico Granata *)
+(* *)
+(* Licensed under the Apache License, Version 2.0 (the "License"); *)
+(* you may not use this file except in compliance with the License. *)
+(* You may obtain a copy of the License at *)
+(*  *)
+(*     http://www.apache.org/licenses/LICENSE-2.0 *)
+(*  *)
+(* Unless required by applicable law or agreed to in writing, software *)
+(* distributed under the License is distributed on an "AS IS" BASIS, *)
+(* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. *)
+(* See the License for the specific language governing permissions and *)
+(* limitations under the License. *)
+
+val type number {
+    x: int64,
+}
+
+impl number {
+    func swap(other: number) {
+        (* intentionally does not work *)
+        let N = self.x;
+        self.x = other.x;
+        other.x = N;
+    }
+}
+
+func main() ret int32 {
+    let a = alloc number{x:12};
+    let b = alloc number{x:13};
+    assert a.x == 12;
+    assert b.x == 13;
+    a->swap(b);
+    assert a.x == 13;
+    (* the swap has failed *)
+    assert b.x == 13;
+    a.x = 12;
+    b->swap(a);
+    assert a.x == 12;
+    (* the swap has failed *)
+    assert b.x == 12;
+    return 0;
+}
+

@@ -11,24 +11,23 @@
 (* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. *)
 (* See the License for the specific language governing permissions and *)
 (* limitations under the License. *)
-        
-val type pair {
+
+ref type number {
     x: int64,
-    y: int64
 }
 
-impl pair {
-    func foo() ret int64 {
-        self.x = self.x + 1;
-        return self.y;
+impl number {
+    func increase() {
+        inc self.x;
     }
 }
 
 func main() ret int32 {
-    let p = alloc pair;
-    p.x = 12;
-    p->foo();
-    assert p.x == 12;
+    let num = alloc number{x:12};
+    assert num.x == 12;
+    num->increase();
+    assert num.x == 13;
+    num->increase();
+    assert num.x == 14;
     return 0;
 }
-
