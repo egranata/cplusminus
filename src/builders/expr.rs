@@ -909,7 +909,13 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 let mut eval_exprs: Vec<BasicValueEnum> = vec![];
                 for expr in exprs {
                     if let Some(eval) = self.build_expr(builder, fd, expr, locals, type_hint) {
-                        if eval_exprs.is_empty() {
+                        if self.tb.is_refcounted_basic_type(eval.get_type()).is_some() {
+                            self.iw.diagnostics.borrow_mut().error(CompilerError::new(
+                                expr.loc,
+                                Error::RefTypeInValTypeForbidden,
+                            ));
+                            return None;
+                        } else if eval_exprs.is_empty() {
                             eval_exprs.push(eval);
                         } else if eval.get_type() != eval_exprs[0].get_type() {
                             self.iw.diagnostics.borrow_mut().error(CompilerError::new(
