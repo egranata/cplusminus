@@ -38,7 +38,7 @@ type transform = fn(int64) ret int64;
 func map(a: arr, f: transform) ret bool {
     var i = 0;
     while (i < a.len) {
-        a.data[i] = (*f)(a.data[i]);
+        a.data[i] = f(a.data[i]);
         i = i + 1;
     };
 
@@ -56,7 +56,7 @@ func main() ret int64 {
     a.data = &d[0];
     a.len = (sizeof expr d) / (sizeof type int64);
     print(a);
-    map(a, &double);
+    map(a, double);
     printf("after:\n");
     print(a);
     return 0;
