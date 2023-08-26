@@ -81,9 +81,11 @@ impl<'a> Metadata<'a> {
 
             let builder = iw.context.create_builder();
             let void_f = iw.builtins.void.fn_type(&[], false);
-            let dummy_f =
-                iw.module
-                    .add_function("", void_f, Some(inkwell::module::Linkage::Internal));
+            let dummy_f = iw.module.add_function(
+                "__build_metadata_for_type__dummy",
+                void_f,
+                Some(inkwell::module::Linkage::Internal),
+            );
             let dummy_bb = iw.context.append_basic_block(dummy_f, "entry");
             builder.position_at_end(dummy_bb);
             builder.build_return(None);

@@ -22,7 +22,11 @@ use inkwell::{
     },
 };
 
-use crate::{iw::CompilerCore, mangler::mangle_special_method};
+use crate::{
+    codegen::structure::{MemoryStrategy, Structure},
+    iw::CompilerCore,
+    mangler::mangle_special_method,
+};
 
 use super::ty::TypeBuilder;
 
@@ -264,10 +268,11 @@ fn find_usr_dealloc_for_type<'a>(
     iw.module.get_function(&name)
 }
 
-pub fn build_dealloc<'a>(
+pub fn build_sys_dealloc<'a>(
     tb: &TypeBuilder<'a>,
     iw: &CompilerCore<'a>,
     ty: StructType<'a>,
+    cdg_st: &Structure<'a>,
 ) -> FunctionValue<'a> {
     let this_type = iw.refcnt.refcount_type.ptr_type(Default::default());
     let func_type = iw
@@ -286,45 +291,48 @@ pub fn build_dealloc<'a>(
     let decref_f = &iw.refcnt.decref_func;
 
     let entry = iw.context.append_basic_block(func, "entry");
-    let do_free = iw.context.append_basic_block(func, "do_free");
-
     builder.position_at_end(entry);
-    let arg0 = func.get_nth_param(0).unwrap().into_pointer_value();
-    let arg0_retyped = builder.build_pointer_cast(arg0, ty.ptr_type(Default::default()), "");
 
-    if let Some(usr_dealloc_f) = find_usr_dealloc_for_type(iw, ty) {
-        builder.build_call(
-            usr_dealloc_f,
-            &[BasicMetadataValueEnum::PointerValue(arg0)],
-            "",
-        );
-    }
-    builder.build_unconditional_branch(do_free);
+    if cdg_st.ms == MemoryStrategy::ByReference {
+        let do_free = iw.context.append_basic_block(func, "do_free");
 
-    builder.position_at_end(do_free);
-    for i in 0..ty.get_field_types().len() {
-        if let Some(field_ty) = ty.get_field_type_at_index(i as u32) {
-            if tb.is_refcounted_basic_type(field_ty).is_some() {
-                if let Ok(field_gep) = builder.build_struct_gep(arg0_retyped, i as u32, "") {
-                    let field_value = builder.build_load(field_gep, "");
-                    builder.build_store(field_gep, field_ty.const_zero());
-                    let field_value = builder.build_pointer_cast(
-                        field_value.into_pointer_value(),
-                        iw.refcnt.refcount_type.ptr_type(Default::default()),
-                        "",
-                    );
-                    builder.build_call(
-                        *decref_f,
-                        &[BasicMetadataValueEnum::PointerValue(field_value)],
-                        "",
-                    );
+        let arg0 = func.get_nth_param(0).unwrap().into_pointer_value();
+        let arg0_retyped = builder.build_pointer_cast(arg0, ty.ptr_type(Default::default()), "");
+
+        if let Some(usr_dealloc_f) = find_usr_dealloc_for_type(iw, ty) {
+            builder.build_call(
+                usr_dealloc_f,
+                &[BasicMetadataValueEnum::PointerValue(arg0)],
+                "",
+            );
+        }
+        builder.build_unconditional_branch(do_free);
+
+        builder.position_at_end(do_free);
+        for i in 0..ty.get_field_types().len() {
+            if let Some(field_ty) = ty.get_field_type_at_index(i as u32) {
+                if tb.is_refcounted_basic_type(field_ty).is_some() {
+                    if let Ok(field_gep) = builder.build_struct_gep(arg0_retyped, i as u32, "") {
+                        let field_value = builder.build_load(field_gep, "");
+                        builder.build_store(field_gep, field_ty.const_zero());
+                        let field_value = builder.build_pointer_cast(
+                            field_value.into_pointer_value(),
+                            iw.refcnt.refcount_type.ptr_type(Default::default()),
+                            "",
+                        );
+                        builder.build_call(
+                            *decref_f,
+                            &[BasicMetadataValueEnum::PointerValue(field_value)],
+                            "",
+                        );
+                    }
                 }
             }
         }
-    }
 
-    let arg0_bmve = BasicMetadataValueEnum::PointerValue(arg0);
-    builder.build_call(iw.refcnt.deallocref_func, &[arg0_bmve], "");
+        let arg0_bmve = BasicMetadataValueEnum::PointerValue(arg0);
+        builder.build_call(iw.refcnt.deallocref_func, &[arg0_bmve], "");
+    }
     builder.build_return(None);
 
     func

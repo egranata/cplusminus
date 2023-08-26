@@ -38,7 +38,7 @@ use crate::{
 
 use super::{
     func::{FunctionBuilder, FunctionBuilderOptions},
-    refcount::build_dealloc,
+    refcount::build_sys_dealloc,
     scope::Scope,
 };
 
@@ -486,7 +486,7 @@ impl<'a> TypeBuilder<'a> {
         }
 
         st_ty.set_body(&fields, false);
-        build_dealloc(self, &self.iw, st_ty);
+        build_sys_dealloc(self, &self.iw, st_ty, &cdg_st);
 
         Some(st_ty)
     }
@@ -609,7 +609,7 @@ impl<'a> TypeBuilder<'a> {
             }
         }
 
-        build_dealloc(self, &self.iw, st_ty);
+        build_sys_dealloc(self, &self.iw, st_ty, &cdg_st);
 
         Some(st_ty)
     }
