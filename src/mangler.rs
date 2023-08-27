@@ -86,7 +86,11 @@ pub fn mangle_special_method(self_decl: StructType<'_>, func: SpecialMemberFunct
 }
 
 pub fn mangle_method_name(fd: &FunctionDefinition, self_name: &str) -> String {
-    do_mangle(CPM_REGULAR_METHOD_PREFIX, &[self_name, &fd.decl.name])
+    let mangled_type = mangle_type_descriptor(&fd.decl.ty);
+    do_mangle(
+        CPM_REGULAR_METHOD_PREFIX,
+        &[self_name, &fd.decl.name, &mangled_type],
+    )
 }
 
 pub fn mangle_function_name(fd: &FunctionDecl) -> String {
