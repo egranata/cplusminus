@@ -91,13 +91,15 @@ impl<'a> Structure<'a> {
         None
     }
 
-    pub fn method_by_name(&self, name: &str) -> Option<Method<'a>> {
-        for method in self.methods.borrow().iter() {
-            if method.name == name {
-                return Some(method.clone());
-            }
-        }
-        None
+    pub fn method_by_name(&self, name: &str) -> Vec<Method<'a>> {
+        let v: Vec<_> = self
+            .methods
+            .borrow()
+            .iter()
+            .filter(|m| m.name == name)
+            .cloned()
+            .collect();
+        v
     }
 
     pub fn self_descriptor(&self) -> TypeDescriptor {

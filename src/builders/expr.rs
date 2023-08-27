@@ -778,45 +778,43 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 let this_lvalue = this_lvalue.unwrap();
                 let this = builder.build_load(this_lvalue.ptr, "");
 
-                let mut method_decl: Option<Method<'a>> = None;
+                let mut method_decls: Vec<Method<'a>> = vec![];
                 let mut this_arg: Option<BasicMetadataValueEnum<'a>> = None;
                 let mut matched = false;
 
                 if let Some(this_type) = self.tb.is_refcounted_basic_type(this.get_type()) {
                     if let Some(let_this_decl) = self.tb.structure_by_llvm_type(this_type) {
-                        if let Some(let_method_decl) = let_this_decl.method_by_name(&mc.name) {
-                            method_decl = Some(let_method_decl);
-                            this_arg = Some(BasicMetadataValueEnum::PointerValue(
-                                this.into_pointer_value(),
-                            ));
-                            matched = true;
-                        } else {
+                        method_decls = let_this_decl.method_by_name(&mc.name);
+                        if method_decls.is_empty() {
                             self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                                 node.loc,
                                 Error::IdentifierNotFound(mc.name.clone()),
                             ));
                             return None;
                         }
+                        this_arg = Some(BasicMetadataValueEnum::PointerValue(
+                            this.into_pointer_value(),
+                        ));
+                        matched = true;
                     }
                 } else if let Some(this_type) = self.tb.is_value_basic_type(this.get_type()) {
                     if let Some(let_this_decl) = self.tb.structure_by_llvm_type(this_type) {
-                        if let Some(let_method_decl) = let_this_decl.method_by_name(&mc.name) {
-                            method_decl = Some(let_method_decl);
-                            this_arg = Some(BasicMetadataValueEnum::PointerValue(
-                                if this.is_pointer_value() {
-                                    this.into_pointer_value()
-                                } else {
-                                    this_lvalue.ptr
-                                },
-                            ));
-                            matched = true;
-                        } else {
+                        method_decls = let_this_decl.method_by_name(&mc.name);
+                        if method_decls.is_empty() {
                             self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                                 node.loc,
                                 Error::IdentifierNotFound(mc.name.clone()),
                             ));
                             return None;
                         }
+                        this_arg = Some(BasicMetadataValueEnum::PointerValue(
+                            if this.is_pointer_value() {
+                                this.into_pointer_value()
+                            } else {
+                                this_lvalue.ptr
+                            },
+                        ));
+                        matched = true;
                     }
                 } else {
                     self.iw.diagnostics.borrow_mut().error(CompilerError::new(
@@ -830,7 +828,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     return None;
                 }
 
-                let method_func = method_decl.unwrap().func;
+                let method_func = method_decls[0].func;
                 let mut f_args: Vec<FunctionCallArgument> = mc
                     .args
                     .iter()
