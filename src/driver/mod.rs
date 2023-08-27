@@ -188,6 +188,14 @@ fn run_multi_jit_impl(
     }
 }
 
+fn is_dest_shared_object(target: &Path) -> bool {
+    if let Some(ext) = target.extension() {
+        ext == "so" || ext == "dylib" || ext == "dll"
+    } else {
+        false
+    }
+}
+
 const REFCOUNT_SOURCE_CODE: &str = include_str!("../lib/refcount.c");
 const ASSERT_SOURCE_CODE: &str = include_str!("../lib/assert.c");
 
@@ -261,6 +269,10 @@ pub fn build_aout(
 
     if options.instrument_refcount {
         clang.arg("-DINSTRUMENT_REFCOUNT");
+    }
+
+    if is_dest_shared_object(target) {
+        clang.arg("-shared");
     }
 
     let process = clang.spawn();
