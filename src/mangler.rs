@@ -15,7 +15,7 @@
 use inkwell::types::StructType;
 
 use crate::{
-    ast::{FunctionDecl, FunctionDefinition},
+    ast::{FunctionDecl, FunctionDefinition, TypeDescriptor},
     builders::ty::TypeBuilder,
 };
 
@@ -39,6 +39,37 @@ fn do_mangle(item_prefix: char, items: &[&str]) -> String {
         .collect();
 
     format!("{}{}{}", CPM_MANGLE_PREFIX, item_prefix, items.join(""))
+}
+
+pub fn mangle_type_descriptor(td: &TypeDescriptor) -> String {
+    match td {
+        TypeDescriptor::Name(name) => {
+            format!("N{}{}", name.len(), name)
+        }
+        TypeDescriptor::Pointer(pointee) => {
+            format!("P{}", mangle_type_descriptor(pointee.as_ref()))
+        }
+        TypeDescriptor::Array(item, len) => {
+            format!("R{}{}", len, mangle_type_descriptor(item))
+        }
+        TypeDescriptor::Function(fd) => {
+            let ret = if let Some(ret_type) = fd.ret.as_ref() {
+                mangle_type_descriptor(ret_type)
+            } else {
+                String::from("V")
+            };
+            let len = fd.args.len();
+            let args: Vec<_> = fd.args.iter().map(mangle_type_descriptor).collect();
+            let args = args.join("");
+            format!("F{}{}{}", ret, len, args)
+        }
+        TypeDescriptor::Tuple(td) => {
+            let len = td.len();
+            let items: Vec<_> = td.iter().map(mangle_type_descriptor).collect();
+            let items = items.join("");
+            format!("T{}{}", len, items)
+        }
+    }
 }
 
 pub fn mangle_special_method(self_decl: StructType<'_>, func: SpecialMemberFunction) -> String {
