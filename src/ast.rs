@@ -312,6 +312,49 @@ pub enum Expr {
 }
 
 impl Expr {
+    // is this expression such that it's a constant value
+    // whose type can be influenced by a hint
+    pub fn is_const_hintable(&self) -> bool {
+        match self {
+            Expr::ConstantNumber(_) => true,
+            Expr::ConstString(_) => false,
+            Expr::Addition(x, y)
+            | Expr::Subtraction(x, y)
+            | Expr::Multiplication(x, y)
+            | Expr::Division(x, y)
+            | Expr::Modulo(x, y)
+            | Expr::ShiftLeft(x, y)
+            | Expr::ShiftRight(x, y)
+            | Expr::Equality(x, y)
+            | Expr::NotEqual(x, y)
+            | Expr::GreaterThan(x, y)
+            | Expr::LessThan(x, y)
+            | Expr::GreaterEqual(x, y)
+            | Expr::LessEqual(x, y)
+            | Expr::And(x, y)
+            | Expr::Or(x, y)
+            | Expr::XOr(x, y) => x.payload.is_const_hintable() && y.payload.is_const_hintable(),
+
+            Expr::UnaryMinus(x) | Expr::UnaryNot(x) => x.payload.is_const_hintable(),
+
+            Expr::Array(v) | Expr::Tuple(v) => v.iter().all(|e| e.payload.is_const_hintable()),
+
+            Expr::FunctionCall(..)
+            | Expr::MethodCall(..)
+            | Expr::Alloc(..)
+            | Expr::Incref(..)
+            | Expr::Getref(..)
+            | Expr::Rvalue(..)
+            | Expr::Cast(..)
+            | Expr::PropertyofVar(..)
+            | Expr::PropertyofType(..)
+            | Expr::Deref(..)
+            | Expr::AddressOf(..) => false,
+        }
+    }
+}
+
+impl Expr {
     pub fn as_identifier(&self) -> Option<&str> {
         if let Expr::Rvalue(Lvalue::Identifier(id)) = &self {
             Some(id)

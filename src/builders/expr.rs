@@ -46,6 +46,7 @@ pub struct ExpressionBuilder<'a, 'b> {
     exit: &'b FunctionExitData<'a>,
 }
 
+#[derive(Clone)]
 enum FunctionCallArgument<'a> {
     Expr(Expression),
     Value(BasicMetadataValueEnum<'a>),
@@ -93,6 +94,34 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         } else {
             None
         }
+    }
+
+    fn build_not_hintable_arg_list(
+        &self,
+        builder: &Builder<'a>,
+        fd: &FunctionDefinition,
+        locals: &Scope<'a>,
+        args: &[FunctionCallArgument<'a>],
+    ) -> Option<Vec<FunctionCallArgument<'a>>> {
+        let mut out: Vec<FunctionCallArgument<'a>> = vec![];
+        for arg in args {
+            match arg {
+                FunctionCallArgument::Expr(e) => {
+                    if e.payload.is_const_hintable() {
+                        out.push(arg.clone());
+                    } else if let Some(v) = self.build_expr(builder, fd, e, locals, None) {
+                        out.push(FunctionCallArgument::Value(v.into()));
+                    } else {
+                        return None;
+                    }
+                }
+                FunctionCallArgument::Value(v) => {
+                    out.push(FunctionCallArgument::Value(*v));
+                }
+            }
+        }
+
+        Some(out)
     }
 
     fn resolve_overloaded_function(
@@ -861,6 +890,8 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     .map(|arg| FunctionCallArgument::Expr(arg.clone()))
                     .collect();
                 f_args.insert(0, FunctionCallArgument::Value(this_arg.unwrap()));
+                let f_args = self.build_not_hintable_arg_list(builder, fd, locals, &f_args);
+                let f_args = f_args?;
 
                 let resolved_method_func =
                     self.resolve_overloaded_function(builder, fd, locals, &f_args, &method_funcs);
