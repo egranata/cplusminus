@@ -17,7 +17,9 @@ use std::cmp::max;
 use inkwell::{
     builder::Builder,
     types::{BasicTypeEnum, FloatType, FunctionType, IntType, StructType},
-    values::{BasicMetadataValueEnum, BasicValueEnum, FloatValue, IntValue, PointerValue},
+    values::{
+        BasicMetadataValueEnum, BasicValueEnum, FloatValue, FunctionValue, IntValue, PointerValue,
+    },
     FloatPredicate, IntPredicate,
 };
 
@@ -91,6 +93,30 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         } else {
             None
         }
+    }
+
+    fn resolve_overloaded_function(
+        &self,
+        _builder: &Builder<'a>,
+        _fd: &FunctionDefinition,
+        _locals: &Scope<'a>,
+        args: &[FunctionCallArgument<'a>],
+        candidates: &[FunctionValue<'a>],
+    ) -> Option<FunctionValue<'a>> {
+        let len = args.len();
+        let filter: Vec<_> = candidates
+            .iter()
+            .filter(|c| c.count_params() as usize == len)
+            .collect();
+
+        if filter.is_empty() {
+            return None;
+        }
+        if filter.len() == 1 {
+            return Some(*filter[0]);
+        }
+
+        todo!();
     }
 
     fn build_function_call_args(
@@ -828,13 +854,24 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     return None;
                 }
 
-                let method_func = method_decls[0].func;
+                let method_funcs: Vec<_> = method_decls.iter().map(|md| md.func).collect();
                 let mut f_args: Vec<FunctionCallArgument> = mc
                     .args
                     .iter()
                     .map(|arg| FunctionCallArgument::Expr(arg.clone()))
                     .collect();
                 f_args.insert(0, FunctionCallArgument::Value(this_arg.unwrap()));
+
+                let resolved_method_func =
+                    self.resolve_overloaded_function(builder, fd, locals, &f_args, &method_funcs);
+                if resolved_method_func.is_none() {
+                    self.iw.diagnostics.borrow_mut().error(CompilerError::new(
+                        node.loc,
+                        Error::OverloadSetEmptyArgc(mc.name.clone(), mc.args.len()),
+                    ));
+                    return None;
+                }
+                let method_func = resolved_method_func.unwrap();
 
                 return if let Some(args) = self.build_function_call_args(
                     builder,

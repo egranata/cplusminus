@@ -23,6 +23,7 @@ pub enum Error {
     TypeNotRefcounted(Option<TypeDescriptor>),
     UnexpectedType(Option<String>),
     ArgCountMismatch(usize, usize),
+    OverloadSetEmptyArgc(String, usize),
     InvalidExpression,
     InternalError(String),
     ParseError(String),
@@ -70,6 +71,9 @@ impl Display for Error {
             }
             Error::ArgCountMismatch(expected, actual) => {
                 write!(f, "{expected} args expected, {actual} actual")
+            }
+            Error::OverloadSetEmptyArgc(name, argc) => {
+                write!(f, "no overload of {name} takes {argc} arguments")
             }
             Error::InvalidExpression => write!(f, "invalid expression"),
             Error::InvalidCast => write!(f, "invalid type cast"),

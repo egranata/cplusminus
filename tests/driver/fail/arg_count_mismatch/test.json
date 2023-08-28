@@ -8,7 +8,7 @@
         "1 args expected, 0 actual",
         "2 args expected, 4 actual",
         "2 args expected, 1 actual",
-        "4 args expected, 3 actual",
-        "4 args expected, 6 actual"
+        "no overload of m takes 2 arguments",
+        "no overload of m takes 5 arguments"
     ]
 }
