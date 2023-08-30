@@ -18,7 +18,7 @@ use inkwell::{
         AnyTypeEnum, ArrayType, BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FunctionType,
         IntType, StructType,
     },
-    values::{BasicValueEnum, FunctionValue, IntValue},
+    values::{BasicMetadataValueEnum, BasicValueEnum, FunctionValue, IntValue},
 };
 
 use crate::{
@@ -92,6 +92,47 @@ impl<'a> TypeBuilder<'a> {
             BasicTypeEnum::PointerType(pt) => AnyTypeEnum::PointerType(pt),
             BasicTypeEnum::StructType(st) => AnyTypeEnum::StructType(st),
             BasicTypeEnum::VectorType(vt) => AnyTypeEnum::VectorType(vt),
+        }
+    }
+
+    pub fn arg_type_matches(&self, arg: BasicMetadataValueEnum<'a>, ty: BasicTypeEnum<'a>) -> bool {
+        match ty {
+            BasicTypeEnum::ArrayType(at) => {
+                if !arg.is_array_value() {
+                    return false;
+                }
+                return arg.into_array_value().get_type() == at;
+            }
+            BasicTypeEnum::FloatType(ft) => {
+                if !arg.is_float_value() {
+                    return false;
+                }
+                return arg.into_float_value().get_type() == ft;
+            }
+            BasicTypeEnum::IntType(it) => {
+                if !arg.is_int_value() {
+                    return false;
+                }
+                return arg.into_int_value().get_type() == it;
+            }
+            BasicTypeEnum::PointerType(pt) => {
+                if !arg.is_pointer_value() {
+                    return false;
+                }
+                return arg.into_pointer_value().get_type() == pt;
+            }
+            BasicTypeEnum::StructType(st) => {
+                if !arg.is_struct_value() {
+                    return false;
+                }
+                return arg.into_struct_value().get_type() == st;
+            }
+            BasicTypeEnum::VectorType(vt) => {
+                if !arg.is_vector_value() {
+                    return false;
+                }
+                return arg.into_vector_value().get_type() == vt;
+            }
         }
     }
 

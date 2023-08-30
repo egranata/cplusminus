@@ -124,26 +124,85 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         Some(out)
     }
 
+    fn test_overload_candidate(
+        &self,
+        builder: &Builder<'a>,
+        fd: &FunctionDefinition,
+        locals: &Scope<'a>,
+        args: &[FunctionCallArgument<'a>],
+        candidate: FunctionValue<'a>,
+    ) -> Option<Vec<FunctionCallArgument<'a>>> {
+        let candidate_type = candidate.get_type();
+        let mut ret_args: Vec<FunctionCallArgument> = vec![];
+        for (idx, arg) in args.iter().enumerate() {
+            let type_hint = candidate_type.get_param_types().get(idx).copied();
+
+            match arg {
+                FunctionCallArgument::Expr(e) => {
+                    let argv = self.build_expr(builder, fd, e, locals, type_hint);
+                    argv?;
+                    if type_hint.is_some() && argv.unwrap().get_type() != type_hint.unwrap() {
+                        return None;
+                    }
+                    ret_args.push(FunctionCallArgument::Value(argv.unwrap().into()));
+                }
+                FunctionCallArgument::Value(v) => {
+                    if type_hint.is_some() && !self.tb.arg_type_matches(*v, type_hint.unwrap()) {
+                        return None;
+                    }
+                    ret_args.push(arg.clone());
+                }
+            }
+        }
+
+        Some(ret_args)
+    }
+
     fn resolve_overloaded_function(
         &self,
-        _builder: &Builder<'a>,
-        _fd: &FunctionDefinition,
-        _locals: &Scope<'a>,
+        builder: &Builder<'a>,
+        fd: &FunctionDefinition,
+        locals: &Scope<'a>,
         args: &[FunctionCallArgument<'a>],
         candidates: &[FunctionValue<'a>],
     ) -> Option<FunctionValue<'a>> {
+        // first do the very easy thing - can we find one and only one possible candidate
+        // by argument count?
         let len = args.len();
-        let filter: Vec<_> = candidates
+        let step0_filter: Vec<_> = candidates
             .iter()
             .filter(|c| c.count_params() as usize == len)
             .collect();
 
-        if filter.is_empty() {
+        if step0_filter.is_empty() {
             return None;
         }
-        if filter.len() == 1 {
-            return Some(*filter[0]);
+        if step0_filter.len() == 1 {
+            return Some(*step0_filter[0]);
         }
+
+        // then try to resolve all constant arguments and see if we end up with one and only one match
+        // the idea is that this is mostly stuff of the form foo(3) with overloads like foo(int64), foo(blah)
+        // and so it's safe to attempt to construct multiple times
+        let mut step1_filter: Vec<(FunctionValue, Vec<FunctionCallArgument>)> = vec![];
+        for c in step0_filter {
+            let attempt = self.test_overload_candidate(builder, fd, locals, args, *c);
+            if let Some(fca) = attempt {
+                step1_filter.push((*c, fca));
+            }
+        }
+
+        if step1_filter.is_empty() {
+            return None;
+        }
+        if step1_filter.len() == 1 {
+            return Some(step1_filter[0].0);
+        }
+
+        // even if we end up with more than one resolution at this time, it's likely to be something like
+        // foo(int32) vs. foo(int64) and then it should be possible to force a decision via "as" cast
+        // or more explicit type; it's more important how we communicate this than the fact that the overload
+        // resolution has failed - for now... crash
 
         todo!();
     }
