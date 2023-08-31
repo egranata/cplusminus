@@ -163,9 +163,10 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         builder: &Builder<'a>,
         fd: &FunctionDefinition,
         locals: &Scope<'a>,
+        name: &str,
         args: &[FunctionCallArgument<'a>],
         candidates: &[FunctionValue<'a>],
-    ) -> Option<FunctionValue<'a>> {
+    ) -> Result<FunctionValue<'a>, crate::err::Error> {
         // first do the very easy thing - can we find one and only one possible candidate
         // by argument count?
         let len = args.len();
@@ -175,15 +176,24 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
             .collect();
 
         if step0_filter.is_empty() {
-            return None;
+            // for methods, subtract 1 since there is an implicit "self" argument
+            // since we don't overload on free functions for now, this is generally
+            // safe to do
+            return Err(crate::err::Error::OverloadSetEmptyArgc(
+                name.to_owned(),
+                len - 1,
+            ));
         }
         if step0_filter.len() == 1 {
-            return Some(*step0_filter[0]);
+            return Ok(*step0_filter[0]);
         }
 
         // then try to resolve all constant arguments and see if we end up with one and only one match
         // the idea is that this is mostly stuff of the form foo(3) with overloads like foo(int64), foo(blah)
         // and so it's safe to attempt to construct multiple times
+        // one possible step missing (here? elsewhere?) is to apply obvious promotions, so for example
+        // let x: int32 = 3
+        // foo(x) should probably work for foo(int64), since we promote integers in other contexts
         let mut step1_filter: Vec<(FunctionValue, Vec<FunctionCallArgument>)> = vec![];
         for c in step0_filter {
             let attempt = self.test_overload_candidate(builder, fd, locals, args, *c);
@@ -193,18 +203,18 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         }
 
         if step1_filter.is_empty() {
-            return None;
+            return Err(crate::err::Error::OverloadSetEmptyArgv(name.to_owned()));
         }
         if step1_filter.len() == 1 {
-            return Some(step1_filter[0].0);
+            return Ok(step1_filter[0].0);
         }
 
-        // even if we end up with more than one resolution at this time, it's likely to be something like
-        // foo(int32) vs. foo(int64) and then it should be possible to force a decision via "as" cast
-        // or more explicit type; it's more important how we communicate this than the fact that the overload
-        // resolution has failed - for now... crash
+        // if we end up with more than one resolution here it's likely to be a case of
+        // foo(3) with foo(int32) vs. foo(int64) and so a way to resolve the overload should always exist
+        // by means of the user providing an explicit type; the diagnostic right now is very much suboptimal
+        // but it at least exists
 
-        todo!();
+        Err(crate::err::Error::OverloadSetAmbiguous(name.to_owned()))
     }
 
     fn build_function_call_args(
@@ -952,13 +962,19 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 let f_args = self.build_not_hintable_arg_list(builder, fd, locals, &f_args);
                 let f_args = f_args?;
 
-                let resolved_method_func =
-                    self.resolve_overloaded_function(builder, fd, locals, &f_args, &method_funcs);
-                if resolved_method_func.is_none() {
-                    self.iw.diagnostics.borrow_mut().error(CompilerError::new(
-                        node.loc,
-                        Error::OverloadSetEmptyArgc(mc.name.clone(), mc.args.len()),
-                    ));
+                let resolved_method_func = self.resolve_overloaded_function(
+                    builder,
+                    fd,
+                    locals,
+                    &mc.name,
+                    &f_args,
+                    &method_funcs,
+                );
+                if let Err(err) = resolved_method_func {
+                    self.iw
+                        .diagnostics
+                        .borrow_mut()
+                        .error(CompilerError::new(node.loc, err));
                     return None;
                 }
                 let method_func = resolved_method_func.unwrap();

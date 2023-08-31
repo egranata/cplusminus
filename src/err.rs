@@ -24,6 +24,8 @@ pub enum Error {
     UnexpectedType(Option<String>),
     ArgCountMismatch(usize, usize),
     OverloadSetEmptyArgc(String, usize),
+    OverloadSetEmptyArgv(String),
+    OverloadSetAmbiguous(String),
     InvalidExpression,
     InternalError(String),
     ParseError(String),
@@ -74,6 +76,15 @@ impl Display for Error {
             }
             Error::OverloadSetEmptyArgc(name, argc) => {
                 write!(f, "no overload of {name} takes {argc} arguments")
+            }
+            Error::OverloadSetEmptyArgv(name) => {
+                write!(f, "no overload of {name} accepts the arguments provided")
+            }
+            Error::OverloadSetAmbiguous(name) => {
+                write!(
+                    f,
+                    "multiple overloads of {name} can accept the arguments provided"
+                )
             }
             Error::InvalidExpression => write!(f, "invalid expression"),
             Error::InvalidCast => write!(f, "invalid type cast"),
