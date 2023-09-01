@@ -13,9 +13,80 @@
 // limitations under the License.
 
 use inkwell::{
+    builder::Builder,
     types::FunctionType,
     values::{BasicMetadataValueEnum, FunctionValue, PointerValue},
 };
+
+use crate::{
+    ast::FunctionDefinition,
+    builders::{
+        expr::{ExpressionBuilder, FunctionCallArgument},
+        scope::Scope,
+    },
+};
+
+fn build_not_hintable_arg_list<'a, 'b>(
+    eb: &ExpressionBuilder<'a, 'b>,
+    builder: &Builder<'a>,
+    fd: &FunctionDefinition,
+    locals: &Scope<'a>,
+    args: &[FunctionCallArgument<'a>],
+) -> Option<Vec<FunctionCallArgument<'a>>> {
+    let mut out: Vec<FunctionCallArgument<'a>> = vec![];
+    for arg in args {
+        match arg {
+            FunctionCallArgument::Expr(e) => {
+                if e.payload.is_const_hintable() {
+                    out.push(arg.clone());
+                } else if let Some(v) = eb.build_expr(builder, fd, e, locals, None) {
+                    out.push(FunctionCallArgument::Value(v.into()));
+                } else {
+                    return None;
+                }
+            }
+            FunctionCallArgument::Value(v) => {
+                out.push(FunctionCallArgument::Value(*v));
+            }
+        }
+    }
+
+    Some(out)
+}
+
+fn test_overload_candidate<'a>(
+    eb: &ExpressionBuilder<'a, '_>,
+    builder: &Builder<'a>,
+    fd: &FunctionDefinition,
+    locals: &Scope<'a>,
+    args: &[FunctionCallArgument<'a>],
+    candidate: FunctionValue<'a>,
+) -> Option<Vec<FunctionCallArgument<'a>>> {
+    let candidate_type = candidate.get_type();
+    let mut ret_args: Vec<FunctionCallArgument> = vec![];
+    for (idx, arg) in args.iter().enumerate() {
+        let type_hint = candidate_type.get_param_types().get(idx).copied();
+
+        match arg {
+            FunctionCallArgument::Expr(e) => {
+                let argv = eb.build_expr(builder, fd, e, locals, type_hint);
+                argv?;
+                if type_hint.is_some() && argv.unwrap().get_type() != type_hint.unwrap() {
+                    return None;
+                }
+                ret_args.push(FunctionCallArgument::Value(argv.unwrap().into()));
+            }
+            FunctionCallArgument::Value(v) => {
+                if type_hint.is_some() && !eb.tb.arg_type_matches(*v, type_hint.unwrap()) {
+                    return None;
+                }
+                ret_args.push(arg.clone());
+            }
+        }
+    }
+
+    Some(ret_args)
+}
 
 #[derive(Clone, Debug)]
 pub enum Callable<'a> {
@@ -35,6 +106,73 @@ impl<'a> Callable<'a> {
         } else {
             None
         }
+    }
+
+    pub fn from_overload_set<'b>(
+        eb: &ExpressionBuilder<'a, 'b>,
+        builder: &Builder<'a>,
+        fd: &FunctionDefinition,
+        locals: &Scope<'a>,
+        name: &str,
+        args: &[FunctionCallArgument<'a>],
+        candidates: &[FunctionValue<'a>],
+    ) -> Result<Callable<'a>, crate::err::Error> {
+        // first do the very easy thing - can we find one and only one possible candidate
+        // by argument count?
+        let args = build_not_hintable_arg_list(eb, builder, fd, locals, args);
+        if args.is_none() {
+            return Err(crate::err::Error::InvalidExpression);
+        }
+        let args = args.unwrap();
+
+        let len = args.len();
+        let step0_filter: Vec<_> = candidates
+            .iter()
+            .filter(|c| c.count_params() as usize == len)
+            .collect();
+
+        if step0_filter.is_empty() {
+            // for methods, subtract 1 since there is an implicit "self" argument
+            // since we don't overload on free functions for now, this is generally
+            // safe to do
+            return Err(crate::err::Error::OverloadSetEmptyArgc(
+                name.to_owned(),
+                len - 1,
+            ));
+        }
+        if step0_filter.len() == 1 {
+            let f = *step0_filter[0];
+            return Ok(Callable::from_function(f));
+        }
+
+        // then try to resolve all constant arguments and see if we end up with one and only one match
+        // the idea is that this is mostly stuff of the form foo(3) with overloads like foo(int64), foo(blah)
+        // and so it's safe to attempt to construct multiple times
+        // one possible step missing (here? elsewhere?) is to apply obvious promotions, so for example
+        // let x: int32 = 3
+        // foo(x) should probably work for foo(int64), since we promote integers in other contexts
+        let mut step1_filter: Vec<(FunctionValue, Vec<FunctionCallArgument>)> = vec![];
+        for c in step0_filter {
+            let attempt = test_overload_candidate(eb, builder, fd, locals, &args, *c);
+            if let Some(fca) = attempt {
+                step1_filter.push((*c, fca));
+            }
+        }
+
+        if step1_filter.is_empty() {
+            return Err(crate::err::Error::OverloadSetEmptyArgv(name.to_owned()));
+        }
+        if step1_filter.len() == 1 {
+            let f = step1_filter[0].0;
+            return Ok(Callable::from_function(f));
+        }
+
+        // if we end up with more than one resolution here it's likely to be a case of
+        // foo(3) with foo(int32) vs. foo(int64) and so a way to resolve the overload should always exist
+        // by means of the user providing an explicit type; the diagnostic right now is very much suboptimal
+        // but it at least exists
+
+        Err(crate::err::Error::OverloadSetAmbiguous(name.to_owned()))
     }
 
     pub fn callee(&self) -> inkwell::values::CallableValue<'a> {
