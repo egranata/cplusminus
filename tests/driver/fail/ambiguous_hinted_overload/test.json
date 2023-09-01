@@ -1,0 +1,9 @@
+{
+    "source_files": [
+        "test.cpm"
+    ],
+    "bom": true,
+    "diags": [
+        "multiple overloads of foo can accept the arguments provided"
+    ]
+}
