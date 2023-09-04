@@ -256,6 +256,7 @@ pub fn find_sys_dealloc_for_type<'a>(
     let name = mangle_special_method(
         ty,
         crate::mangler::SpecialMemberFunction::BuiltinDeallocator,
+        None,
     );
     iw.module.get_function(&name).unwrap()
 }
@@ -264,7 +265,11 @@ fn find_usr_dealloc_for_type<'a>(
     iw: &CompilerCore<'a>,
     ty: StructType<'a>,
 ) -> Option<FunctionValue<'a>> {
-    let name = mangle_special_method(ty, crate::mangler::SpecialMemberFunction::UserDeallocator);
+    let name = mangle_special_method(
+        ty,
+        crate::mangler::SpecialMemberFunction::UserDeallocator,
+        None,
+    );
     iw.module.get_function(&name)
 }
 
@@ -282,6 +287,7 @@ pub fn build_sys_dealloc<'a>(
     let name = mangle_special_method(
         ty,
         crate::mangler::SpecialMemberFunction::BuiltinDeallocator,
+        None,
     );
     let func = iw
         .module

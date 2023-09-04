@@ -63,11 +63,16 @@ pub struct Structure<'a> {
     pub var_ty: BasicTypeEnum<'a>,
     pub ms: MemoryStrategy,
     pub fields: MutableOf<Vec<Field<'a>>>,
+    pub init: MutableOf<Vec<FunctionValue<'a>>>,
     pub methods: MutableOf<Vec<Method<'a>>>,
     pub export: bool,
 }
 
 impl<'a> Structure<'a> {
+    pub fn has_explicit_init(&self) -> bool {
+        !self.init.borrow().is_empty()
+    }
+
     pub fn field_idx_by_name(&self, name: &str) -> Option<usize> {
         let fields: &Vec<Field<'a>> = &self.fields.borrow();
         let iter = zip(fields.iter(), 0..fields.len());

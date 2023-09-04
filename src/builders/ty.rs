@@ -363,16 +363,6 @@ impl<'a> TypeBuilder<'a> {
         }
     }
 
-    pub fn find_init_for_type(
-        &self,
-        scope: &Scope<'a>,
-        this_ty: StructType<'a>,
-    ) -> Option<FunctionValue<'a>> {
-        let full_name =
-            mangle_special_method(this_ty, crate::mangler::SpecialMemberFunction::Initializer);
-        scope.find_function(&full_name, true)
-    }
-
     fn build_init(
         &self,
         scope: &Scope<'a>,
@@ -389,13 +379,16 @@ impl<'a> TypeBuilder<'a> {
             explicit_rw: false,
         }];
         init.args.iter().for_each(|a| real_args.push(a.clone()));
-        let full_name =
-            mangle_special_method(this_ty, crate::mangler::SpecialMemberFunction::Initializer);
-
         let init_arg_types: Vec<TypeDescriptor> =
             real_args.iter().map(|arg| arg.ty.clone()).collect();
         let ftd = FunctionTypeDescriptor::new(init_arg_types, None, false);
         let fn_type = TypeDescriptor::Function(ftd);
+
+        let full_name = mangle_special_method(
+            this_ty,
+            crate::mangler::SpecialMemberFunction::Initializer,
+            Some(fn_type.clone()),
+        );
 
         let func_def = FunctionDefinition {
             decl: FunctionDecl {
@@ -436,6 +429,7 @@ impl<'a> TypeBuilder<'a> {
         let full_name = mangle_special_method(
             this_ty,
             crate::mangler::SpecialMemberFunction::UserDeallocator,
+            None,
         );
 
         let ftd = FunctionTypeDescriptor::new(vec![ty], None, false);
@@ -485,6 +479,7 @@ impl<'a> TypeBuilder<'a> {
             var_ty,
             ms,
             fields: Default::default(),
+            init: Default::default(),
             methods: Default::default(),
             export: true, // export so impls can be added
         };
@@ -532,6 +527,29 @@ impl<'a> TypeBuilder<'a> {
         Some(st_ty)
     }
 
+    pub fn import_init_from_bom(&self, scope: &Scope<'a>, sd: &StructBomEntry) -> bool {
+        let st_ty_descriptor = TypeDescriptor::Name(sd.name.clone());
+        let st_ty = self
+            .llvm_type_by_descriptor(scope, &st_ty_descriptor)
+            .unwrap();
+        let st_ty = self.is_val_or_ref_basic_type(st_ty).unwrap();
+        let cdg_st = self.structure_by_llvm_type(st_ty).unwrap();
+
+        for id in &sd.inits {
+            if let Some(f) = self.iw.module.get_function(&id.llvm_symbol_name) {
+                cdg_st.init.borrow_mut().push(f);
+            } else {
+                self.iw.diagnostics.borrow_mut().error(CompilerError::new(
+                    TokenSpan::origin(),
+                    Error::IdentifierNotFound(id.llvm_symbol_name.clone()),
+                ));
+                return false;
+            }
+        }
+
+        true
+    }
+
     pub fn build_structure_from_decl(
         &self,
         scope: &Scope<'a>,
@@ -563,6 +581,7 @@ impl<'a> TypeBuilder<'a> {
             var_ty,
             ms,
             fields: Default::default(),
+            init: Default::default(),
             methods: Default::default(),
             export: sd.export,
         };
@@ -637,11 +656,10 @@ impl<'a> TypeBuilder<'a> {
             }
         }
 
-        if let Some(init) = &sd.init {
-            if self
-                .build_init(scope, &cdg_st, st_ty, init, sd.export)
-                .is_none()
-            {
+        for init in &sd.init {
+            if let Some(init_f) = self.build_init(scope, &cdg_st, st_ty, init, sd.export) {
+                cdg_st.init.borrow_mut().push(init_f);
+            } else {
                 self.iw
                     .diagnostics
                     .borrow_mut()

@@ -314,7 +314,7 @@ impl<'a> CompilerCore<'a> {
             name: raw.name.clone(),
             ms: raw.ms,
             fields: vec![],
-            init: None,
+            init: vec![],
             dealloc: None,
             export: raw.export,
         };
@@ -323,15 +323,7 @@ impl<'a> CompilerCore<'a> {
             match entry {
                 crate::ast::StructEntryDecl::Field(field) => proper.fields.push(field.clone()),
                 crate::ast::StructEntryDecl::Init(init) => {
-                    if proper.init.is_some() {
-                        self.diagnostics.borrow_mut().error(CompilerError::new(
-                            init.loc,
-                            Error::DuplicatedStructMember("init".to_owned()),
-                        ));
-                        return None;
-                    } else {
-                        proper.init = Some(init.clone());
-                    }
+                    proper.init.push(init.clone());
                 }
                 crate::ast::StructEntryDecl::Dealloc(dealloc) => {
                     if proper.dealloc.is_some() {
@@ -411,6 +403,16 @@ impl<'a> CompilerCore<'a> {
                 self.diagnostics.borrow_mut().error(CompilerError::new(
                     id.loc,
                     Error::ImportFailed(ef.user_facing_name.clone()),
+                ));
+            }
+        }
+
+        for sd in &bom.structs {
+            let tb = TypeBuilder::new(self.clone());
+            if !tb.import_init_from_bom(&self.globals, sd) {
+                self.diagnostics.borrow_mut().error(CompilerError::new(
+                    id.loc,
+                    Error::ImportFailed(sd.name.clone()),
                 ));
             }
         }

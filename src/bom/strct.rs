@@ -29,6 +29,12 @@ pub struct FieldBomEntry {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct InitBomEntry {
+    pub llvm_symbol_name: String,
+    pub underlying_type: TypeDescriptor,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MethodBomEntry {
     pub user_facing_name: String,
     pub underlying_func_llvm_name: String,
@@ -39,6 +45,7 @@ pub struct StructBomEntry {
     pub name: String,
     pub ms: MemoryStrategy,
     pub fields: Vec<FieldBomEntry>,
+    pub inits: Vec<InitBomEntry>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -58,10 +65,20 @@ impl StructBomEntry {
                 underlying_type: TypeBuilder::descriptor_by_llvm_type(field.ty).unwrap(),
             })
             .collect();
+        let inits: Vec<InitBomEntry> = udt
+            .init
+            .borrow()
+            .iter()
+            .map(|f| InitBomEntry {
+                llvm_symbol_name: f.get_name().to_str().unwrap().to_owned(),
+                underlying_type: TypeBuilder::descriptor_for_function_type(f.get_type()).unwrap(),
+            })
+            .collect();
         Self {
             name: udt.name.clone(),
             ms: udt.ms,
             fields,
+            inits,
         }
     }
 

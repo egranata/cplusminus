@@ -318,11 +318,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         match init {
             Some(ai) => match ai {
                 AllocInitializer::ByFieldList(init_list) => {
-                    if self
-                        .tb
-                        .find_init_for_type(locals, struct_def.str_ty)
-                        .is_some()
-                    {
+                    if struct_def.has_explicit_init() {
                         self.iw
                             .diagnostics
                             .borrow_mut()
@@ -359,17 +355,25 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     builder.build_store(val_alloca, val);
                 }
                 AllocInitializer::ByInit(args) => {
-                    if let Some(init_func) = self.tb.find_init_for_type(locals, struct_def.str_ty) {
-                        let their_type = init_func.get_type();
-                        let mut eval_args: Vec<FunctionCallArgument> =
-                            vec![FunctionCallArgument::Value(val_alloca.into())];
-                        args.iter().for_each(|arg| {
-                            eval_args.push(FunctionCallArgument::Expr(arg.clone()))
-                        });
+                    let mut eval_args: Vec<FunctionCallArgument> =
+                        vec![FunctionCallArgument::Value(val_alloca.into())];
+                    args.iter()
+                        .for_each(|arg| eval_args.push(FunctionCallArgument::Expr(arg.clone())));
+                    let init_r = Callable::from_overload_set(
+                        self,
+                        builder,
+                        fd,
+                        locals,
+                        "init",
+                        &eval_args,
+                        struct_def.init.borrow().as_ref(),
+                    );
+                    if let Ok(init_func) = init_r {
+                        let their_type = init_func.fn_type();
                         if let Some(call_args) = self
                             .build_function_call_args(builder, fd, locals, &eval_args, their_type)
                         {
-                            builder.build_call(init_func, &call_args, "");
+                            self.build_function_call(node, builder, &init_func, &call_args);
                         } else {
                             self.iw
                                 .diagnostics
@@ -387,11 +391,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 }
             },
             None => {
-                if self
-                    .tb
-                    .find_init_for_type(locals, struct_def.str_ty)
-                    .is_some()
-                {
+                if struct_def.has_explicit_init() {
                     self.iw
                         .diagnostics
                         .borrow_mut()
@@ -431,11 +431,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         match init {
             Some(ai) => match ai {
                 AllocInitializer::ByFieldList(init_list) => {
-                    if self
-                        .tb
-                        .find_init_for_type(locals, struct_def.str_ty)
-                        .is_some()
-                    {
+                    if struct_def.has_explicit_init() {
                         self.iw
                             .diagnostics
                             .borrow_mut()
@@ -469,19 +465,27 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     }
                 }
                 AllocInitializer::ByInit(args) => {
-                    if let Some(init_func) = self.tb.find_init_for_type(locals, struct_def.str_ty) {
-                        let their_type = init_func.get_type();
-                        let mut eval_args: Vec<FunctionCallArgument> =
-                            vec![FunctionCallArgument::Value(
-                                BasicMetadataValueEnum::PointerValue(pv),
-                            )];
-                        args.iter().for_each(|arg| {
-                            eval_args.push(FunctionCallArgument::Expr(arg.clone()))
-                        });
+                    let mut eval_args: Vec<FunctionCallArgument> =
+                        vec![FunctionCallArgument::Value(
+                            BasicMetadataValueEnum::PointerValue(pv),
+                        )];
+                    args.iter()
+                        .for_each(|arg| eval_args.push(FunctionCallArgument::Expr(arg.clone())));
+                    let init_r = Callable::from_overload_set(
+                        self,
+                        builder,
+                        fd,
+                        locals,
+                        "init",
+                        &eval_args,
+                        struct_def.init.borrow().as_ref(),
+                    );
+                    if let Ok(init_func) = init_r {
+                        let their_type = init_func.fn_type();
                         if let Some(call_args) = self
                             .build_function_call_args(builder, fd, locals, &eval_args, their_type)
                         {
-                            builder.build_call(init_func, &call_args, "");
+                            self.build_function_call(node, builder, &init_func, &call_args);
                         } else {
                             self.iw
                                 .diagnostics
@@ -499,11 +503,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 }
             },
             None => {
-                if self
-                    .tb
-                    .find_init_for_type(locals, struct_def.str_ty)
-                    .is_some()
-                {
+                if struct_def.has_explicit_init() {
                     self.iw
                         .diagnostics
                         .borrow_mut()

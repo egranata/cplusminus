@@ -160,7 +160,7 @@ pub struct ProperStructDecl {
     pub name: String,
     pub ms: MemoryStrategy,
     pub fields: Vec<FieldDecl>,
-    pub init: Option<InitDecl>,
+    pub init: Vec<InitDecl>,
     pub dealloc: Option<DeallocDecl>,
     pub export: bool,
 }

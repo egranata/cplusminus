@@ -72,17 +72,30 @@ pub fn mangle_type_descriptor(td: &TypeDescriptor) -> String {
     }
 }
 
-pub fn mangle_special_method(self_decl: StructType<'_>, func: SpecialMemberFunction) -> String {
+pub fn mangle_special_method(
+    self_decl: StructType<'_>,
+    func: SpecialMemberFunction,
+    imp: Option<TypeDescriptor>,
+) -> String {
     assert!(!TypeBuilder::is_tuple_type(self_decl));
 
     let type_name = self_decl.get_name().unwrap().to_str().unwrap();
     let func_name = match func {
-        SpecialMemberFunction::Initializer => "init",
-        SpecialMemberFunction::UserDeallocator => "drop",
-        SpecialMemberFunction::BuiltinDeallocator => "dealloc",
+        SpecialMemberFunction::Initializer => {
+            assert!(imp.is_some());
+            format!("init{}", mangle_type_descriptor(&imp.unwrap()))
+        }
+        SpecialMemberFunction::UserDeallocator => {
+            assert!(imp.is_none());
+            String::from("drop")
+        }
+        SpecialMemberFunction::BuiltinDeallocator => {
+            assert!(imp.is_none());
+            String::from("dealloc")
+        }
     };
 
-    do_mangle(CPM_SPECIAL_METHOD_PREFIX, &[type_name, func_name])
+    do_mangle(CPM_SPECIAL_METHOD_PREFIX, &[type_name, &func_name])
 }
 
 pub fn mangle_method_name(fd: &FunctionDefinition, self_name: &str) -> String {
