@@ -72,6 +72,10 @@ impl<'a> BuiltinTypes<'a> {
         i.const_float(val)
     }
 
+    pub fn get(&self, name: &str) -> Option<BasicTypeEnum<'a>> {
+        self.builtin_types_map().get(name).copied()
+    }
+
     pub fn builtin_types_map(&self) -> HashMap<String, BasicTypeEnum<'a>> {
         let ret = HashMap::from([
             (String::from("bool"), BasicTypeEnum::IntType(self.bool)),

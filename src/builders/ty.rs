@@ -160,10 +160,11 @@ impl<'a> TypeBuilder<'a> {
                 }
                 None
             }
-            BasicTypeEnum::IntType(it) => {
-                let n = format!("int{}", it.get_bit_width());
-                Some(TypeDescriptor::Name(n))
-            }
+            BasicTypeEnum::IntType(it) => Some(TypeDescriptor::Name(match it.get_bit_width() {
+                1 => String::from("bool"),
+                8 => String::from("byte"),
+                _ => format!("int{}", it.get_bit_width()),
+            })),
             BasicTypeEnum::FloatType(ft) => {
                 let is_f64 = ft.get_context().f64_type() == ft;
                 if is_f64 {
@@ -223,7 +224,11 @@ impl<'a> TypeBuilder<'a> {
                     return Some(ty);
                 }
 
-                return self.iw.structs.borrow().get(name).map(|ty| ty.var_ty);
+                if let Some(ty) = self.iw.structs.borrow().get(name).map(|ty| ty.var_ty) {
+                    return Some(ty);
+                }
+
+                self.iw.builtins.get(name)
             }
             TypeDescriptor::Pointer(ptr) => {
                 return self
