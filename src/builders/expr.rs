@@ -296,6 +296,91 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         self.iw.builtins.flt_n(n, ty)
     }
 
+    #[allow(clippy::too_many_arguments)]
+    fn alloc_by_initializer(
+        &self,
+        builder: &Builder<'a>,
+        locals: &Scope<'a>,
+        struct_def: &crate::codegen::structure::Structure<'a>,
+        fd: &FunctionDefinition,
+        node: &Expression,
+        self_arg: FunctionCallArgument<'a>,
+        args: &[Expression],
+    ) -> bool {
+        let mut eval_args: Vec<FunctionCallArgument> = vec![self_arg];
+
+        args.iter()
+            .for_each(|arg| eval_args.push(FunctionCallArgument::Expr(arg.clone())));
+        let init_r = Callable::from_overload_set(
+            self,
+            builder,
+            fd,
+            locals,
+            "init",
+            &eval_args,
+            struct_def.init.borrow().as_ref(),
+        );
+        if let Ok(init_func) = init_r {
+            let their_type = init_func.fn_type();
+            if let Some(call_args) =
+                self.build_function_call_args(builder, fd, locals, &eval_args, their_type)
+            {
+                self.build_function_call(node, builder, &init_func, &call_args);
+                true
+            } else {
+                self.iw
+                    .diagnostics
+                    .borrow_mut()
+                    .error(CompilerError::new(node.loc, Error::InvalidExpression));
+                false
+            }
+        } else {
+            self.iw.diagnostics.borrow_mut().error(CompilerError::new(
+                node.loc,
+                Error::FieldNotFound(String::from("init")),
+            ));
+            false
+        }
+    }
+
+    fn check_allowed_allocation(
+        &self,
+        ty: StructType<'a>,
+        node: &Expression,
+        init: &Option<AllocInitializer>,
+    ) -> Option<crate::codegen::structure::Structure<'a>> {
+        let struct_def = self.tb.structure_by_llvm_type(ty);
+        let struct_def = struct_def?;
+
+        match init {
+            Some(ai) => match ai {
+                AllocInitializer::ByFieldList(..) => {
+                    return if struct_def.has_explicit_init() {
+                        self.iw
+                            .diagnostics
+                            .borrow_mut()
+                            .error(CompilerError::new(node.loc, Error::InitMustBeUsed));
+                        None
+                    } else {
+                        Some(struct_def)
+                    };
+                }
+                AllocInitializer::ByInit(..) => Some(struct_def),
+            },
+            None => {
+                return if struct_def.has_explicit_init() {
+                    self.iw
+                        .diagnostics
+                        .borrow_mut()
+                        .error(CompilerError::new(node.loc, Error::InitMustBeUsed));
+                    None
+                } else {
+                    Some(struct_def)
+                };
+            }
+        }
+    }
+
     fn alloc_value_type(
         &self,
         builder: &Builder<'a>,
@@ -305,9 +390,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         node: &Expression,
         init: &Option<AllocInitializer>,
     ) -> Option<BasicValueEnum<'a>> {
-        let struct_def = self.tb.structure_by_llvm_type(ty);
-        struct_def.as_ref()?;
-        let struct_def = struct_def.unwrap();
+        let struct_def = self.check_allowed_allocation(ty, node, init)?;
         let val_alloca = self.exit.create_alloca(
             builder,
             ty,
@@ -318,14 +401,6 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         match init {
             Some(ai) => match ai {
                 AllocInitializer::ByFieldList(init_list) => {
-                    if struct_def.has_explicit_init() {
-                        self.iw
-                            .diagnostics
-                            .borrow_mut()
-                            .error(CompilerError::new(node.loc, Error::InitMustBeUsed));
-                        return None;
-                    }
-
                     let mut val = builder.build_load(val_alloca, "").into_struct_value();
                     for fi in init_list {
                         if let Some(idx) = struct_def.field_idx_by_name(&fi.field) {
@@ -355,50 +430,19 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     builder.build_store(val_alloca, val);
                 }
                 AllocInitializer::ByInit(args) => {
-                    let mut eval_args: Vec<FunctionCallArgument> =
-                        vec![FunctionCallArgument::Value(val_alloca.into())];
-                    args.iter()
-                        .for_each(|arg| eval_args.push(FunctionCallArgument::Expr(arg.clone())));
-                    let init_r = Callable::from_overload_set(
-                        self,
+                    let self_arg = FunctionCallArgument::Value(val_alloca.into());
+                    self.alloc_by_initializer(
                         builder,
-                        fd,
                         locals,
-                        "init",
-                        &eval_args,
-                        struct_def.init.borrow().as_ref(),
+                        &struct_def,
+                        fd,
+                        node,
+                        self_arg,
+                        args,
                     );
-                    if let Ok(init_func) = init_r {
-                        let their_type = init_func.fn_type();
-                        if let Some(call_args) = self
-                            .build_function_call_args(builder, fd, locals, &eval_args, their_type)
-                        {
-                            self.build_function_call(node, builder, &init_func, &call_args);
-                        } else {
-                            self.iw
-                                .diagnostics
-                                .borrow_mut()
-                                .error(CompilerError::new(node.loc, Error::InvalidExpression));
-                            return None;
-                        }
-                    } else {
-                        self.iw.diagnostics.borrow_mut().error(CompilerError::new(
-                            node.loc,
-                            Error::FieldNotFound(String::from("init")),
-                        ));
-                        return None;
-                    }
                 }
             },
-            None => {
-                if struct_def.has_explicit_init() {
-                    self.iw
-                        .diagnostics
-                        .borrow_mut()
-                        .error(CompilerError::new(node.loc, Error::InitMustBeUsed));
-                    return None;
-                }
-            }
+            None => {}
         }
 
         Some(builder.build_load(val_alloca, ""))
@@ -413,6 +457,8 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         node: &Expression,
         init: &Option<AllocInitializer>,
     ) -> Option<BasicValueEnum<'a>> {
+        let struct_def = self.check_allowed_allocation(ty, node, init)?;
+
         let pv = alloc_refcounted_type(&self.iw, builder, ty);
         let temp_pv = self.exit.create_alloca(
             builder,
@@ -424,20 +470,9 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         let ret = builder.build_load(temp_pv, "");
         self.exit.decref_on_exit(temp_pv);
 
-        let struct_def = self.tb.structure_by_llvm_type(ty);
-        struct_def.as_ref()?;
-        let struct_def = struct_def.unwrap();
-
         match init {
             Some(ai) => match ai {
                 AllocInitializer::ByFieldList(init_list) => {
-                    if struct_def.has_explicit_init() {
-                        self.iw
-                            .diagnostics
-                            .borrow_mut()
-                            .error(CompilerError::new(node.loc, Error::InitMustBeUsed));
-                        return None;
-                    }
                     for fi in init_list {
                         if let Some(idx) = struct_def.field_idx_by_name(&fi.field) {
                             let type_hint = struct_def.field_type_by_name(&fi.field);
@@ -465,52 +500,20 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     }
                 }
                 AllocInitializer::ByInit(args) => {
-                    let mut eval_args: Vec<FunctionCallArgument> =
-                        vec![FunctionCallArgument::Value(
-                            BasicMetadataValueEnum::PointerValue(pv),
-                        )];
-                    args.iter()
-                        .for_each(|arg| eval_args.push(FunctionCallArgument::Expr(arg.clone())));
-                    let init_r = Callable::from_overload_set(
-                        self,
+                    let self_arg =
+                        FunctionCallArgument::Value(BasicMetadataValueEnum::PointerValue(pv));
+                    self.alloc_by_initializer(
                         builder,
-                        fd,
                         locals,
-                        "init",
-                        &eval_args,
-                        struct_def.init.borrow().as_ref(),
+                        &struct_def,
+                        fd,
+                        node,
+                        self_arg,
+                        args,
                     );
-                    if let Ok(init_func) = init_r {
-                        let their_type = init_func.fn_type();
-                        if let Some(call_args) = self
-                            .build_function_call_args(builder, fd, locals, &eval_args, their_type)
-                        {
-                            self.build_function_call(node, builder, &init_func, &call_args);
-                        } else {
-                            self.iw
-                                .diagnostics
-                                .borrow_mut()
-                                .error(CompilerError::new(node.loc, Error::InvalidExpression));
-                            return None;
-                        }
-                    } else {
-                        self.iw.diagnostics.borrow_mut().error(CompilerError::new(
-                            node.loc,
-                            Error::FieldNotFound(String::from("init")),
-                        ));
-                        return None;
-                    }
                 }
             },
-            None => {
-                if struct_def.has_explicit_init() {
-                    self.iw
-                        .diagnostics
-                        .borrow_mut()
-                        .error(CompilerError::new(node.loc, Error::InitMustBeUsed));
-                    return None;
-                }
-            }
+            None => {}
         }
 
         Some(ret)
