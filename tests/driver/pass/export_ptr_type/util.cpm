@@ -12,14 +12,9 @@
 (* See the License for the specific language governing permissions and *)
 (* limitations under the License. *)
 
-import "util.bom";
+export type Char = byte;
 
-extern func strlen(s: String) ret int32;
+export type String = *Char;
 
-func main() ret int32 {
-    let foo: String = "hello world";
-    let n = strlen(foo);
-    assert n == 11;
-    return 0;
-}
-
+(* same time but with and without the indirection *)
+export type CString = *byte;

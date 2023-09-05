@@ -151,7 +151,7 @@ impl<'a> TypeBuilder<'a> {
         ty.const_zero()
     }
 
-    pub fn descriptor_by_llvm_type(&self, ty: BasicTypeEnum) -> Option<TypeDescriptor> {
+    pub fn descriptor_by_llvm_type(&self, ty: BasicTypeEnum<'a>) -> Option<TypeDescriptor> {
         match ty {
             BasicTypeEnum::ArrayType(at) => {
                 if let Some(td) = self.descriptor_by_llvm_type(at.get_element_type()) {
@@ -179,14 +179,38 @@ impl<'a> TypeBuilder<'a> {
             BasicTypeEnum::PointerType(pt) => {
                 let pointee = pt.get_element_type();
                 match pointee {
-                    AnyTypeEnum::ArrayType(_)
-                    | AnyTypeEnum::FloatType(_)
-                    | AnyTypeEnum::IntType(_)
-                    | AnyTypeEnum::PointerType(_)
-                    | AnyTypeEnum::StructType(_)
-                    | AnyTypeEnum::VectorType(_) => {
-                        self.descriptor_by_llvm_type(BasicTypeEnum::try_from(pointee).unwrap())
+                    AnyTypeEnum::ArrayType(at) => BasicTypeEnum::try_from(at)
+                        .map_or(None, |bte| self.descriptor_by_llvm_type(bte))
+                        .map(|td| TypeDescriptor::Pointer(Box::new(td))),
+                    AnyTypeEnum::FloatType(ft) => BasicTypeEnum::try_from(ft)
+                        .map_or(None, |bte| self.descriptor_by_llvm_type(bte))
+                        .map(|td| TypeDescriptor::Pointer(Box::new(td))),
+                    AnyTypeEnum::IntType(it) => BasicTypeEnum::try_from(it)
+                        .map_or(None, |bte| self.descriptor_by_llvm_type(bte))
+                        .map(|td| TypeDescriptor::Pointer(Box::new(td))),
+                    AnyTypeEnum::PointerType(pt) => {
+                        if self.is_refcounted_basic_type(ty).is_some() {
+                            BasicTypeEnum::try_from(pt)
+                                .map_or(None, |bte| self.descriptor_by_llvm_type(bte))
+                        } else {
+                            BasicTypeEnum::try_from(pt)
+                                .map_or(None, |bte| self.descriptor_by_llvm_type(bte))
+                                .map(|td| TypeDescriptor::Pointer(Box::new(td)))
+                        }
                     }
+                    AnyTypeEnum::StructType(st) => {
+                        if self.is_refcounted_basic_type(ty).is_some() {
+                            BasicTypeEnum::try_from(st)
+                                .map_or(None, |bte| self.descriptor_by_llvm_type(bte))
+                        } else {
+                            BasicTypeEnum::try_from(st)
+                                .map_or(None, |bte| self.descriptor_by_llvm_type(bte))
+                                .map(|td| TypeDescriptor::Pointer(Box::new(td)))
+                        }
+                    }
+                    AnyTypeEnum::VectorType(vt) => BasicTypeEnum::try_from(vt)
+                        .map_or(None, |bte| self.descriptor_by_llvm_type(bte))
+                        .map(|td| TypeDescriptor::Pointer(Box::new(td))),
                     AnyTypeEnum::FunctionType(ft) => self.descriptor_for_function_type(ft),
                     AnyTypeEnum::VoidType(_) => panic!("unexpected void type"),
                 }
@@ -306,7 +330,7 @@ impl<'a> TypeBuilder<'a> {
         }
     }
 
-    pub fn descriptor_for_function_type(&self, ty: FunctionType) -> Option<TypeDescriptor> {
+    pub fn descriptor_for_function_type(&self, ty: FunctionType<'a>) -> Option<TypeDescriptor> {
         let return_type = if ty.get_return_type().is_none() {
             None
         } else {

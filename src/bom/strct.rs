@@ -55,7 +55,7 @@ pub struct ImplBomEntry {
 }
 
 impl StructBomEntry {
-    pub fn new(udt: &Structure<'_>, tb: &TypeBuilder) -> Self {
+    pub fn new<'a>(udt: &Structure<'a>, tb: &TypeBuilder<'a>) -> Self {
         let fields: Vec<FieldBomEntry> = udt
             .fields
             .borrow()
