@@ -55,14 +55,14 @@ pub struct ImplBomEntry {
 }
 
 impl StructBomEntry {
-    pub fn new(udt: &Structure<'_>) -> Self {
+    pub fn new(udt: &Structure<'_>, tb: &TypeBuilder) -> Self {
         let fields: Vec<FieldBomEntry> = udt
             .fields
             .borrow()
             .iter()
             .map(|field| FieldBomEntry {
                 name: field.name.clone(),
-                underlying_type: TypeBuilder::descriptor_by_llvm_type(field.ty).unwrap(),
+                underlying_type: tb.descriptor_by_llvm_type(field.ty).unwrap(),
             })
             .collect();
         let inits: Vec<InitBomEntry> = udt
@@ -71,7 +71,7 @@ impl StructBomEntry {
             .iter()
             .map(|f| InitBomEntry {
                 llvm_symbol_name: f.get_name().to_str().unwrap().to_owned(),
-                underlying_type: TypeBuilder::descriptor_for_function_type(f.get_type()).unwrap(),
+                underlying_type: tb.descriptor_for_function_type(f.get_type()).unwrap(),
             })
             .collect();
         Self {

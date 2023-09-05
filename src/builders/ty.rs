@@ -151,10 +151,10 @@ impl<'a> TypeBuilder<'a> {
         ty.const_zero()
     }
 
-    pub fn descriptor_by_llvm_type(ty: BasicTypeEnum) -> Option<TypeDescriptor> {
+    pub fn descriptor_by_llvm_type(&self, ty: BasicTypeEnum) -> Option<TypeDescriptor> {
         match ty {
             BasicTypeEnum::ArrayType(at) => {
-                if let Some(td) = TypeBuilder::descriptor_by_llvm_type(at.get_element_type()) {
+                if let Some(td) = self.descriptor_by_llvm_type(at.get_element_type()) {
                     let n = at.len();
                     return Some(TypeDescriptor::Array(Box::new(td), n as usize));
                 }
@@ -184,10 +184,10 @@ impl<'a> TypeBuilder<'a> {
                     | AnyTypeEnum::IntType(_)
                     | AnyTypeEnum::PointerType(_)
                     | AnyTypeEnum::StructType(_)
-                    | AnyTypeEnum::VectorType(_) => TypeBuilder::descriptor_by_llvm_type(
-                        BasicTypeEnum::try_from(pointee).unwrap(),
-                    ),
-                    AnyTypeEnum::FunctionType(ft) => TypeBuilder::descriptor_for_function_type(ft),
+                    | AnyTypeEnum::VectorType(_) => {
+                        self.descriptor_by_llvm_type(BasicTypeEnum::try_from(pointee).unwrap())
+                    }
+                    AnyTypeEnum::FunctionType(ft) => self.descriptor_for_function_type(ft),
                     AnyTypeEnum::VoidType(_) => panic!("unexpected void type"),
                 }
             }
@@ -199,7 +199,7 @@ impl<'a> TypeBuilder<'a> {
                     let fts: Vec<Option<TypeDescriptor>> = st
                         .get_field_types()
                         .iter()
-                        .map(|bt| TypeBuilder::descriptor_by_llvm_type(*bt))
+                        .map(|bt| self.descriptor_by_llvm_type(*bt))
                         .collect();
                     if fts.iter().any(|td| td.is_none()) {
                         return None;
@@ -306,16 +306,17 @@ impl<'a> TypeBuilder<'a> {
         }
     }
 
-    pub fn descriptor_for_function_type(ty: FunctionType) -> Option<TypeDescriptor> {
+    pub fn descriptor_for_function_type(&self, ty: FunctionType) -> Option<TypeDescriptor> {
         let return_type = if ty.get_return_type().is_none() {
             None
         } else {
-            TypeBuilder::descriptor_by_llvm_type(ty.get_return_type().unwrap()).map(Box::new)
+            self.descriptor_by_llvm_type(ty.get_return_type().unwrap())
+                .map(Box::new)
         };
         let arg_types: Vec<Option<TypeDescriptor>> = ty
             .get_param_types()
             .iter()
-            .map(|at| TypeBuilder::descriptor_by_llvm_type(*at))
+            .map(|at| self.descriptor_by_llvm_type(*at))
             .collect();
         if arg_types.iter().any(|at| at.is_none()) {
             return None;

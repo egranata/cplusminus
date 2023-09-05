@@ -118,7 +118,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                             aargs.push(BasicMetadataValueEnum::from(aarg));
                         } else {
                             // safe because compat is always true when no type hint is available
-                            let exp_type = TypeBuilder::descriptor_by_llvm_type(type_hint.unwrap());
+                            let exp_type = self.tb.descriptor_by_llvm_type(type_hint.unwrap());
                             self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                                 expr.loc,
                                 Error::UnexpectedType(exp_type.map(|t| format!("{t}"))),
@@ -899,9 +899,9 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     } else {
                         self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                             node.loc,
-                            Error::TypeNotRefcounted(TypeBuilder::descriptor_by_llvm_type(
-                                expr.get_type(),
-                            )),
+                            Error::TypeNotRefcounted(
+                                self.tb.descriptor_by_llvm_type(expr.get_type()),
+                            ),
                         ));
                         None
                     }
@@ -924,9 +924,9 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     } else {
                         self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                             node.loc,
-                            Error::TypeNotRefcounted(TypeBuilder::descriptor_by_llvm_type(
-                                expr.get_type(),
-                            )),
+                            Error::TypeNotRefcounted(
+                                self.tb.descriptor_by_llvm_type(expr.get_type()),
+                            ),
                         ));
                         None
                     }

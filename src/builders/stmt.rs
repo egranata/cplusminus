@@ -234,10 +234,10 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                             builder.build_store(self.exit.ret_alloca.unwrap(), value);
                             builder.build_unconditional_branch(self.exit.exit_block);
                         } else {
-                            let ret_type = TypeBuilder::descriptor_by_llvm_type(
-                                func.get_type().get_return_type().unwrap(),
-                            )
-                            .unwrap();
+                            let ret_type = self
+                                .tb
+                                .descriptor_by_llvm_type(func.get_type().get_return_type().unwrap())
+                                .unwrap();
                             let msg =
                                 format!("{ret_type}, which is not the type of this expression",);
                             self.iw.diagnostics.borrow_mut().error(CompilerError::new(
@@ -260,9 +260,9 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                     } else {
                         self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                             node.loc,
-                            Error::TypeNotRefcounted(TypeBuilder::descriptor_by_llvm_type(
-                                value.get_type(),
-                            )),
+                            Error::TypeNotRefcounted(
+                                self.tb.descriptor_by_llvm_type(value.get_type()),
+                            ),
                         ));
                     }
                 }
@@ -329,9 +329,8 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                     };
 
                     if value.get_type() != decl_ty {
-                        let val_ty_td =
-                            TypeBuilder::descriptor_by_llvm_type(value.get_type()).unwrap();
-                        let decl_ty_td = TypeBuilder::descriptor_by_llvm_type(decl_ty).unwrap();
+                        let val_ty_td = self.tb.descriptor_by_llvm_type(value.get_type()).unwrap();
+                        let decl_ty_td = self.tb.descriptor_by_llvm_type(decl_ty).unwrap();
                         self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                             node.loc,
                             Error::InvalidTypeSpecifier(decl_ty_td, val_ty_td),

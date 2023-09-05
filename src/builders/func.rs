@@ -77,11 +77,15 @@ impl FunctionBuilderOptions {
 
 pub struct FunctionBuilder<'a> {
     iw: CompilerCore<'a>,
+    tb: TypeBuilder<'a>,
 }
 
 impl<'a> FunctionBuilder<'a> {
     pub fn new(iw: CompilerCore<'a>) -> Self {
-        Self { iw }
+        Self {
+            iw: iw.clone(),
+            tb: TypeBuilder::new(iw.clone()),
+        }
     }
 }
 
@@ -182,15 +186,13 @@ impl<'a> FunctionBuilder<'a> {
         scope: &Scope<'a>,
         fd: &FunctionDecl,
     ) -> Option<FunctionType<'a>> {
-        let tb = TypeBuilder::new(self.iw.clone());
-        tb.function_type_for_descriptor(scope, &fd.ty)
+        self.tb.function_type_for_descriptor(scope, &fd.ty)
     }
 
     fn decref_locals(&self, builder: &Builder<'a>, vc: &FunctionExitData<'a>) {
         for vi in vc.need_decref.borrow().iter() {
             let ptr_val_type = vi.get_type().get_element_type();
-            let tb = TypeBuilder::new(self.iw.clone());
-            if tb.is_refcounted_any_type(ptr_val_type).is_some() {
+            if self.tb.is_refcounted_any_type(ptr_val_type).is_some() {
                 let name = format!(
                     "decref_load_{}",
                     vi.get_name().to_str().unwrap_or("default")
@@ -409,7 +411,7 @@ impl<'a> FunctionBuilder<'a> {
 
         if let Some(fv) = ret {
             if opts.export {
-                let bom_entry = FunctionBomEntry::new(&func.name, fv);
+                let bom_entry = FunctionBomEntry::new(&func.name, &self.tb, fv);
                 self.iw.bom.borrow_mut().functions.push(bom_entry);
             }
         }

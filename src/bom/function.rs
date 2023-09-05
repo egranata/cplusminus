@@ -29,8 +29,8 @@ pub struct FunctionBomEntry {
 }
 
 impl FunctionBomEntry {
-    pub fn new(name: &str, fv: FunctionValue<'_>) -> Self {
-        let ft = TypeBuilder::descriptor_for_function_type(fv.get_type()).unwrap();
+    pub fn new(name: &str, tb: &TypeBuilder, fv: FunctionValue<'_>) -> Self {
+        let ft = tb.descriptor_for_function_type(fv.get_type()).unwrap();
         Self {
             user_facing_name: name.to_string(),
             llvm_symbol_name: fv.get_name().to_str().unwrap().to_string(),

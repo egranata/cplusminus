@@ -473,7 +473,7 @@ impl<'a> CompilerCore<'a> {
                         .commit();
                     if let Some(fv) = fb.declare(&self.globals, &fd.decl, opts) {
                         if fd.export {
-                            let bom_entry = FunctionBomEntry::new(&fd.decl.name, fv);
+                            let bom_entry = FunctionBomEntry::new(&fd.decl.name, &tb, fv);
                             self.bom.borrow_mut().functions.push(bom_entry);
                         }
                     }
@@ -484,7 +484,7 @@ impl<'a> CompilerCore<'a> {
                             self.metadata.build_metadata_for_type(self, &tb, st);
                             if let Some(strct) = tb.structure_by_llvm_type(st) {
                                 if psd.export {
-                                    let bom_entry = StructBomEntry::new(&strct);
+                                    let bom_entry = StructBomEntry::new(&strct, &tb);
                                     self.bom.borrow_mut().structs.push(bom_entry);
                                 }
                             }
@@ -503,7 +503,7 @@ impl<'a> CompilerCore<'a> {
                     if let Some(uty) = tb.alias(&self.globals, &ad.name, &ad.ty) {
                         if ad.export {
                             // we just generated this from a descriptor, assume roundtrip is safe
-                            let utd = TypeBuilder::descriptor_by_llvm_type(uty).unwrap();
+                            let utd = tb.descriptor_by_llvm_type(uty).unwrap();
                             let bom_entry = AliasBomEntry::new(&ad.name, &utd);
                             self.bom.borrow_mut().aliases.push(bom_entry);
                         }
