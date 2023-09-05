@@ -23,7 +23,7 @@ use inkwell::{
 use peg::{error::ParseError, str::LineCol};
 use std::{
     cell::RefCell,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     process::Command,
     rc::Rc,
@@ -172,6 +172,7 @@ pub struct CompilerCore<'a> {
     pub builtins: BuiltinTypes<'a>,
     pub globals: Scope<'a>,
     pub bom: MutableOf<BillOfMaterials>,
+    pub imports: MutableOf<HashSet<PathBuf>>,
 }
 
 impl<'a> CompilerCore<'a> {
@@ -213,6 +214,7 @@ impl<'a> CompilerCore<'a> {
             builtins: BuiltinTypes::new(context),
             globals: ScopeObject::root(),
             bom: Default::default(),
+            imports: Default::default(),
         };
         new.fill_default_types();
         new.forbid_32bit_targets();
@@ -535,13 +537,16 @@ impl<'a> CompilerCore<'a> {
                         .source
                         .file_in_input_path(&id.path)
                         .unwrap_or(PathBuf::from(&id.path));
-                    if let Some(bom) = BillOfMaterials::load(bom_path.as_path()) {
-                        self.import(id, &bom);
-                    } else {
-                        self.diagnostics.borrow_mut().error(CompilerError::new(
-                            tld.loc,
-                            Error::InternalError(String::from("unable to find BOM")),
-                        ));
+                    if !self.imports.borrow().contains(&bom_path) {
+                        if let Some(bom) = BillOfMaterials::load(bom_path.as_path()) {
+                            self.imports.borrow_mut().insert(bom_path);
+                            self.import(id, &bom);
+                        } else {
+                            self.diagnostics.borrow_mut().error(CompilerError::new(
+                                tld.loc,
+                                Error::InternalError(String::from("unable to find BOM")),
+                            ));
+                        }
                     }
                 }
                 crate::ast::TopLevelDecl::Variable(gvd) => {

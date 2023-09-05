@@ -532,7 +532,15 @@ impl<'a> TypeBuilder<'a> {
         let st_ty = self
             .llvm_type_by_descriptor(scope, &st_ty_descriptor)
             .unwrap();
-        let st_ty = self.is_val_or_ref_basic_type(st_ty).unwrap();
+        let st_ty = self.is_val_or_ref_basic_type(st_ty);
+        if st_ty.is_none() {
+            self.iw.diagnostics.borrow_mut().error(CompilerError::new(
+                TokenSpan::origin(),
+                Error::IdentifierNotFound(sd.name.clone()),
+            ));
+            return false;
+        };
+        let st_ty = st_ty.unwrap();
         let cdg_st = self.structure_by_llvm_type(st_ty).unwrap();
 
         for id in &sd.inits {
