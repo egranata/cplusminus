@@ -748,24 +748,8 @@ impl<'a> TypeBuilder<'a> {
         }
     }
 
-    pub fn is_val_or_ref_any_type(&self, ty: AnyTypeEnum<'a>) -> Option<StructType<'a>> {
-        if let Some(st) = self.is_refcounted_any_type(ty) {
-            Some(st)
-        } else {
-            self.is_value_any_type(ty)
-        }
-    }
-
     pub fn is_refcounted_any_type(&self, ty: AnyTypeEnum<'a>) -> Option<StructType<'a>> {
-        if let AnyTypeEnum::PointerType(pty) = ty {
-            if let AnyTypeEnum::StructType(sty) = pty.get_element_type() {
-                if self.is_refcounted_type(sty) {
-                    return Some(sty);
-                }
-            }
-        }
-
-        None
+        BasicTypeEnum::try_from(ty).map_or(None, |x| self.is_refcounted_basic_type(x))
     }
 
     pub fn is_refcounted_basic_type(&self, ty: BasicTypeEnum<'a>) -> Option<StructType<'a>> {
@@ -781,21 +765,7 @@ impl<'a> TypeBuilder<'a> {
     }
 
     pub fn is_value_any_type(&self, ty: AnyTypeEnum<'a>) -> Option<StructType<'a>> {
-        if let AnyTypeEnum::StructType(sty) = ty {
-            if self.is_value_type(sty) {
-                return Some(sty);
-            }
-        }
-
-        if let AnyTypeEnum::PointerType(ptr) = ty {
-            if let AnyTypeEnum::StructType(sty) = ptr.get_element_type() {
-                if self.is_value_type(sty) {
-                    return Some(sty);
-                }
-            }
-        }
-
-        None
+        BasicTypeEnum::try_from(ty).map_or(None, |x| self.is_value_basic_type(x))
     }
 
     pub fn is_value_basic_type(&self, ty: BasicTypeEnum<'a>) -> Option<StructType<'a>> {
