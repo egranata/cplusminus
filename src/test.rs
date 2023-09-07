@@ -160,12 +160,16 @@ mod driver_tests {
         target: &PathBuf,
         options: &CompilerOptions,
         diags_match: &Option<Vec<String>>,
+        diags_no_match: &Option<Vec<String>>,
         stdout_match: &Option<Vec<String>>,
         stderr_match: &Option<Vec<String>>,
     ) {
         let run_result = compile_run_temp(sources, target, options);
         if let Some(expected_diags) = diags_match {
             match_diags(expected_diags, &run_result, true);
+        }
+        if let Some(expected_diags) = diags_no_match {
+            match_diags(expected_diags, &run_result, false);
         }
         match run_result.outcome {
             TestOutcome::CompilationFailure | TestOutcome::RuntimeError(..) => {
@@ -200,12 +204,16 @@ mod driver_tests {
         target: &PathBuf,
         options: &CompilerOptions,
         diags_match: &Option<Vec<String>>,
+        diags_no_match: &Option<Vec<String>>,
         stdout_match: &Option<Vec<String>>,
         stderr_match: &Option<Vec<String>>,
     ) {
         let run_result = compile_run_temp(sources, target, options);
         if let Some(expected_diags) = diags_match {
             match_diags(expected_diags, &run_result, true);
+        }
+        if let Some(expected_diags) = diags_no_match {
+            match_diags(expected_diags, &run_result, false);
         }
         match run_result.outcome {
             TestOutcome::CompilationFailure | TestOutcome::RuntimeError(..) => {}

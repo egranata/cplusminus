@@ -63,6 +63,7 @@ struct DriverTestConfig {
     source_files: Vec<String>,
     bom: bool,
     diags_match: Option<Vec<String>>,
+    diags_no_match: Option<Vec<String>>,
     stdout_match: Option<Vec<String>>,
     stderr_match: Option<Vec<String>>,
 }
@@ -117,6 +118,7 @@ fn build_driver_test_code(func_to_call: &str, indir: &Path, outfile_path: &Path)
         let test_json_str = std::fs::read_to_string(test_json_path).unwrap();
         let test_descriptor: DriverTestConfig = serde_json::from_str(&test_json_str).unwrap();
         let diags_match = opt_vec_to_opt_str(&test_descriptor.diags_match);
+        let diags_no_match = opt_vec_to_opt_str(&test_descriptor.diags_no_match);
         let stdout_match = opt_vec_to_opt_str(&test_descriptor.stdout_match);
         let stderr_match = opt_vec_to_opt_str(&test_descriptor.stderr_match);
 
@@ -152,6 +154,12 @@ fn build_driver_test_code(func_to_call: &str, indir: &Path, outfile_path: &Path)
         write!(
             outfile_handle,
             "{}",
+            opt_str_to_opt_vec(&diags_no_match, "diags_no_match")
+        )
+        .expect("<io error>");
+        write!(
+            outfile_handle,
+            "{}",
             opt_str_to_opt_vec(&stdout_match, "stdout_match")
         )
         .expect("<io error>");
@@ -178,7 +186,7 @@ fn build_driver_test_code(func_to_call: &str, indir: &Path, outfile_path: &Path)
             outfile_handle,
             "{}",
             format!(
-                "    {func_to_call}(&sources, &dest, &opts, &diags_match, &stdout_match, &stderr_match);"
+                "    {func_to_call}(&sources, &dest, &opts, &diags_match, &diags_no_match, &stdout_match, &stderr_match);"
             )
         )
         .expect("<io error>");
@@ -193,7 +201,7 @@ fn build_driver_test_code(func_to_call: &str, indir: &Path, outfile_path: &Path)
             outfile_handle,
             "{}",
             format!(
-                "    {func_to_call}(&sources, &dest, &opts, &diags_match, &stdout_match, &stderr_match);"
+                "    {func_to_call}(&sources, &dest, &opts, &diags_match, &diags_no_match, &stdout_match, &stderr_match);"
             )
         )
         .expect("<io error>");

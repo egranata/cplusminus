@@ -1,0 +1,19 @@
+{
+    "source_files": [
+        "test.cpm"
+    ],
+    "bom": false,
+    "diags_match": [
+        "variable x was declared but never used",
+        "variable y was declared but never used",
+        "variable rt2 was declared but never used",
+        "variable t2 was declared but never used"
+    ],
+    "diags_no_match": [
+        "variable z was declared but never used",
+        "variable _x was declared but never used",
+        "variable rt1 was declared but never used",
+        "variable rt3 was declared but never used",
+        "variable t1 was declared but never used"
+    ]
+}
