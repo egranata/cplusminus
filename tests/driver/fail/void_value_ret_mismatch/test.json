@@ -3,7 +3,7 @@
         "test.cpm"
     ],
     "bom": false,
-    "diags": [
+    "diags_match": [
         "expected value being returned",
         "test.cpm:16:5",
         "expected no return value for void function",

@@ -3,7 +3,7 @@
         "test.cpm"
     ],
     "bom": false,
-    "diags": [
+    "diags_match": [
         "this declaration cannot be resolved to a type",
         "test.cpm:16:5"
     ]

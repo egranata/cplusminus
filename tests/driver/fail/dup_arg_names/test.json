@@ -3,7 +3,7 @@
         "test.cpm"
     ],
     "bom": false,
-    "diags": [
+    "diags_match": [
         "argument x already defined for this function",
         "test.cpm:15:30"
     ]

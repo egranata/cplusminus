@@ -3,7 +3,7 @@
         "test.cpm"
     ],
     "bom": false,
-    "diags": [
+    "diags_match": [
         "identifier __field is reserved",
         "test.cpm:16:5"
     ]

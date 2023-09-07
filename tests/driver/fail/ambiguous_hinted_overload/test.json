@@ -3,7 +3,7 @@
         "test.cpm"
     ],
     "bom": true,
-    "diags": [
+    "diags_match": [
         "multiple overloads of foo can accept the arguments provided"
     ]
 }

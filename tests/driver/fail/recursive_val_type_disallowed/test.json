@@ -3,7 +3,7 @@
         "test.cpm"
     ],
     "bom": false,
-    "diags": [
+    "diags_match": [
         "field f would cause this type to be recursive",
         "test.cpm:16:5"
     ]

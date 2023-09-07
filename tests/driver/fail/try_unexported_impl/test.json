@@ -4,7 +4,7 @@
         "main.cpm"
     ],
     "bom": true,
-    "diags": [
+    "diags_match": [
         "identifier add not found",
         "main.cpm:21:13"
     ]

@@ -135,9 +135,9 @@ mod driver_tests {
         return false;
     }
 
-    fn match_diags(expected_diags: &[String], actual_result: &DriverTestResult) {
+    fn match_diags(expected_diags: &[String], actual_result: &DriverTestResult, matching: bool) {
         for diag in expected_diags {
-            assert!(find_string_in_map(diag, &actual_result.diags));
+            assert!(find_string_in_map(diag, &actual_result.diags) == matching);
         }
     }
 
@@ -159,13 +159,13 @@ mod driver_tests {
         sources: &[PathBuf],
         target: &PathBuf,
         options: &CompilerOptions,
-        diags: &Option<Vec<String>>,
+        diags_match: &Option<Vec<String>>,
         stdout_match: &Option<Vec<String>>,
         stderr_match: &Option<Vec<String>>,
     ) {
         let run_result = compile_run_temp(sources, target, options);
-        if let Some(expected_diags) = diags {
-            match_diags(expected_diags, &run_result);
+        if let Some(expected_diags) = diags_match {
+            match_diags(expected_diags, &run_result, true);
         }
         match run_result.outcome {
             TestOutcome::CompilationFailure | TestOutcome::RuntimeError(..) => {
@@ -199,13 +199,13 @@ mod driver_tests {
         sources: &[PathBuf],
         target: &PathBuf,
         options: &CompilerOptions,
-        diags: &Option<Vec<String>>,
+        diags_match: &Option<Vec<String>>,
         stdout_match: &Option<Vec<String>>,
         stderr_match: &Option<Vec<String>>,
     ) {
         let run_result = compile_run_temp(sources, target, options);
-        if let Some(expected_diags) = diags {
-            match_diags(expected_diags, &run_result);
+        if let Some(expected_diags) = diags_match {
+            match_diags(expected_diags, &run_result, true);
         }
         match run_result.outcome {
             TestOutcome::CompilationFailure | TestOutcome::RuntimeError(..) => {}

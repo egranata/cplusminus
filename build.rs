@@ -62,7 +62,7 @@ fn build_jit_tests(indir: &Path, outdir: &Path, pass: bool) {
 struct DriverTestConfig {
     source_files: Vec<String>,
     bom: bool,
-    diags: Option<Vec<String>>,
+    diags_match: Option<Vec<String>>,
     stdout_match: Option<Vec<String>>,
     stderr_match: Option<Vec<String>>,
 }
@@ -116,7 +116,7 @@ fn build_driver_test_code(func_to_call: &str, indir: &Path, outfile_path: &Path)
         }
         let test_json_str = std::fs::read_to_string(test_json_path).unwrap();
         let test_descriptor: DriverTestConfig = serde_json::from_str(&test_json_str).unwrap();
-        let diags = opt_vec_to_opt_str(&test_descriptor.diags);
+        let diags_match = opt_vec_to_opt_str(&test_descriptor.diags_match);
         let stdout_match = opt_vec_to_opt_str(&test_descriptor.stdout_match);
         let stderr_match = opt_vec_to_opt_str(&test_descriptor.stderr_match);
 
@@ -143,7 +143,12 @@ fn build_driver_test_code(func_to_call: &str, indir: &Path, outfile_path: &Path)
             format!("    let sources: Vec<PathBuf> = vec![{sources}];\n")
         )
         .expect("<io error>");
-        write!(outfile_handle, "{}", opt_str_to_opt_vec(&diags, "diags")).expect("<io error>");
+        write!(
+            outfile_handle,
+            "{}",
+            opt_str_to_opt_vec(&diags_match, "diags_match")
+        )
+        .expect("<io error>");
         write!(
             outfile_handle,
             "{}",
@@ -173,7 +178,7 @@ fn build_driver_test_code(func_to_call: &str, indir: &Path, outfile_path: &Path)
             outfile_handle,
             "{}",
             format!(
-                "    {func_to_call}(&sources, &dest, &opts, &diags, &stdout_match, &stderr_match);"
+                "    {func_to_call}(&sources, &dest, &opts, &diags_match, &stdout_match, &stderr_match);"
             )
         )
         .expect("<io error>");
@@ -188,7 +193,7 @@ fn build_driver_test_code(func_to_call: &str, indir: &Path, outfile_path: &Path)
             outfile_handle,
             "{}",
             format!(
-                "    {func_to_call}(&sources, &dest, &opts, &diags, &stdout_match, &stderr_match);"
+                "    {func_to_call}(&sources, &dest, &opts, &diags_match, &stdout_match, &stderr_match);"
             )
         )
         .expect("<io error>");

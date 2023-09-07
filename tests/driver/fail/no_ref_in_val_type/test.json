@@ -3,7 +3,7 @@
         "test.cpm"
     ],
     "bom": false,
-    "diags": [
+    "diags_match": [
         "ref type field of val type is not implemented",
         "test.cpm:20:5"
     ]

@@ -3,7 +3,7 @@
         "test.cpm"
     ],
     "bom": false,
-    "diags": [
+    "diags_match": [
         "n is read-only",
         "test.cpm:16:5",
         "x is read-only",

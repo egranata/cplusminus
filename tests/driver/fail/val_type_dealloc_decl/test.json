@@ -3,7 +3,7 @@
         "test.cpm"
     ],
     "bom": false,
-    "diags": [
+    "diags_match": [
         "this declaration is only permitted for reference types",
         "test.cpm:17:5"
     ]

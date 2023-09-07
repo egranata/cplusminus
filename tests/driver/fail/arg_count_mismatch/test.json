@@ -3,7 +3,7 @@
         "test.cpm"
     ],
     "bom": true,
-    "diags": [
+    "diags_match": [
         "1 args expected, 3 actual",
         "1 args expected, 0 actual",
         "2 args expected, 4 actual",

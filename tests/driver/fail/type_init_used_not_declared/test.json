@@ -3,7 +3,7 @@
         "test.cpm"
     ],
     "bom": false,
-    "diags": [
+    "diags_match": [
         "field init not found",
         "test.cpm:26:14",
         "test.cpm:27:14"

@@ -3,7 +3,7 @@
         "test.cpm"
     ],
     "bom": false,
-    "diags": [
+    "diags_match": [
         "identifier __X__7wrapper__3get is reserved",
         "test.cpm:15:1"
     ]

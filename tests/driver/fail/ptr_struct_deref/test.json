@@ -3,7 +3,7 @@
         "test.cpm"
     ],
     "bom": false,
-    "diags": [
+    "diags_match": [
         "type mismatch in expression: expected not a refcounted type",
         "test.cpm:22:14",
         "type mismatch in expression: expected pointer type",
