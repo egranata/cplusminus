@@ -267,7 +267,7 @@ impl<'a> FunctionBuilder<'a> {
             builder.build_store(alloca, param_value);
             ret.insert_variable(
                 param_name,
-                VarInfo::new(fd.decl.loc, param_name.clone(), alloca, param_rw),
+                VarInfo::new(fd.decl.loc, param_name.clone(), alloca, true, param_rw),
                 false,
             );
         }

@@ -101,6 +101,21 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
         }
     }
 
+    fn warn_on_unused_locals(&self, vc: &ScopeObject) {
+        vc.variables.values(|vi| {
+            // ignore args, they will be done at the function level
+            if !vi.is_arg && !*vi.referenced.borrow() && !vi.name.starts_with('_') {
+                self.iw
+                    .diagnostics
+                    .borrow_mut()
+                    .warning(CompilerWarning::new(
+                        vi.loc,
+                        Warning::LocalValueNeverAccessed(vi.name.clone()),
+                    ));
+            }
+        });
+    }
+
     fn warn_on_unwritten_locals(&self, vc: &ScopeObject) {
         vc.variables.values(|vi| {
             if vi.rw && !*vi.written.borrow() {
@@ -172,6 +187,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                     self.build_stmt(builder, fd, node, &block_locals, func, brek);
                 }
                 self.warn_on_unwritten_locals(&block_locals);
+                self.warn_on_unused_locals(&block_locals);
             }
             Break => {
                 if let Some(bb) = brek {
@@ -349,7 +365,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                     self.exit.decref_on_exit(alloca);
                     locals.insert_variable(
                         &var.name,
-                        VarInfo::new(node.loc, var.name.clone(), alloca, rw),
+                        VarInfo::new(node.loc, var.name.clone(), alloca, false, rw),
                         true,
                     );
                 }

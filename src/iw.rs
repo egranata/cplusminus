@@ -582,8 +582,13 @@ impl<'a> CompilerCore<'a> {
                             false,
                         );
 
-                        let vi =
-                            VarInfo::new(tld.loc, vd.name.clone(), global.as_pointer_value(), true);
+                        let vi = VarInfo::new(
+                            tld.loc,
+                            vd.name.clone(),
+                            global.as_pointer_value(),
+                            false,
+                            true,
+                        );
                         self.globals.insert_variable(&vd.name, vi, true);
 
                         if gvd.export {

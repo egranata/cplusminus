@@ -56,6 +56,7 @@ impl VariableBomEntry {
             TokenSpan::origin(),
             self.user_facing_name.clone(),
             gv.as_pointer_value(),
+            false,
             true,
         );
         scope.insert_variable(&self.user_facing_name, vi, true);

@@ -27,16 +27,26 @@ pub struct VarInfo<'a> {
     pub name: String,
     pub alloca: PointerValue<'a>,
     pub rw: bool,
+    pub is_arg: bool,
+    pub referenced: Rc<RefCell<bool>>,
     pub written: Rc<RefCell<bool>>,
 }
 
 impl<'a> VarInfo<'a> {
-    pub fn new(loc: TokenSpan, name: String, alloca: PointerValue<'a>, rw: bool) -> Self {
+    pub fn new(
+        loc: TokenSpan,
+        name: String,
+        alloca: PointerValue<'a>,
+        is_arg: bool,
+        rw: bool,
+    ) -> Self {
         Self {
             loc,
             name,
             alloca,
             rw,
+            is_arg,
+            referenced: Rc::new(RefCell::new(false)),
             written: Rc::new(RefCell::new(false)),
         }
     }

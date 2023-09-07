@@ -44,6 +44,11 @@ impl<'a> ResolvedLvalue<'a> {
             *vi.written.borrow_mut() = true
         }
     }
+    pub fn mark_referenced(&self) {
+        if let Some(vi) = &self.var {
+            *vi.referenced.borrow_mut() = true
+        }
+    }
 }
 
 impl<'a, 'b> LvalueBuilder<'a, 'b> {
@@ -69,6 +74,23 @@ impl<'a, 'b> LvalueBuilder<'a, 'b> {
     }
 
     pub fn build_lvalue(
+        &self,
+        builder: &Builder<'a>,
+        fd: &FunctionDefinition,
+        node: &Lvalue,
+        locals: &Scope<'a>,
+    ) -> Result<ResolvedLvalue<'a>, Error> {
+        let result = self.do_build_lvalue(builder, fd, node, locals);
+        match result {
+            Ok(rlv) => {
+                rlv.mark_referenced();
+                Ok(rlv)
+            }
+            Err(err) => Err(err),
+        }
+    }
+
+    fn do_build_lvalue(
         &self,
         builder: &Builder<'a>,
         fd: &FunctionDefinition,
