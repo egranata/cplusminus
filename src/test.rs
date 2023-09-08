@@ -137,7 +137,10 @@ mod driver_tests {
 
     fn match_diags(expected_diags: &[String], actual_result: &DriverTestResult, matching: bool) {
         for diag in expected_diags {
-            assert!(find_string_in_map(diag, &actual_result.diags) == matching);
+            assert!(
+                find_string_in_map(diag, &actual_result.diags) == matching,
+                "for diagnostic {diag} matching was not {matching}"
+            );
         }
     }
 
@@ -148,10 +151,16 @@ mod driver_tests {
         matching: bool,
     ) {
         for stdout in expected_stdout {
-            assert!(actual_result.stdout.contains(stdout) == matching);
+            assert!(
+                actual_result.stdout.contains(stdout) == matching,
+                "for stdout {stdout} matching was not {matching}"
+            );
         }
         for stderr in expected_stderr {
-            assert!(actual_result.stderr.contains(stderr) == matching);
+            assert!(
+                actual_result.stderr.contains(stderr) == matching,
+                "for stderr {stderr} matching was not {matching}"
+            );
         }
     }
 
