@@ -15,7 +15,7 @@
 func main() ret int32 {
     var x: int32 = 6;
     var a: int32 = 0;
-    while (x>0) {
+    while x>0 {
         if (a > 3) { return 0; };
         x = x - 1;
         a = a + x;

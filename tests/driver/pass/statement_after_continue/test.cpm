@@ -19,7 +19,7 @@ func main() ret int64 {
         inc x;
         if (x == 1) { continue; };
         inc y;
-    } while(x < 10);
+    } while (x < 10);
     return x - y - 1;
 }
 

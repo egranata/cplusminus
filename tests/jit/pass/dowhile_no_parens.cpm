@@ -11,23 +11,13 @@
 (* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. *)
 (* See the License for the specific language governing permissions and *)
 (* limitations under the License. *)
-        
-func main() ret int64 {
-    var a = 1;
-    if(12 > 34) {
-        return 12;
-    } elsif (3 > 5) {
-        return 5;
-    } elsif (12 > 10) {
-        (* this is the expected branch *)
-        return 0;
-    } elsif 7 > 12 {
-        return 8;
-    } elsif (12 > 7) {
-        return 6;
-    } else {
-        a = 36;
-        return a;
-    };
-}
 
+func main() ret int32 {
+    do {
+    } while false;
+    do {
+        break;
+    } while true;
+
+    return 0;
+}

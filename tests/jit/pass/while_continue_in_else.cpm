@@ -15,7 +15,7 @@
 func main() ret int64 {
     var a = 0;
     var b = 0;
-    while(a > 100) {
+    while a > 100 {
         inc b;
     } else {
         inc a;

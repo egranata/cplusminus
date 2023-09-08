@@ -15,7 +15,7 @@
 func main() ret int64 {
     var a = 0;
     var b = 0;
-    while(a < 10) {
+    while a < 10 {
         inc a;
         if (b == 0) { continue; };
         inc b;

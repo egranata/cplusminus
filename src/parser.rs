@@ -128,7 +128,9 @@ peg::parser! {
 
         rule _() = (comment() / [' ' | '\t' | '\r' | '\n'])*
 
-        rule __() = [' ' | '\t' | '\r' | '\n']+
+        rule __() -> bool = [' ' | '\t' | '\r' | '\n']+ {
+            true
+        }
 
         rule array_expr() -> Expr =
         "[" _ es:top_level_expr()**"," _ "]" { Expr::Array(es) }
@@ -205,6 +207,16 @@ peg::parser! {
         rule top_level_expr() -> Expression =
         _ c:expr() _ { c }
 
+        // this is useful in if/while/do blocks where you can write either
+        // if thing or if(thing) and both should be
+        // valid syntaxes, but ifthing (no space and no parenthesis)
+        // is not an acceptable syntax; we do not try to be smart with other
+        // delimiters, e.g. we would not accept if*x even if "x" was a
+        // pointer-to a boolean
+        rule delimited_expression() -> Expression =
+        &"(" c:top_level_expr() {c} /
+        __() c:top_level_expr() {c}
+
         rule var_decl_rw_ro() -> bool =
         "var" { true } /
         "let" { false }
@@ -253,13 +265,13 @@ peg::parser! {
         start:position!() lv:lvalue() _ "=" _ e:top_level_expr() end:position!() { Statement { loc:TokenSpan{start,end}, payload:Stmt::Assignment(lv,Box::new(e)) } }
 
         rule ifcond() -> IfCondition =
-        start:position!() "(" _ cond:top_level_expr() _ ")" _ body:block() end:position!() { IfCondition{loc:TokenSpan{start,end},cond:Box::new(cond),body:Box::new(body)} }
+        start:position!() cond:delimited_expression() _ body:block() end:position!() { IfCondition{loc:TokenSpan{start,end},cond:Box::new(cond),body:Box::new(body)} }
 
         rule ifcheck() -> IfCondition =
-        "if" _ cond:ifcond() _ { cond }
+        "if" cond:ifcond() _ { cond }
 
         rule elsifcheck() -> IfCondition =
-        "elsif" _ cond:ifcond() _ { cond }
+        "elsif" cond:ifcond() _ { cond }
 
         rule elscheck() -> Box<Statement> =
         "else" _ blk:block() { Box::new(blk) }
@@ -301,7 +313,7 @@ peg::parser! {
         start:position!() e:top_level_expr() end:position!() { Statement { loc:TokenSpan{start,end}, payload:Stmt::Expression(Box::new(e)) } }
 
         rule whilestmt() -> Statement =
-        start:position!() "while" _ "(" c:top_level_expr() _ ")" _ blk:block() _ els:elscheck()? end:position!()  {
+        start:position!() "while" c:delimited_expression() _ blk:block() _ els:elscheck()? end:position!()  {
             let wh = WhileStmt {
                 cond: Box::new(c),
                 body: Box::new(blk),
@@ -311,7 +323,7 @@ peg::parser! {
         }
 
         rule dowhilestmt() -> Statement =
-        start:position!() "do" _ blk:block() _ "while" _ "(" c:top_level_expr() _ ")" end:position!()  {
+        start:position!() "do" _ blk:block() _ "while" c:delimited_expression() _ end:position!()  {
             let wh = DoWhileStmt {
                 body: Box::new(blk),
                 cond: Box::new(c),

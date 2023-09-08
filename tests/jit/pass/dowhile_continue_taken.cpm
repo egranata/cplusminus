@@ -19,6 +19,6 @@ func main() ret int64 {
         inc a;
         continue;
         inc b;
-    } while(a < 10);
+    } while a < 10;
     return b;
 }

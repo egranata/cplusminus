@@ -16,6 +16,6 @@ func main() ret int64 {
     var a = 10;
     do {
         if ((dec a) == 3) { break; };
-    } while(a > 0);
+    } while a > 0;
     return a - 3;
 }
