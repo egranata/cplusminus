@@ -5,6 +5,11 @@
     "bom": false,
     "diags_match": [
         "variable q declared mutable but never written to",
-        "variable m declared mutable but never written to"
+        "variable n declared mutable but never written to",
+        "variable m was declared but never used"
+    ],
+    "diags_no_match": [
+        "variable m declared mutable but never written to",
+        "variable n was declared but never used"
     ]
 }

@@ -52,6 +52,24 @@ impl<'a> VarInfo<'a> {
     }
 }
 
+impl<'a> VarInfo<'a> {
+    pub fn is_unreferenced(&self, ignore_underscore: bool, ignore_arg: bool) -> bool {
+        let referenced = *self.referenced.borrow();
+        !(referenced
+            || (self.is_arg && ignore_arg)
+            || (ignore_underscore && self.name.starts_with('_')))
+    }
+
+    pub fn is_unwritten(&self) -> bool {
+        let written = *self.written.borrow();
+        if written {
+            false
+        } else {
+            self.rw
+        }
+    }
+}
+
 #[derive(Clone)]
 pub enum HierarchicalStorage<T: Clone> {
     Root(MutableOf<HashMap<String, T>>),

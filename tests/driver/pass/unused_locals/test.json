@@ -7,9 +7,13 @@
         "variable x was declared but never used",
         "variable y was declared but never used",
         "variable rt2 was declared but never used",
-        "variable t2 was declared but never used"
+        "variable t2 was declared but never used",
+        "variable t1 declared mutable but never written to"
     ],
     "diags_no_match": [
+        "variable t2 declared mutable but never written to",
+        "variable x declared mutable but never written to",
+        "variable y declared mutable but never written to",
         "variable z was declared but never used",
         "variable _x was declared but never used",
         "variable rt1 was declared but never used",

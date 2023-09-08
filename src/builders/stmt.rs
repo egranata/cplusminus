@@ -101,10 +101,10 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
         }
     }
 
-    fn warn_on_unused_locals(&self, vc: &ScopeObject) {
+    fn emit_warnings_for_locals(&self, vc: &ScopeObject) {
         vc.variables.values(|vi| {
             // ignore args, they will be done at the function level
-            if !vi.is_arg && !*vi.referenced.borrow() && !vi.name.starts_with('_') {
+            if vi.is_unreferenced(true, true) {
                 self.iw
                     .diagnostics
                     .borrow_mut()
@@ -112,13 +112,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                         vi.loc,
                         Warning::LocalValueNeverAccessed(vi.name.clone()),
                     ));
-            }
-        });
-    }
-
-    fn warn_on_unwritten_locals(&self, vc: &ScopeObject) {
-        vc.variables.values(|vi| {
-            if vi.rw && !*vi.written.borrow() {
+            } else if vi.is_unwritten() {
                 self.iw
                     .diagnostics
                     .borrow_mut()
@@ -186,8 +180,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                 for node in block {
                     self.build_stmt(builder, fd, node, &block_locals, func, brek);
                 }
-                self.warn_on_unwritten_locals(&block_locals);
-                self.warn_on_unused_locals(&block_locals);
+                self.emit_warnings_for_locals(&block_locals);
             }
             Break => {
                 if let Some(bb) = brek {
