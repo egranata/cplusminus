@@ -18,9 +18,7 @@ use inkwell::{
     basic_block::BasicBlock,
     builder::Builder,
     types::FunctionType,
-    values::{
-        AnyValue, BasicValueEnum, FunctionValue, InstructionOpcode, InstructionValue, PointerValue,
-    },
+    values::{BasicValueEnum, FunctionValue, InstructionOpcode, InstructionValue, PointerValue},
 };
 
 use crate::{
@@ -158,26 +156,6 @@ impl<'a> FunctionExitData<'a> {
     pub fn decref_on_exit(&self, pv: PointerValue<'a>) {
         self.need_decref.borrow_mut().push(pv);
     }
-
-    pub fn undecref_on_exit(&self, pv: PointerValue<'a>) {
-        let mut ndr = self.need_decref.borrow_mut();
-        loop {
-            let mut any_deleted = false;
-            for i in 0..ndr.len() {
-                unsafe {
-                    let pvi = ndr.get_unchecked(i);
-                    if *pvi == pv {
-                        ndr.remove(i);
-                        any_deleted = true;
-                        break;
-                    }
-                }
-            }
-            if !any_deleted {
-                break;
-            };
-        }
-    }
 }
 
 impl<'a> FunctionBuilder<'a> {
@@ -235,7 +213,7 @@ impl<'a> FunctionBuilder<'a> {
         let sb = StatementBuilder::new(self.iw.clone(), &exit);
         sb.build_stmt(&builder, fd, &fd.body, &locals, func, None);
 
-        self.purge_unreachables(func, &exit);
+        self.purge_unreachables(func);
 
         builder.position_at_end(exit_block);
         if let Some(ret_alloca) = ret_alloca {
@@ -289,7 +267,7 @@ impl<'a> FunctionBuilder<'a> {
         }
     }
 
-    fn purge_unreachables(&self, func: FunctionValue<'a>, vc: &FunctionExitData<'a>) {
+    fn purge_unreachables(&self, func: FunctionValue<'a>) {
         for bb in func.get_basic_blocks() {
             let mut found_terminal = false;
             let mut instr: Option<InstructionValue<'a>> = bb.get_first_instruction();
@@ -301,10 +279,9 @@ impl<'a> FunctionBuilder<'a> {
                 instr = iv.get_next_instruction();
 
                 if found_terminal {
-                    if iv.get_opcode() == InstructionOpcode::Alloca {
-                        let pv = iv.as_any_value_enum().into_pointer_value();
-                        vc.undecref_on_exit(pv);
-                    }
+                    // there should be no allocas outside of the initial block which
+                    // is under our control and has no post-terminal instructions
+                    assert!(iv.get_opcode() != InstructionOpcode::Alloca);
                     iv.erase_from_basic_block();
                 } else if is_terminator_instruction(iv) {
                     found_terminal = true;

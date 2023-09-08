@@ -12,10 +12,10 @@
 (* See the License for the specific language governing permissions and *)
 (* limitations under the License. *)
 
-func main() ret int64 {
-    let x = 0;
+func main() ret int32 {
+    let x: int32 = 0;
     return x;
-    var x = 123;
+    var x: int32 = 123;
     return x;
     inc x;
     return x + 1;
