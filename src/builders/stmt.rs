@@ -101,29 +101,6 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
         }
     }
 
-    fn emit_warnings_for_locals(&self, vc: &ScopeObject) {
-        vc.variables.values(|vi| {
-            // ignore args, they will be done at the function level
-            if vi.is_unreferenced(true, true) {
-                self.iw
-                    .diagnostics
-                    .borrow_mut()
-                    .warning(CompilerWarning::new(
-                        vi.loc,
-                        Warning::LocalValueNeverAccessed(vi.name.clone()),
-                    ));
-            } else if vi.is_unwritten() {
-                self.iw
-                    .diagnostics
-                    .borrow_mut()
-                    .warning(CompilerWarning::new(
-                        vi.loc,
-                        Warning::MutableValueNeverWrittenTo(vi.name.clone()),
-                    ));
-            }
-        });
-    }
-
     pub fn build_stmt(
         &self,
         builder: &Builder<'a>,
@@ -180,7 +157,11 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                 for node in block {
                     self.build_stmt(builder, fd, node, &block_locals, func, brek);
                 }
-                self.emit_warnings_for_locals(&block_locals);
+                block_locals.emit_warnings_for_locals(
+                    &mut self.iw.diagnostics.borrow_mut(),
+                    true,
+                    true,
+                );
             }
             Break => {
                 if let Some(bb) = brek {

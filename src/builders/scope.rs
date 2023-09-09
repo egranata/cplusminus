@@ -184,4 +184,28 @@ impl<'a> ScopeObject<'a> {
     }
 }
 
+impl<'a> ScopeObject<'a> {
+    pub fn emit_warnings_for_locals(
+        &self,
+        diagnostics: &mut crate::driver::diags::Diagnostics,
+        ignore_underscore: bool,
+        ignore_arg: bool,
+    ) {
+        self.variables.values(|vi| {
+            // ignore args, they will be done at the function level
+            if vi.is_unreferenced(ignore_underscore, ignore_arg) {
+                diagnostics.warning(crate::err::CompilerWarning::new(
+                    vi.loc,
+                    crate::err::Warning::LocalValueNeverAccessed(vi.name.clone()),
+                ));
+            } else if vi.is_unwritten() {
+                diagnostics.warning(crate::err::CompilerWarning::new(
+                    vi.loc,
+                    crate::err::Warning::MutableValueNeverWrittenTo(vi.name.clone()),
+                ));
+            }
+        });
+    }
+}
+
 pub type Scope<'a> = Rc<ScopeObject<'a>>;

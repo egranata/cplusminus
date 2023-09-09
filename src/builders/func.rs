@@ -189,7 +189,7 @@ impl<'a> FunctionBuilder<'a> {
 
         let ret_alloca: Option<PointerValue<'a>>;
 
-        let locals = self.build_argument_allocas(func, &builder, fd);
+        let local_args = self.build_argument_allocas(func, &builder, fd);
         if let Some(ret_ty) = func.get_type().get_return_type() {
             // this alloca is whitelisted because it is created at function entry
             ret_alloca = Some(builder.build_alloca(ret_ty, "ret_alloca"));
@@ -211,7 +211,7 @@ impl<'a> FunctionBuilder<'a> {
         builder.position_at_end(body);
 
         let sb = StatementBuilder::new(self.iw.clone(), &exit);
-        sb.build_stmt(&builder, fd, &fd.body, &locals, func, None);
+        sb.build_stmt(&builder, fd, &fd.body, &local_args, func, None);
 
         self.purge_unreachables(func);
 
@@ -226,6 +226,8 @@ impl<'a> FunctionBuilder<'a> {
         }
 
         self.build_failsafe_returns(func, &builder, exit_block);
+
+        local_args.emit_warnings_for_locals(&mut self.iw.diagnostics.borrow_mut(), true, false);
     }
 
     fn build_argument_allocas(
