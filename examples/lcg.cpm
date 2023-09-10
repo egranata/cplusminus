@@ -1,0 +1,72 @@
+(* Copyright 2023 Enrico Granata *)
+(* *)
+(* Licensed under the Apache License, Version 2.0 (the "License"); *)
+(* you may not use this file except in compliance with the License. *)
+(* You may obtain a copy of the License at *)
+(*  *)
+(*     http://www.apache.org/licenses/LICENSE-2.0 *)
+(*  *)
+(* Unless required by applicable law or agreed to in writing, software *)
+(* distributed under the License is distributed on an "AS IS" BASIS, *)
+(* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. *)
+(* See the License for the specific language governing permissions and *)
+(* limitations under the License. *)
+
+type time_t = int64;
+extern func time(t: *time_t) ret time_t;
+
+func gettime() ret time_t {
+    let t = time(0 as *time_t);
+    return t;
+}
+
+extern vararg func printf(fmt: *byte) ret int32;
+
+ref type LCG {
+    a: int64,
+    c: int64,
+    m: int64,
+    x: int64,
+    init() {
+        self.a = 1140671485;
+        self.c = 12820163;
+        self.m = 16777216;
+        self.x = gettime();
+    },
+    init(x: int64) {
+        self.a = 1140671485;
+        self.c = 12820163;
+        self.m = 16777216;
+        self.x = x;
+    }
+}
+
+impl LCG {
+    func next() ret int64 {
+        let next = self.x * self.a;
+        let next = next + self.c;
+        let next = next % self.m;
+        self.x = next;
+        if next > 0 {
+            return next;
+        } else {
+            return -next;
+        };
+    }
+
+    func next(l: int64, h: int64) ret int64 {
+        assert h > l;
+        let n = self->next();
+        let range = h-l+1;
+        let n = n % range;
+        return n + l;
+    }
+}
+
+func main() ret int32 {
+    let lcg = alloc LCG();
+    printf("random = %lld %lld\n", lcg->next(), lcg->next());
+    (* range chosen so its size is a power of 2 *)
+    printf("random[10,41] = %lld %lld %lld\n", lcg->next(10,41), lcg->next(10,41), lcg->next(10,41));
+    return 0;
+}
