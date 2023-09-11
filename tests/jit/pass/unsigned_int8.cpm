@@ -1,0 +1,56 @@
+(* Copyright 2023 Enrico Granata *)
+(* *)
+(* Licensed under the Apache License, Version 2.0 (the "License"); *)
+(* you may not use this file except in compliance with the License. *)
+(* You may obtain a copy of the License at *)
+(*  *)
+(*     http://www.apache.org/licenses/LICENSE-2.0 *)
+(*  *)
+(* Unless required by applicable law or agreed to in writing, software *)
+(* distributed under the License is distributed on an "AS IS" BASIS, *)
+(* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. *)
+(* See the License for the specific language governing permissions and *)
+(* limitations under the License. *)
+
+func comparison() ret int32 {
+    let n: byte = 127;
+    let m = n + 1;
+    assert n > m;
+    assert m u> n;
+
+    assert m < n;
+    assert n u< m;
+
+    assert n >= m;
+    assert m u>= n;
+
+    assert m <= n;
+    assert n u<= m;
+}
+
+func division() ret int32 {
+    let m: byte = -2;
+
+    let q_s = m / 2;
+    let q_u = m u/ 2;
+
+    assert q_s == -1;
+    assert q_u == 127;
+}
+
+func remainder() ret int32 {
+    let m: byte = -3;
+
+    let q_s = m % 2;
+    let q_u = m u% 2;
+
+    assert q_s == -1;
+    assert q_u == 1;
+}
+
+func main() ret int32 {
+    comparison();
+    division();
+    remainder();
+    return 0;
+}
