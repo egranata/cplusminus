@@ -179,6 +179,7 @@ pub enum Warning {
     ExportInLocalDeclUnused,
     ExportImplIgnored,
     CannotInstrumentJitRefcount,
+    UnsignedCastIgnored,
 }
 
 impl Display for Warning {
@@ -207,6 +208,9 @@ impl Display for Warning {
                     f,
                     "instrumenting refcounting API not supported when in JIT mode"
                 )
+            }
+            Warning::UnsignedCastIgnored => {
+                write!(f, "unsigned specifier ignored for this cast")
             }
         }
     }

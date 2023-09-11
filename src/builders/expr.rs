@@ -997,10 +997,12 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     }
                 };
             }
-            Cast(e, t, _unsigned) => {
+            Cast(e, t, unsigned) => {
                 if let Some(expr) = self.build_expr(builder, fd, e.as_ref(), locals, type_hint) {
                     if let Some(ty) = self.tb.llvm_type_by_descriptor(locals, t) {
-                        if let Some(ret) = self.tb.build_cast(builder, expr, ty) {
+                        if let Some(ret) =
+                            self.tb.build_cast(builder, expr, ty, node.loc, *unsigned)
+                        {
                             Some(ret)
                         } else {
                             self.iw

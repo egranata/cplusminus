@@ -834,6 +834,8 @@ impl<'a> TypeBuilder<'a> {
         builder: &Builder<'a>,
         expr: BasicValueEnum<'a>,
         ty: BasicTypeEnum<'a>,
+        loc: TokenSpan,
+        unsigned: bool,
     ) -> Option<BasicValueEnum<'a>> {
         use BasicTypeEnum::{FloatType, IntType, PointerType};
         use BasicValueEnum::{FloatValue, IntValue, PointerValue};
@@ -844,7 +846,7 @@ impl<'a> TypeBuilder<'a> {
         }
 
         if let (IntType(st), IntType(dest_int)) = (expr_ty, ty) {
-            let sign_flag = !TypeBuilder::is_boolean_int(st);
+            let sign_flag = !unsigned && !TypeBuilder::is_boolean_int(st);
             return Some(IntValue(builder.build_int_cast_sign_flag(
                 expr.into_int_value(),
                 dest_int,
@@ -852,6 +854,35 @@ impl<'a> TypeBuilder<'a> {
                 "",
             )));
         }
+
+        if let (IntType(_), FloatType(dest_flt)) = (expr_ty, ty) {
+            return Some(if unsigned {
+                FloatValue(builder.build_unsigned_int_to_float(expr.into_int_value(), dest_flt, ""))
+            } else {
+                FloatValue(builder.build_signed_int_to_float(expr.into_int_value(), dest_flt, ""))
+            });
+        }
+
+        if let (FloatType(_), IntType(dest_int)) = (expr_ty, ty) {
+            return Some(if unsigned {
+                IntValue(builder.build_float_to_unsigned_int(expr.into_float_value(), dest_int, ""))
+            } else {
+                IntValue(builder.build_float_to_signed_int(expr.into_float_value(), dest_int, ""))
+            });
+        }
+
+        // all casts from here on out should ignore unsigned
+        // make it an explicit () so that any attempt to touch it by accident
+        // fails quickly and swiftly
+        #[allow(unused, clippy::let_unit_value)]
+        let unsigned = ();
+        self.iw
+            .diagnostics
+            .borrow_mut()
+            .warning(CompilerWarning::new(
+                loc,
+                crate::err::Warning::UnsignedCastIgnored,
+            ));
 
         if let (PointerType(_), IntType(dest_int)) = (expr_ty, ty) {
             return Some(IntValue(builder.build_ptr_to_int(
@@ -873,22 +904,6 @@ impl<'a> TypeBuilder<'a> {
             return Some(PointerValue(builder.build_pointer_cast(
                 expr.into_pointer_value(),
                 dest_ptr,
-                "",
-            )));
-        }
-
-        if let (IntType(_), FloatType(dest_flt)) = (expr_ty, ty) {
-            return Some(FloatValue(builder.build_signed_int_to_float(
-                expr.into_int_value(),
-                dest_flt,
-                "",
-            )));
-        }
-
-        if let (FloatType(_), IntType(dest_int)) = (expr_ty, ty) {
-            return Some(IntValue(builder.build_float_to_signed_int(
-                expr.into_float_value(),
-                dest_int,
                 "",
             )));
         }
