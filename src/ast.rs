@@ -283,16 +283,16 @@ pub enum Expr {
     UnaryMinus(Box<Expression>),
     UnaryNot(Box<Expression>),
     Multiplication(Box<Expression>, Box<Expression>),
-    Division(Box<Expression>, Box<Expression>),
-    Modulo(Box<Expression>, Box<Expression>),
+    SignedDivision(Box<Expression>, Box<Expression>),
+    SignedModulo(Box<Expression>, Box<Expression>),
     ShiftLeft(Box<Expression>, Box<Expression>),
     ShiftRight(Box<Expression>, Box<Expression>),
     Equality(Box<Expression>, Box<Expression>),
     NotEqual(Box<Expression>, Box<Expression>),
-    GreaterThan(Box<Expression>, Box<Expression>),
-    LessThan(Box<Expression>, Box<Expression>),
-    GreaterEqual(Box<Expression>, Box<Expression>),
-    LessEqual(Box<Expression>, Box<Expression>),
+    SignedGreaterThan(Box<Expression>, Box<Expression>),
+    SignedLessThan(Box<Expression>, Box<Expression>),
+    SignedGreaterEqual(Box<Expression>, Box<Expression>),
+    SignedLessEqual(Box<Expression>, Box<Expression>),
     And(Box<Expression>, Box<Expression>),
     Or(Box<Expression>, Box<Expression>),
     XOr(Box<Expression>, Box<Expression>),
@@ -302,7 +302,7 @@ pub enum Expr {
     Incref(Box<Expression>),
     Getref(Box<Expression>),
     Rvalue(Lvalue),
-    Cast(Box<Expression>, TypeDescriptor),
+    Cast(Box<Expression>, TypeDescriptor, bool),
     Array(Vec<Expression>),
     PropertyofVar(Box<Expression>, TypeProperty),
     PropertyofType(TypeDescriptor, TypeProperty),
@@ -321,16 +321,16 @@ impl Expr {
             Expr::Addition(x, y)
             | Expr::Subtraction(x, y)
             | Expr::Multiplication(x, y)
-            | Expr::Division(x, y)
-            | Expr::Modulo(x, y)
+            | Expr::SignedDivision(x, y)
+            | Expr::SignedModulo(x, y)
             | Expr::ShiftLeft(x, y)
             | Expr::ShiftRight(x, y)
             | Expr::Equality(x, y)
             | Expr::NotEqual(x, y)
-            | Expr::GreaterThan(x, y)
-            | Expr::LessThan(x, y)
-            | Expr::GreaterEqual(x, y)
-            | Expr::LessEqual(x, y)
+            | Expr::SignedGreaterThan(x, y)
+            | Expr::SignedLessThan(x, y)
+            | Expr::SignedGreaterEqual(x, y)
+            | Expr::SignedLessEqual(x, y)
             | Expr::And(x, y)
             | Expr::Or(x, y)
             | Expr::XOr(x, y) => x.payload.is_const_hintable() && y.payload.is_const_hintable(),

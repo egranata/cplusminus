@@ -154,13 +154,13 @@ peg::parser! {
 
             ae:array_expr() { ae }
             --
-            x:(@) __() "as" __() ty:typename() { Expr::Cast(Box::new(x), ty) }
+            x:(@) __() "as" __() u:("unsigned" __())? ty:typename() { Expr::Cast(Box::new(x), ty, u.is_some()) }
             x:(@) _ "==" _ y:@ { Expr::Equality(Box::new(x), Box::new(y)) }
             x:(@) _ "!=" _ y:@ { Expr::NotEqual(Box::new(x), Box::new(y)) }
-            x:(@) _ ">" _ y:@ { Expr::GreaterThan(Box::new(x), Box::new(y)) }
-            x:(@) _ "<" _ y:@ { Expr::LessThan(Box::new(x), Box::new(y)) }
-            x:(@) _ ">=" _ y:@ { Expr::GreaterEqual(Box::new(x), Box::new(y)) }
-            x:(@) _ "<=" _ y:@ { Expr::LessEqual(Box::new(x), Box::new(y)) }
+            x:(@) _ ">" _ y:@ { Expr::SignedGreaterThan(Box::new(x), Box::new(y)) }
+            x:(@) _ "<" _ y:@ { Expr::SignedLessThan(Box::new(x), Box::new(y)) }
+            x:(@) _ ">=" _ y:@ { Expr::SignedGreaterEqual(Box::new(x), Box::new(y)) }
+            x:(@) _ "<=" _ y:@ { Expr::SignedLessEqual(Box::new(x), Box::new(y)) }
             --
             "alloc" __() ty:typename() _ init:alloc_init_expr()? {
                 Expr::Alloc(ty, init)
@@ -184,8 +184,8 @@ peg::parser! {
             --
             x:(@) _ "*" _ y:@ { Expr::Multiplication(Box::new(x), Box::new(y)) }
             x:(@) _ "&&" _ y:@ { Expr::And(Box::new(x), Box::new(y)) }
-            x:(@) _ "/" _ y:@ { Expr::Division(Box::new(x), Box::new(y)) }
-            x:(@) _ "%" _ y:@ { Expr::Modulo(Box::new(x), Box::new(y)) }
+            x:(@) _ "/" _ y:@ { Expr::SignedDivision(Box::new(x), Box::new(y)) }
+            x:(@) _ "%" _ y:@ { Expr::SignedModulo(Box::new(x), Box::new(y)) }
             --
             this:lvalue() "->" name:ident() "(" args:func_call_args() ")" {
                 let mc = MethodCall{ this, name, args };

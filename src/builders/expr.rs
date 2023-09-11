@@ -198,14 +198,14 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
             Expr::Addition(..) => builder.build_int_add(x, y, ""),
             Expr::Subtraction(..) => builder.build_int_sub(x, y, ""),
             Expr::Multiplication(..) => builder.build_int_mul(x, y, ""),
-            Expr::Division(..) => builder.build_int_signed_div(x, y, ""),
-            Expr::Modulo(..) => builder.build_int_signed_rem(x, y, ""),
+            Expr::SignedDivision(..) => builder.build_int_signed_div(x, y, ""),
+            Expr::SignedModulo(..) => builder.build_int_signed_rem(x, y, ""),
             Expr::Equality(..) => builder.build_int_compare(IntPredicate::EQ, x, y, ""),
             Expr::NotEqual(..) => builder.build_int_compare(IntPredicate::NE, x, y, ""),
-            Expr::GreaterThan(..) => builder.build_int_compare(IntPredicate::SGT, x, y, ""),
-            Expr::LessThan(..) => builder.build_int_compare(IntPredicate::SLT, x, y, ""),
-            Expr::GreaterEqual(..) => builder.build_int_compare(IntPredicate::SGE, x, y, ""),
-            Expr::LessEqual(..) => builder.build_int_compare(IntPredicate::SLE, x, y, ""),
+            Expr::SignedGreaterThan(..) => builder.build_int_compare(IntPredicate::SGT, x, y, ""),
+            Expr::SignedLessThan(..) => builder.build_int_compare(IntPredicate::SLT, x, y, ""),
+            Expr::SignedGreaterEqual(..) => builder.build_int_compare(IntPredicate::SGE, x, y, ""),
+            Expr::SignedLessEqual(..) => builder.build_int_compare(IntPredicate::SLE, x, y, ""),
             Expr::And(..) => builder.build_and(x, y, ""),
             Expr::Or(..) => builder.build_or(x, y, ""),
             Expr::XOr(..) => builder.build_xor(x, y, ""),
@@ -251,24 +251,24 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
             Expr::Addition(..) => FloatValue(builder.build_float_add(x, y, "")),
             Expr::Subtraction(..) => FloatValue(builder.build_float_sub(x, y, "")),
             Expr::Multiplication(..) => FloatValue(builder.build_float_mul(x, y, "")),
-            Expr::Division(..) => FloatValue(builder.build_float_div(x, y, "")),
-            Expr::Modulo(..) => FloatValue(builder.build_float_rem(x, y, "")),
+            Expr::SignedDivision(..) => FloatValue(builder.build_float_div(x, y, "")),
+            Expr::SignedModulo(..) => FloatValue(builder.build_float_rem(x, y, "")),
             Expr::Equality(..) => {
                 IntValue(builder.build_float_compare(FloatPredicate::OEQ, x, y, ""))
             }
             Expr::NotEqual(..) => {
                 IntValue(builder.build_float_compare(FloatPredicate::ONE, x, y, ""))
             }
-            Expr::GreaterThan(..) => {
+            Expr::SignedGreaterThan(..) => {
                 IntValue(builder.build_float_compare(FloatPredicate::OGT, x, y, ""))
             }
-            Expr::LessThan(..) => {
+            Expr::SignedLessThan(..) => {
                 IntValue(builder.build_float_compare(FloatPredicate::OLT, x, y, ""))
             }
-            Expr::GreaterEqual(..) => {
+            Expr::SignedGreaterEqual(..) => {
                 IntValue(builder.build_float_compare(FloatPredicate::OGE, x, y, ""))
             }
-            Expr::LessEqual(..) => {
+            Expr::SignedLessEqual(..) => {
                 IntValue(builder.build_float_compare(FloatPredicate::OLE, x, y, ""))
             }
             _ => panic!(""),
@@ -611,7 +611,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     .error(CompilerError::new(node.loc, Error::UnexpectedType(None)));
                 None
             }
-            Multiplication(x, y) | Division(x, y) | Modulo(x, y) => {
+            Multiplication(x, y) | SignedDivision(x, y) | SignedModulo(x, y) => {
                 let (bx, by) =
                     self.get_binop_args(builder, fd, x.as_ref(), y.as_ref(), locals, type_hint);
 
@@ -683,7 +683,10 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     None
                 }
             }
-            GreaterThan(x, y) | GreaterEqual(x, y) | LessThan(x, y) | LessEqual(x, y) => {
+            SignedGreaterThan(x, y)
+            | SignedGreaterEqual(x, y)
+            | SignedLessThan(x, y)
+            | SignedLessEqual(x, y) => {
                 let (bx, by) =
                     self.get_binop_args(builder, fd, x.as_ref(), y.as_ref(), locals, type_hint);
 
@@ -957,7 +960,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     }
                 };
             }
-            Cast(e, t) => {
+            Cast(e, t, _unsigned) => {
                 if let Some(expr) = self.build_expr(builder, fd, e.as_ref(), locals, type_hint) {
                     if let Some(ty) = self.tb.llvm_type_by_descriptor(locals, t) {
                         if let Some(ret) = self.tb.build_cast(builder, expr, ty) {
