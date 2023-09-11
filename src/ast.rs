@@ -285,6 +285,8 @@ pub enum Expr {
     Multiplication(Box<Expression>, Box<Expression>),
     SignedDivision(Box<Expression>, Box<Expression>),
     SignedModulo(Box<Expression>, Box<Expression>),
+    UnsignedDivision(Box<Expression>, Box<Expression>),
+    UnsignedModulo(Box<Expression>, Box<Expression>),
     ShiftLeft(Box<Expression>, Box<Expression>),
     ShiftRight(Box<Expression>, Box<Expression>),
     Equality(Box<Expression>, Box<Expression>),
@@ -293,6 +295,10 @@ pub enum Expr {
     SignedLessThan(Box<Expression>, Box<Expression>),
     SignedGreaterEqual(Box<Expression>, Box<Expression>),
     SignedLessEqual(Box<Expression>, Box<Expression>),
+    UnsignedGreaterThan(Box<Expression>, Box<Expression>),
+    UnsignedLessThan(Box<Expression>, Box<Expression>),
+    UnsignedGreaterEqual(Box<Expression>, Box<Expression>),
+    UnsignedLessEqual(Box<Expression>, Box<Expression>),
     And(Box<Expression>, Box<Expression>),
     Or(Box<Expression>, Box<Expression>),
     XOr(Box<Expression>, Box<Expression>),
@@ -312,6 +318,20 @@ pub enum Expr {
 }
 
 impl Expr {
+    pub fn is_unsigned_operation(&self) -> bool {
+        matches!(
+            self,
+            Expr::UnsignedDivision(..)
+                | Expr::UnsignedGreaterEqual(..)
+                | Expr::UnsignedGreaterThan(..)
+                | Expr::UnsignedLessEqual(..)
+                | Expr::UnsignedLessThan(..)
+                | Expr::UnsignedModulo(..)
+        )
+    }
+}
+
+impl Expr {
     // is this expression such that it's a constant value
     // whose type can be influenced by a hint
     pub fn is_const_hintable(&self) -> bool {
@@ -323,6 +343,8 @@ impl Expr {
             | Expr::Multiplication(x, y)
             | Expr::SignedDivision(x, y)
             | Expr::SignedModulo(x, y)
+            | Expr::UnsignedDivision(x, y)
+            | Expr::UnsignedModulo(x, y)
             | Expr::ShiftLeft(x, y)
             | Expr::ShiftRight(x, y)
             | Expr::Equality(x, y)
@@ -331,6 +353,10 @@ impl Expr {
             | Expr::SignedLessThan(x, y)
             | Expr::SignedGreaterEqual(x, y)
             | Expr::SignedLessEqual(x, y)
+            | Expr::UnsignedGreaterThan(x, y)
+            | Expr::UnsignedLessThan(x, y)
+            | Expr::UnsignedGreaterEqual(x, y)
+            | Expr::UnsignedLessEqual(x, y)
             | Expr::And(x, y)
             | Expr::Or(x, y)
             | Expr::XOr(x, y) => x.payload.is_const_hintable() && y.payload.is_const_hintable(),

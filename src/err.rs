@@ -50,6 +50,7 @@ pub enum Error {
     ContinueOutsideOfLoop,
     ThirtyTwoBitUnsupported,
     ImportFailed(String),
+    UnsignedFloatUnsupported,
 }
 
 impl Display for Error {
@@ -135,6 +136,12 @@ impl Display for Error {
             }
             Error::ImportFailed(name) => {
                 write!(f, "import of declaration {name} failed")
+            }
+            Error::UnsignedFloatUnsupported => {
+                write!(
+                    f,
+                    "unsigned operators not supported for floating-point values"
+                )
             }
         }
     }

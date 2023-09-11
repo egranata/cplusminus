@@ -169,6 +169,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         builder: &Builder<'a>,
         x: IntValue<'a>,
         y: IntValue<'a>,
+        op: &Expr,
     ) -> (IntValue<'a>, IntValue<'a>) {
         let x_wide = x.get_type().get_bit_width();
         let y_wide = y.get_type().get_bit_width();
@@ -181,8 +182,16 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         }
         let max_wide = max(x_wide, y_wide);
         let max_wide_type = self.iw.context.custom_width_int_type(max_wide);
-        let x = builder.build_int_s_extend(x, max_wide_type, "");
-        let y = builder.build_int_s_extend(y, max_wide_type, "");
+        let x = if op.is_unsigned_operation() {
+            builder.build_int_z_extend(x, max_wide_type, "")
+        } else {
+            builder.build_int_s_extend(x, max_wide_type, "")
+        };
+        let y = if op.is_unsigned_operation() {
+            builder.build_int_z_extend(y, max_wide_type, "")
+        } else {
+            builder.build_int_s_extend(y, max_wide_type, "")
+        };
         (x, y)
     }
 
@@ -193,19 +202,27 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         y: IntValue<'a>,
         op: &Expr,
     ) -> Option<BasicValueEnum<'a>> {
-        let (x, y) = self.widen_int_if_needed(builder, x, y);
+        let (x, y) = self.widen_int_if_needed(builder, x, y, op);
         Some(BasicValueEnum::IntValue(match op {
             Expr::Addition(..) => builder.build_int_add(x, y, ""),
             Expr::Subtraction(..) => builder.build_int_sub(x, y, ""),
             Expr::Multiplication(..) => builder.build_int_mul(x, y, ""),
             Expr::SignedDivision(..) => builder.build_int_signed_div(x, y, ""),
             Expr::SignedModulo(..) => builder.build_int_signed_rem(x, y, ""),
+            Expr::UnsignedDivision(..) => builder.build_int_unsigned_div(x, y, ""),
+            Expr::UnsignedModulo(..) => builder.build_int_unsigned_rem(x, y, ""),
             Expr::Equality(..) => builder.build_int_compare(IntPredicate::EQ, x, y, ""),
             Expr::NotEqual(..) => builder.build_int_compare(IntPredicate::NE, x, y, ""),
             Expr::SignedGreaterThan(..) => builder.build_int_compare(IntPredicate::SGT, x, y, ""),
             Expr::SignedLessThan(..) => builder.build_int_compare(IntPredicate::SLT, x, y, ""),
             Expr::SignedGreaterEqual(..) => builder.build_int_compare(IntPredicate::SGE, x, y, ""),
             Expr::SignedLessEqual(..) => builder.build_int_compare(IntPredicate::SLE, x, y, ""),
+            Expr::UnsignedGreaterThan(..) => builder.build_int_compare(IntPredicate::UGT, x, y, ""),
+            Expr::UnsignedLessThan(..) => builder.build_int_compare(IntPredicate::ULT, x, y, ""),
+            Expr::UnsignedGreaterEqual(..) => {
+                builder.build_int_compare(IntPredicate::UGE, x, y, "")
+            }
+            Expr::UnsignedLessEqual(..) => builder.build_int_compare(IntPredicate::ULE, x, y, ""),
             Expr::And(..) => builder.build_and(x, y, ""),
             Expr::Or(..) => builder.build_or(x, y, ""),
             Expr::XOr(..) => builder.build_xor(x, y, ""),
@@ -243,11 +260,11 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         builder: &Builder<'a>,
         x: FloatValue<'a>,
         y: FloatValue<'a>,
-        op: &Expr,
+        node: &Expression,
     ) -> Option<BasicValueEnum<'a>> {
         use BasicValueEnum::{FloatValue, IntValue};
         let (x, y) = self.widen_flt_if_needed(builder, x, y);
-        Some(match op {
+        Some(match node.payload {
             Expr::Addition(..) => FloatValue(builder.build_float_add(x, y, "")),
             Expr::Subtraction(..) => FloatValue(builder.build_float_sub(x, y, "")),
             Expr::Multiplication(..) => FloatValue(builder.build_float_mul(x, y, "")),
@@ -270,6 +287,18 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
             }
             Expr::SignedLessEqual(..) => {
                 IntValue(builder.build_float_compare(FloatPredicate::OLE, x, y, ""))
+            }
+            Expr::UnsignedDivision(..)
+            | Expr::UnsignedModulo(..)
+            | Expr::UnsignedGreaterEqual(..)
+            | Expr::UnsignedGreaterThan(..)
+            | Expr::UnsignedLessEqual(..)
+            | Expr::UnsignedLessThan(..) => {
+                self.iw.diagnostics.borrow_mut().error(CompilerError::new(
+                    node.loc,
+                    Error::UnsignedFloatUnsupported,
+                ));
+                return None;
             }
             _ => panic!(""),
         })
@@ -590,7 +619,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 }
 
                 if let (Some(FloatValue(ix)), Some(FloatValue(iy))) = (bx, by) {
-                    return self.build_flt_bin_op(builder, ix, iy, &node.payload);
+                    return self.build_flt_bin_op(builder, ix, iy, node);
                 }
 
                 if let (Some(PointerValue(px)), Some(IntValue(iy))) = (bx, by) {
@@ -611,7 +640,11 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     .error(CompilerError::new(node.loc, Error::UnexpectedType(None)));
                 None
             }
-            Multiplication(x, y) | SignedDivision(x, y) | SignedModulo(x, y) => {
+            Multiplication(x, y)
+            | SignedDivision(x, y)
+            | SignedModulo(x, y)
+            | UnsignedDivision(x, y)
+            | UnsignedModulo(x, y) => {
                 let (bx, by) =
                     self.get_binop_args(builder, fd, x.as_ref(), y.as_ref(), locals, type_hint);
 
@@ -620,7 +653,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 }
 
                 if let (Some(FloatValue(ix)), Some(FloatValue(iy))) = (bx, by) {
-                    return self.build_flt_bin_op(builder, ix, iy, &node.payload);
+                    return self.build_flt_bin_op(builder, ix, iy, node);
                 }
 
                 self.iw
@@ -686,7 +719,11 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
             SignedGreaterThan(x, y)
             | SignedGreaterEqual(x, y)
             | SignedLessThan(x, y)
-            | SignedLessEqual(x, y) => {
+            | SignedLessEqual(x, y)
+            | UnsignedGreaterEqual(x, y)
+            | UnsignedLessThan(x, y)
+            | UnsignedGreaterThan(x, y)
+            | UnsignedLessEqual(x, y) => {
                 let (bx, by) =
                     self.get_binop_args(builder, fd, x.as_ref(), y.as_ref(), locals, type_hint);
 
@@ -695,7 +732,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 }
 
                 if let (Some(FloatValue(ix)), Some(FloatValue(iy))) = (bx, by) {
-                    return self.build_flt_bin_op(builder, ix, iy, &node.payload);
+                    return self.build_flt_bin_op(builder, ix, iy, node);
                 }
 
                 self.iw
@@ -725,7 +762,7 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 }
 
                 if let (Some(FloatValue(ix)), Some(FloatValue(iy))) = (bx, by) {
-                    return self.build_flt_bin_op(builder, ix, iy, &node.payload);
+                    return self.build_flt_bin_op(builder, ix, iy, node);
                 }
 
                 self.iw
