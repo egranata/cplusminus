@@ -398,6 +398,11 @@ impl<'a> FunctionBuilder<'a> {
         ret
     }
 
+    // this function really does two things:
+    // - finds an existing method's llvm function declaration and returns it
+    // - but if it does not already exist, then it declares it
+    // it should probably be split in two, or at least given some kind of argument
+    // to specify what is expect (find vs. create)
     pub fn declare_method(
         &self,
         scope: &Scope<'a>,
@@ -440,7 +445,10 @@ impl<'a> FunctionBuilder<'a> {
             .export(export)
             .commit();
 
-        let fv = self.declare(scope, &new_decl, opts);
+        let mut fv = scope.find_function(&new_decl.name, true);
+        if fv.is_none() {
+            fv = self.declare(scope, &new_decl, opts);
+        }
         (new_decl, fv)
     }
 

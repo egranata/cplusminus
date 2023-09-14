@@ -517,7 +517,7 @@ impl<'a> CompilerCore<'a> {
                     if let Some(ty) = tb.llvm_type_by_descriptor(&self.globals, &id.of) {
                         if let Some(sty) = tb.is_val_or_ref_basic_type(ty) {
                             if let Some(struct_info) = tb.structure_by_llvm_type(sty) {
-                                tb.build_impl(&self.globals, &struct_info, id);
+                                tb.declare_impl(&self.globals, &struct_info, id);
                             } else {
                                 self.diagnostics.borrow_mut().error(CompilerError::new(
                                     id.loc,
@@ -613,15 +613,35 @@ impl<'a> CompilerCore<'a> {
 
     fn define_pass(&self, tlds: &[TopLevelDeclaration]) -> bool {
         for tld in tlds {
+            let tb: TypeBuilder<'a> = TypeBuilder::new(self.clone());
+
             match &tld.payload {
                 crate::ast::TopLevelDecl::Function(fd) => {
                     let fb = FunctionBuilder::new(self.clone());
                     fb.build(&self.globals, fd);
                 }
+                crate::ast::TopLevelDecl::Implementation(id) => {
+                    if let Some(ty) = tb.llvm_type_by_descriptor(&self.globals, &id.of) {
+                        if let Some(sty) = tb.is_val_or_ref_basic_type(ty) {
+                            if let Some(struct_info) = tb.structure_by_llvm_type(sty) {
+                                tb.define_impl(&self.globals, &struct_info, id);
+                            } else {
+                                self.diagnostics.borrow_mut().error(CompilerError::new(
+                                    id.loc,
+                                    Error::TypeNotFound(id.of.clone()),
+                                ));
+                            }
+                        } else {
+                            self.diagnostics.borrow_mut().error(CompilerError::new(
+                                id.loc,
+                                Error::UnexpectedType(Some("structure".to_owned())),
+                            ));
+                        }
+                    }
+                }
 
                 crate::ast::TopLevelDecl::Alias(..)
                 | crate::ast::TopLevelDecl::Extern(..)
-                | crate::ast::TopLevelDecl::Implementation(..)
                 | crate::ast::TopLevelDecl::Import(..)
                 | crate::ast::TopLevelDecl::Structure(..)
                 | crate::ast::TopLevelDecl::Variable(..) => {}

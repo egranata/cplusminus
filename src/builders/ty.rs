@@ -786,10 +786,9 @@ impl<'a> TypeBuilder<'a> {
         None
     }
 
-    pub fn build_impl(&self, scope: &Scope<'a>, sd: &Structure<'a>, id: &ImplDecl) {
+    pub fn declare_impl(&self, scope: &Scope<'a>, sd: &Structure<'a>, id: &ImplDecl) {
         let mut bom_entry = ImplBomEntry::new(sd);
         let fb = FunctionBuilder::new(self.iw.clone());
-        let mut decls: Vec<FunctionDecl> = vec![];
         let export = if id.export && !sd.export {
             self.iw
                 .diagnostics
@@ -811,7 +810,6 @@ impl<'a> TypeBuilder<'a> {
                 };
                 bom_entry.add_method(&new_method);
                 sd.methods.borrow_mut().push(new_method);
-                decls.push(decl.0);
             } else {
                 self.iw
                     .diagnostics
@@ -820,12 +818,22 @@ impl<'a> TypeBuilder<'a> {
                 return;
             }
         }
-        for (id, method) in id.methods.iter().enumerate() {
-            let decl = decls.get(id).unwrap();
-            fb.define_method(scope, &method.imp, decl);
-        }
         if export {
             self.iw.bom.borrow_mut().impls.push(bom_entry);
+        }
+    }
+
+    pub fn define_impl(&self, scope: &Scope<'a>, sd: &Structure<'a>, id: &ImplDecl) {
+        let fb = FunctionBuilder::new(self.iw.clone());
+        let export = if id.export && !sd.export {
+            false
+        } else {
+            sd.export && id.export
+        };
+
+        for method in &id.methods {
+            let decl = fb.declare_method(scope, &method.imp, sd, export);
+            fb.define_method(scope, &method.imp, &decl.0);
         }
     }
 
