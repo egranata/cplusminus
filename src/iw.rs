@@ -639,11 +639,15 @@ impl<'a> CompilerCore<'a> {
                         }
                     }
                 }
+                crate::ast::TopLevelDecl::Structure(sd) => {
+                    if let Some(psd) = self.fixup_struct_decl(sd) {
+                        tb.define_structure_from_decl(&self.globals, &psd);
+                    }
+                }
 
                 crate::ast::TopLevelDecl::Alias(..)
                 | crate::ast::TopLevelDecl::Extern(..)
                 | crate::ast::TopLevelDecl::Import(..)
-                | crate::ast::TopLevelDecl::Structure(..)
                 | crate::ast::TopLevelDecl::Variable(..) => {}
             }
         }

@@ -393,13 +393,56 @@ impl<'a> TypeBuilder<'a> {
         }
     }
 
-    fn build_init(
+    fn declare_init(
         &self,
         scope: &Scope<'a>,
         self_decl: &Structure<'a>,
         this_ty: StructType<'a>,
         init: &InitDecl,
         export: bool,
+    ) -> Option<FunctionValue<'a>> {
+        let mut real_args = vec![FunctionArgument {
+            loc: init.loc,
+            name: String::from("self"),
+            ty: self_decl.self_descriptor(),
+            rw: false,
+            explicit_rw: false,
+        }];
+        init.args.iter().for_each(|a| real_args.push(a.clone()));
+        let init_arg_types: Vec<TypeDescriptor> =
+            real_args.iter().map(|arg| arg.ty.clone()).collect();
+        let ftd = FunctionTypeDescriptor::new(init_arg_types, None, false);
+        let fn_type = TypeDescriptor::Function(ftd);
+
+        let full_name = mangle_special_method(
+            this_ty,
+            crate::mangler::SpecialMemberFunction::Initializer,
+            Some(fn_type.clone()),
+        );
+
+        let func_decl = FunctionDecl {
+            loc: init.loc,
+            name: full_name,
+            args: real_args,
+            ty: fn_type,
+        };
+
+        let fb = FunctionBuilder::new(self.iw.clone());
+        let opts = FunctionBuilderOptions::default()
+            .extrn(false)
+            .global(true)
+            .mangle(false)
+            .export(export)
+            .commit();
+        fb.declare(scope, &func_decl, opts)
+    }
+
+    fn define_init(
+        &self,
+        scope: &Scope<'a>,
+        self_decl: &Structure<'a>,
+        this_ty: StructType<'a>,
+        init: &InitDecl,
     ) -> Option<FunctionValue<'a>> {
         let mut real_args = vec![FunctionArgument {
             loc: init.loc,
@@ -432,21 +475,55 @@ impl<'a> TypeBuilder<'a> {
         };
 
         let fb = FunctionBuilder::new(self.iw.clone());
+        fb.build(scope, &func_def)
+    }
+
+    fn declare_usr_dealloc(
+        &self,
+        scope: &Scope<'a>,
+        this_ty: StructType<'a>,
+        dealloc: &DeallocDecl,
+        export: bool,
+    ) -> Option<FunctionValue<'a>> {
+        let ty = TypeDescriptor::Name(this_ty.get_name().unwrap().to_str().unwrap().to_owned());
+        let real_args = vec![FunctionArgument {
+            loc: dealloc.loc,
+            name: String::from("self"),
+            ty: ty.clone(),
+            rw: false,
+            explicit_rw: false,
+        }];
+        let full_name = mangle_special_method(
+            this_ty,
+            crate::mangler::SpecialMemberFunction::UserDeallocator,
+            None,
+        );
+
+        let ftd = FunctionTypeDescriptor::new(vec![ty], None, false);
+        let fn_type = TypeDescriptor::Function(ftd);
+
+        let func_decl = FunctionDecl {
+            loc: dealloc.loc,
+            name: full_name,
+            args: real_args,
+            ty: fn_type,
+        };
+
+        let fb = FunctionBuilder::new(self.iw.clone());
         let opts = FunctionBuilderOptions::default()
             .extrn(false)
             .global(true)
             .mangle(false)
             .export(export)
             .commit();
-        fb.compile(scope, &func_def, opts)
+        fb.declare(scope, &func_decl, opts)
     }
 
-    fn build_usr_dealloc(
+    fn define_usr_dealloc(
         &self,
         scope: &Scope<'a>,
         this_ty: StructType<'a>,
         dealloc: &DeallocDecl,
-        export: bool,
     ) -> Option<FunctionValue<'a>> {
         let ty = TypeDescriptor::Name(this_ty.get_name().unwrap().to_str().unwrap().to_owned());
         let real_args = vec![FunctionArgument {
@@ -477,13 +554,7 @@ impl<'a> TypeBuilder<'a> {
         };
 
         let fb = FunctionBuilder::new(self.iw.clone());
-        let opts = FunctionBuilderOptions::default()
-            .extrn(false)
-            .global(true)
-            .mangle(false)
-            .export(export)
-            .commit();
-        fb.compile(scope, &func_def, opts)
+        fb.build(scope, &func_def)
     }
 
     pub fn build_structure_from_bom(
@@ -683,7 +754,7 @@ impl<'a> TypeBuilder<'a> {
 
         if let Some(dealloc) = &sd.dealloc {
             if self
-                .build_usr_dealloc(scope, st_ty, dealloc, sd.export)
+                .declare_usr_dealloc(scope, st_ty, dealloc, sd.export)
                 .is_none()
             {
                 self.iw
@@ -695,7 +766,7 @@ impl<'a> TypeBuilder<'a> {
         }
 
         for init in &sd.init {
-            if let Some(init_f) = self.build_init(scope, &cdg_st, st_ty, init, sd.export) {
+            if let Some(init_f) = self.declare_init(scope, &cdg_st, st_ty, init, sd.export) {
                 cdg_st.init.borrow_mut().push(init_f);
             } else {
                 self.iw
@@ -707,6 +778,25 @@ impl<'a> TypeBuilder<'a> {
         }
 
         build_sys_dealloc(self, &self.iw, st_ty, &cdg_st);
+
+        Some(st_ty)
+    }
+
+    pub fn define_structure_from_decl(
+        &self,
+        scope: &Scope<'a>,
+        sd: &ProperStructDecl,
+    ) -> Option<StructType<'a>> {
+        let cdg_st = self.iw.structs.borrow().get(&sd.name).cloned()?;
+        let st_ty = cdg_st.str_ty;
+
+        if let Some(dealloc) = &sd.dealloc {
+            self.define_usr_dealloc(scope, st_ty, dealloc);
+        }
+
+        for init in &sd.init {
+            self.define_init(scope, &cdg_st, st_ty, init);
+        }
 
         Some(st_ty)
     }
