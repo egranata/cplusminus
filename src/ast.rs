@@ -143,6 +143,7 @@ pub enum StructEntryDecl {
     Field(FieldDecl),
     Init(InitDecl),
     Dealloc(DeallocDecl),
+    Method(MethodDecl),
 }
 
 #[derive(Clone, Debug)]
@@ -162,6 +163,7 @@ pub struct ProperStructDecl {
     pub fields: Vec<FieldDecl>,
     pub init: Vec<InitDecl>,
     pub dealloc: Option<DeallocDecl>,
+    pub inline_impl: Option<ImplDecl>,
     pub export: bool,
 }
 

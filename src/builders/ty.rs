@@ -779,6 +779,10 @@ impl<'a> TypeBuilder<'a> {
 
         build_sys_dealloc(self, &self.iw, st_ty, &cdg_st);
 
+        if let Some(ii) = &sd.inline_impl {
+            self.declare_impl(scope, &cdg_st, ii);
+        }
+
         Some(st_ty)
     }
 
@@ -796,6 +800,10 @@ impl<'a> TypeBuilder<'a> {
 
         for init in &sd.init {
             self.define_init(scope, &cdg_st, st_ty, init);
+        }
+
+        if let Some(ii) = &sd.inline_impl {
+            self.define_impl(scope, &cdg_st, ii);
         }
 
         Some(st_ty)

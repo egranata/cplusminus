@@ -31,7 +31,7 @@ use std::{
 
 use crate::{
     ast::{
-        ProperStructDecl, RawStructDecl, TokenLocation, TokenSpan, TopLevelDecl,
+        ImplDecl, ProperStructDecl, RawStructDecl, TokenLocation, TokenSpan, TopLevelDecl,
         TopLevelDeclaration, TypeDescriptor,
     },
     bom::{
@@ -318,7 +318,15 @@ impl<'a> CompilerCore<'a> {
             fields: vec![],
             init: vec![],
             dealloc: None,
+            inline_impl: None,
             export: raw.export,
+        };
+
+        let mut inline_impl = ImplDecl {
+            loc: proper.loc,
+            of: TypeDescriptor::Name(proper.name.clone()),
+            methods: vec![],
+            export: proper.export,
         };
 
         for entry in &raw.entries {
@@ -338,7 +346,14 @@ impl<'a> CompilerCore<'a> {
                         proper.dealloc = Some(dealloc.clone());
                     }
                 }
+                crate::ast::StructEntryDecl::Method(method) => {
+                    inline_impl.methods.push(method.clone())
+                }
             }
+        }
+
+        if !inline_impl.methods.is_empty() {
+            proper.inline_impl = Some(inline_impl);
         }
 
         Some(proper)

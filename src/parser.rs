@@ -286,25 +286,30 @@ peg::parser! {
         rule elscheck() -> Box<Statement> =
         "else" _ blk:block() { Box::new(blk) }
 
-        rule field_decl() -> StructEntryDecl =
+        rule struct_field_decl() -> StructEntryDecl =
         start:position!() _ n:ident() _ ty:type_decl() _ end:position!() {
             let field = FieldDecl { loc:TokenSpan{start,end}, name:n, ty };
             StructEntryDecl::Field(field)
         }
 
-        rule init_decl() -> StructEntryDecl =
+        rule struct_init_decl() -> StructEntryDecl =
         _ start:position!() _ "init" _ "(" _ args:func_arg()**"," dummy_comma() ")" _ body:block() end:position!() _ {
             let init = InitDecl { loc:TokenSpan{start, end}, args, body };
             StructEntryDecl::Init(init)
         }
 
-        rule dealloc_decl() -> StructEntryDecl =
+        rule struct_dealloc_decl() -> StructEntryDecl =
         _ start:position!() _ "dealloc" _ body:block() end:position!() _ {
             let dealloc = DeallocDecl { loc:TokenSpan{start, end}, body };
             StructEntryDecl::Dealloc(dealloc)
         }
 
-        rule struct_entry() -> StructEntryDecl = field_decl() / init_decl() / dealloc_decl();
+        rule struct_method_decl() -> StructEntryDecl =
+        _ start:position!() _ md:method_def() _ end:position!() _ {
+            StructEntryDecl::Method(md)
+        }
+
+        rule struct_entry() -> StructEntryDecl = struct_field_decl() / struct_init_decl() / struct_dealloc_decl() / struct_method_decl();
 
         rule ref_val_decl() -> bool =
         _ s:$("ref" / "val") __() { s == "ref" }
