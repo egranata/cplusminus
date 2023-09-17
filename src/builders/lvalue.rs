@@ -271,6 +271,11 @@ impl<'a, 'b> LvalueBuilder<'a, 'b> {
                                     ptr_elem_size,
                                     "",
                                 );
+                                let total_offset = builder.build_int_z_extend(
+                                    total_offset,
+                                    ptr_as_int.get_type(),
+                                    "",
+                                );
                                 builder.build_int_to_ptr(
                                     builder.build_int_add(ptr_as_int, total_offset, ""),
                                     base_obj
