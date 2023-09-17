@@ -123,6 +123,7 @@ impl<'a> Structure<'a> {
             ty: self.self_descriptor(),
             rw: false,
             explicit_rw: false,
+            implicit: true,
         }
     }
 }

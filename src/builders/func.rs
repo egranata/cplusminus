@@ -240,6 +240,7 @@ impl<'a> FunctionBuilder<'a> {
         for i in 0..func.get_params().len() {
             let param_name = &fd.decl.args[i].name;
             let param_rw = fd.decl.args[i].rw;
+            let implicit = fd.decl.args[i].implicit;
             let param_value = func.get_nth_param(i as u32).unwrap();
             let param_type = param_value.get_type();
             // this alloca is whitelisted because it does not participate in exit deallocation
@@ -247,7 +248,14 @@ impl<'a> FunctionBuilder<'a> {
             builder.build_store(alloca, param_value);
             ret.insert_variable(
                 param_name,
-                VarInfo::new(fd.decl.loc, param_name.clone(), alloca, true, param_rw),
+                VarInfo::new(
+                    fd.decl.loc,
+                    param_name.clone(),
+                    alloca,
+                    true,
+                    param_rw,
+                    implicit,
+                ),
                 false,
             );
         }

@@ -339,7 +339,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                     self.exit.decref_on_exit(alloca);
                     locals.insert_variable(
                         &var.name,
-                        VarInfo::new(node.loc, var.name.clone(), alloca, false, rw),
+                        VarInfo::new(node.loc, var.name.clone(), alloca, false, rw, false),
                         true,
                     );
                 }

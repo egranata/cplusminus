@@ -58,6 +58,7 @@ impl VariableBomEntry {
             gv.as_pointer_value(),
             false,
             true,
+            false,
         );
         scope.insert_variable(&self.user_facing_name, vi, true);
         Some(gv)

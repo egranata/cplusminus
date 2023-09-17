@@ -1,0 +1,12 @@
+{
+    "source_files": [
+        "test.cpm"
+    ],
+    "bom": false,
+    "diags_match": [
+        "variable x was declared but never used"
+    ],
+    "diags_no_match": [
+        "variable self was declared but never used"
+    ]
+}

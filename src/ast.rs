@@ -182,6 +182,7 @@ pub struct FunctionArgument {
     pub ty: TypeDescriptor,
     pub rw: bool,
     pub explicit_rw: bool,
+    pub implicit: bool,
 }
 
 #[derive(Clone, Debug)]

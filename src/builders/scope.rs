@@ -30,6 +30,7 @@ pub struct VarInfo<'a> {
     pub is_arg: bool,
     pub referenced: Rc<RefCell<bool>>,
     pub written: Rc<RefCell<bool>>,
+    pub is_implicit: bool,
 }
 
 impl<'a> VarInfo<'a> {
@@ -39,6 +40,7 @@ impl<'a> VarInfo<'a> {
         alloca: PointerValue<'a>,
         is_arg: bool,
         rw: bool,
+        implicit: bool,
     ) -> Self {
         Self {
             loc,
@@ -48,6 +50,7 @@ impl<'a> VarInfo<'a> {
             is_arg,
             referenced: Rc::new(RefCell::new(false)),
             written: Rc::new(RefCell::new(false)),
+            is_implicit: implicit,
         }
     }
 }
@@ -55,14 +58,18 @@ impl<'a> VarInfo<'a> {
 impl<'a> VarInfo<'a> {
     pub fn is_unreferenced(&self, ignore_underscore: bool, ignore_arg: bool) -> bool {
         let referenced = *self.referenced.borrow();
-        !(referenced
-            || (self.is_arg && ignore_arg)
-            || (ignore_underscore && self.name.starts_with('_')))
+        if self.is_implicit {
+            false
+        } else {
+            !(referenced
+                || (self.is_arg && ignore_arg)
+                || (ignore_underscore && self.name.starts_with('_')))
+        }
     }
 
     pub fn is_unwritten(&self) -> bool {
         let written = *self.written.borrow();
-        if written {
+        if self.is_implicit || written {
             false
         } else {
             self.rw

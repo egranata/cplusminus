@@ -379,7 +379,7 @@ peg::parser! {
         start:position!() "{" _ s:top_level_statement()* _ "}" end:position!() { Statement { loc:TokenSpan{start,end}, payload:Stmt::Block(s) } }
 
         rule func_arg() -> FunctionArgument =
-        _ start:position!() rw:var_decl_rw_ro()? _ name:ident() _ ty:type_decl() end:position!() _ { FunctionArgument{loc:TokenSpan{start,end}, name,ty,rw:rw.unwrap_or(false), explicit_rw:rw.is_some()} }
+        _ start:position!() rw:var_decl_rw_ro()? _ name:ident() _ ty:type_decl() end:position!() _ { FunctionArgument{loc:TokenSpan{start,end}, name,ty,rw:rw.unwrap_or(false), explicit_rw:rw.is_some(), implicit:false} }
 
         rule function_ret() -> TypeDescriptor =
         _ "ret" _ ty:typename() _ { ty }

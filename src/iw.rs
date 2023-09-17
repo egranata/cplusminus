@@ -603,6 +603,7 @@ impl<'a> CompilerCore<'a> {
                             global.as_pointer_value(),
                             false,
                             true,
+                            false,
                         );
                         self.globals.insert_variable(&vd.name, vi, true);
 
