@@ -20,7 +20,7 @@ use inkwell::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::ast::TypeDescriptor;
+use crate::ast::{FunctionArgument, TypeDescriptor};
 
 use super::MutableOf;
 
@@ -107,12 +107,22 @@ impl<'a> Structure<'a> {
         v
     }
 
-    pub fn self_descriptor(&self) -> TypeDescriptor {
+    fn self_descriptor(&self) -> TypeDescriptor {
         let self_td = TypeDescriptor::Name(self.name.clone());
         if self.ms == MemoryStrategy::ByValue {
             TypeDescriptor::Pointer(Box::new(self_td))
         } else {
             self_td
+        }
+    }
+
+    pub fn self_argument(&self, loc: crate::ast::TokenSpan) -> FunctionArgument {
+        FunctionArgument {
+            loc,
+            name: String::from("self"),
+            ty: self.self_descriptor(),
+            rw: false,
+            explicit_rw: false,
         }
     }
 }

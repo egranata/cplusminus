@@ -23,8 +23,8 @@ use inkwell::{
 
 use crate::{
     ast::{
-        DeallocDecl, FieldDecl, FunctionArgument, FunctionDecl, FunctionDefinition,
-        FunctionTypeDescriptor, ImplDecl, InitDecl, ProperStructDecl, TokenSpan, TypeDescriptor,
+        DeallocDecl, FieldDecl, FunctionDecl, FunctionDefinition, FunctionTypeDescriptor, ImplDecl,
+        InitDecl, ProperStructDecl, TokenSpan, TypeDescriptor,
     },
     bom::strct::{ImplBomEntry, StructBomEntry},
     codegen::{
@@ -401,13 +401,7 @@ impl<'a> TypeBuilder<'a> {
         init: &InitDecl,
         export: bool,
     ) -> Option<FunctionValue<'a>> {
-        let mut real_args = vec![FunctionArgument {
-            loc: init.loc,
-            name: String::from("self"),
-            ty: self_decl.self_descriptor(),
-            rw: false,
-            explicit_rw: false,
-        }];
+        let mut real_args = vec![self_decl.self_argument(init.loc)];
         init.args.iter().for_each(|a| real_args.push(a.clone()));
         let init_arg_types: Vec<TypeDescriptor> =
             real_args.iter().map(|arg| arg.ty.clone()).collect();
@@ -444,13 +438,7 @@ impl<'a> TypeBuilder<'a> {
         this_ty: StructType<'a>,
         init: &InitDecl,
     ) -> Option<FunctionValue<'a>> {
-        let mut real_args = vec![FunctionArgument {
-            loc: init.loc,
-            name: String::from("self"),
-            ty: self_decl.self_descriptor(),
-            rw: false,
-            explicit_rw: false,
-        }];
+        let mut real_args = vec![self_decl.self_argument(init.loc)];
         init.args.iter().for_each(|a| real_args.push(a.clone()));
         let init_arg_types: Vec<TypeDescriptor> =
             real_args.iter().map(|arg| arg.ty.clone()).collect();
@@ -482,17 +470,12 @@ impl<'a> TypeBuilder<'a> {
         &self,
         scope: &Scope<'a>,
         this_ty: StructType<'a>,
+        self_decl: &Structure<'a>,
         dealloc: &DeallocDecl,
         export: bool,
     ) -> Option<FunctionValue<'a>> {
         let ty = TypeDescriptor::Name(this_ty.get_name().unwrap().to_str().unwrap().to_owned());
-        let real_args = vec![FunctionArgument {
-            loc: dealloc.loc,
-            name: String::from("self"),
-            ty: ty.clone(),
-            rw: false,
-            explicit_rw: false,
-        }];
+        let real_args = vec![self_decl.self_argument(dealloc.loc)];
         let full_name = mangle_special_method(
             this_ty,
             crate::mangler::SpecialMemberFunction::UserDeallocator,
@@ -522,17 +505,12 @@ impl<'a> TypeBuilder<'a> {
     fn define_usr_dealloc(
         &self,
         scope: &Scope<'a>,
+        self_decl: &Structure<'a>,
         this_ty: StructType<'a>,
         dealloc: &DeallocDecl,
     ) -> Option<FunctionValue<'a>> {
         let ty = TypeDescriptor::Name(this_ty.get_name().unwrap().to_str().unwrap().to_owned());
-        let real_args = vec![FunctionArgument {
-            loc: dealloc.loc,
-            name: String::from("self"),
-            ty: ty.clone(),
-            rw: false,
-            explicit_rw: false,
-        }];
+        let real_args = vec![self_decl.self_argument(dealloc.loc)];
         let full_name = mangle_special_method(
             this_ty,
             crate::mangler::SpecialMemberFunction::UserDeallocator,
@@ -754,7 +732,7 @@ impl<'a> TypeBuilder<'a> {
 
         if let Some(dealloc) = &sd.dealloc {
             if self
-                .declare_usr_dealloc(scope, st_ty, dealloc, sd.export)
+                .declare_usr_dealloc(scope, st_ty, &cdg_st, dealloc, sd.export)
                 .is_none()
             {
                 self.iw
@@ -795,7 +773,7 @@ impl<'a> TypeBuilder<'a> {
         let st_ty = cdg_st.str_ty;
 
         if let Some(dealloc) = &sd.dealloc {
-            self.define_usr_dealloc(scope, st_ty, dealloc);
+            self.define_usr_dealloc(scope, &cdg_st, st_ty, dealloc);
         }
 
         for init in &sd.init {

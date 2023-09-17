@@ -411,13 +411,7 @@ impl<'a> FunctionBuilder<'a> {
         export: bool,
     ) -> (FunctionDecl, Option<FunctionValue<'a>>) {
         let fqn = mangle_method_name(fd, &self_decl.name);
-        let self_arg = FunctionArgument {
-            loc: fd.decl.loc,
-            name: String::from("self"),
-            ty: self_decl.self_descriptor(),
-            rw: false,
-            explicit_rw: false,
-        };
+        let self_arg = self_decl.self_argument(fd.decl.loc);
         let mut new_args = vec![self_arg];
         new_args.extend_from_slice(&fd.decl.args);
         let new_arg_types: Vec<TypeDescriptor> =
