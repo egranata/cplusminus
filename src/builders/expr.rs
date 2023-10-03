@@ -17,7 +17,7 @@ use std::cmp::max;
 use inkwell::{
     builder::Builder,
     types::{BasicTypeEnum, FloatType, FunctionType, IntType, StructType},
-    values::{BasicMetadataValueEnum, BasicValueEnum, FloatValue, IntValue, PointerValue},
+    values::{BasicMetadataValueEnum, BasicValueEnum, FloatValue, IntValue},
     FloatPredicate, IntPredicate,
 };
 
@@ -230,18 +230,6 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
             Expr::ShiftRight(..) => builder.build_right_shift(x, y, true, ""),
             _ => panic!(""),
         }))
-    }
-
-    fn build_ptr_bin_op(
-        &self,
-        builder: &Builder<'a>,
-        x: PointerValue<'a>,
-        y: PointerValue<'a>,
-        op: &Expr,
-    ) -> Option<BasicValueEnum<'a>> {
-        let ptr_diff = builder.build_ptr_diff(x, y, "");
-        let zero = self.iw.builtins.zero(ptr_diff.get_type());
-        self.build_int_bin_op(builder, ptr_diff, zero, op)
     }
 
     fn build_flt_bin_op(
@@ -736,10 +724,6 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
 
                 if let (Some(IntValue(ix)), Some(IntValue(iy))) = (bx, by) {
                     return self.build_int_bin_op(builder, ix, iy, &node.payload);
-                }
-
-                if let (Some(PointerValue(ix)), Some(PointerValue(iy))) = (bx, by) {
-                    return self.build_ptr_bin_op(builder, ix, iy, &node.payload);
                 }
 
                 if let (Some(FloatValue(ix)), Some(FloatValue(iy))) = (bx, by) {
