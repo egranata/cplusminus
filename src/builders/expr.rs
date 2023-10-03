@@ -244,17 +244,6 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         self.build_int_bin_op(builder, ptr_diff, zero, op)
     }
 
-    fn build_ptr_int_bin_op(
-        &self,
-        builder: &Builder<'a>,
-        x: PointerValue<'a>,
-        y: IntValue<'a>,
-        op: &Expr,
-    ) -> Option<BasicValueEnum<'a>> {
-        let x_int = builder.build_ptr_to_int(x, y.get_type(), "");
-        self.build_int_bin_op(builder, x_int, y, op)
-    }
-
     fn build_flt_bin_op(
         &self,
         builder: &Builder<'a>,
@@ -751,14 +740,6 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
 
                 if let (Some(PointerValue(ix)), Some(PointerValue(iy))) = (bx, by) {
                     return self.build_ptr_bin_op(builder, ix, iy, &node.payload);
-                }
-
-                if let (Some(PointerValue(ix)), Some(IntValue(iy))) = (bx, by) {
-                    return self.build_ptr_int_bin_op(builder, ix, iy, &node.payload);
-                }
-
-                if let (Some(IntValue(ix)), Some(PointerValue(iy))) = (bx, by) {
-                    return self.build_ptr_int_bin_op(builder, iy, ix, &node.payload);
                 }
 
                 if let (Some(FloatValue(ix)), Some(FloatValue(iy))) = (bx, by) {
