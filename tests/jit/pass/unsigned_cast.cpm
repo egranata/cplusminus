@@ -11,12 +11,23 @@
 (* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. *)
 (* See the License for the specific language governing permissions and *)
 (* limitations under the License. *)
-        
+
 func main() ret int32 {
-    var ptr: *int32 = 0 as *int32;
-    ptr = ptr + 1;
-    let ptr = ptr as int64;
-    assert ptr >= 4;
+    let b: byte = 200;
+    
+    let i32_signed = b as int32;
+    let i32_unsigned = b as unsigned int32;
+
+    assert i32_signed < 0;
+    assert i32_unsigned > 0;
+    assert i32_unsigned == 200;
+
+    let i64_signed = b as int64;
+    let i64_unsigned = b as unsigned int64;
+
+    assert i64_signed < 0;
+    assert i64_unsigned > 0;
+    assert i64_unsigned == 200;
+
     return 0;
 }
-

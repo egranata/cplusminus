@@ -921,8 +921,8 @@ impl<'a> TypeBuilder<'a> {
         loc: TokenSpan,
         unsigned: bool,
     ) -> Option<BasicValueEnum<'a>> {
-        use BasicTypeEnum::{FloatType, IntType, PointerType};
-        use BasicValueEnum::{FloatValue, IntValue, PointerValue};
+        use BasicTypeEnum::{FloatType, IntType};
+        use BasicValueEnum::{FloatValue, IntValue};
 
         let expr_ty = expr.get_type();
         if expr_ty == ty {
@@ -967,30 +967,6 @@ impl<'a> TypeBuilder<'a> {
                 loc,
                 crate::err::Warning::UnsignedCastIgnored,
             ));
-
-        if let (PointerType(_), IntType(dest_int)) = (expr_ty, ty) {
-            return Some(IntValue(builder.build_ptr_to_int(
-                expr.into_pointer_value(),
-                dest_int,
-                "",
-            )));
-        }
-
-        if let (IntType(_), PointerType(dest_ptr)) = (expr_ty, ty) {
-            return Some(PointerValue(builder.build_int_to_ptr(
-                expr.into_int_value(),
-                dest_ptr,
-                "",
-            )));
-        }
-
-        if let (PointerType(_), PointerType(dest_ptr)) = (expr_ty, ty) {
-            return Some(PointerValue(builder.build_pointer_cast(
-                expr.into_pointer_value(),
-                dest_ptr,
-                "",
-            )));
-        }
 
         None
     }
