@@ -157,6 +157,7 @@ peg::parser! {
             x:(@) __() "as" __() u:("unsigned" __())? ty:typename() { Expr::Cast(Box::new(x), ty, u.is_some()) }
 
             x:(@) _ "==" _ y:@ { Expr::Equality(Box::new(x), Box::new(y)) }
+            x:(@) _ "===" _ y:@ { Expr::Identity(Box::new(x), Box::new(y)) }
             x:(@) _ "!=" _ y:@ { Expr::NotEqual(Box::new(x), Box::new(y)) }
 
             x:(@) _ ">" _ y:@ { Expr::SignedGreaterThan(Box::new(x), Box::new(y)) }

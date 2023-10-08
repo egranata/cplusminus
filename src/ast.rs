@@ -293,6 +293,7 @@ pub enum Expr {
     ShiftLeft(Box<Expression>, Box<Expression>),
     ShiftRight(Box<Expression>, Box<Expression>),
     Equality(Box<Expression>, Box<Expression>),
+    Identity(Box<Expression>, Box<Expression>),
     NotEqual(Box<Expression>, Box<Expression>),
     SignedGreaterThan(Box<Expression>, Box<Expression>),
     SignedLessThan(Box<Expression>, Box<Expression>),
@@ -351,6 +352,7 @@ impl Expr {
             | Expr::ShiftLeft(x, y)
             | Expr::ShiftRight(x, y)
             | Expr::Equality(x, y)
+            | Expr::Identity(x, y)
             | Expr::NotEqual(x, y)
             | Expr::SignedGreaterThan(x, y)
             | Expr::SignedLessThan(x, y)

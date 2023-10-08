@@ -17,7 +17,7 @@ use std::cmp::max;
 use inkwell::{
     builder::Builder,
     types::{BasicTypeEnum, FloatType, FunctionType, IntType, StructType},
-    values::{BasicMetadataValueEnum, BasicValueEnum, FloatValue, IntValue},
+    values::{BasicMetadataValueEnum, BasicValueEnum, FloatValue, IntValue, PointerValue},
     FloatPredicate, IntPredicate,
 };
 
@@ -228,6 +228,23 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
             Expr::XOr(..) => builder.build_xor(x, y, ""),
             Expr::ShiftLeft(..) => builder.build_left_shift(x, y, ""),
             Expr::ShiftRight(..) => builder.build_right_shift(x, y, true, ""),
+            _ => panic!(""),
+        }))
+    }
+
+    fn build_ptr_bin_op(
+        &self,
+        builder: &Builder<'a>,
+        x: PointerValue<'a>,
+        y: PointerValue<'a>,
+        op: &Expr,
+    ) -> Option<BasicValueEnum<'a>> {
+        Some(BasicValueEnum::IntValue(match op {
+            Expr::Identity(..) => {
+                let diff = builder.build_ptr_diff(x, y, "");
+                let zero = diff.get_type().const_zero();
+                builder.build_int_compare(IntPredicate::EQ, diff, zero, "")
+            }
             _ => panic!(""),
         }))
     }
@@ -728,6 +745,20 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
 
                 if let (Some(FloatValue(ix)), Some(FloatValue(iy))) = (bx, by) {
                     return self.build_flt_bin_op(builder, ix, iy, node);
+                }
+
+                self.iw
+                    .diagnostics
+                    .borrow_mut()
+                    .error(CompilerError::new(node.loc, Error::UnexpectedType(None)));
+                None
+            }
+            Identity(x, y) => {
+                let (bx, by) =
+                    self.get_binop_args(builder, fd, x.as_ref(), y.as_ref(), locals, type_hint);
+
+                if let (Some(PointerValue(ix)), Some(PointerValue(iy))) = (bx, by) {
+                    return self.build_ptr_bin_op(builder, ix, iy, &node.payload);
                 }
 
                 self.iw
