@@ -16,7 +16,7 @@ use std::cmp::max;
 
 use inkwell::{
     builder::Builder,
-    types::{BasicTypeEnum, FloatType, FunctionType, IntType, StructType},
+    types::{BasicTypeEnum, FloatType, IntType, StructType},
     values::{BasicMetadataValueEnum, BasicValueEnum, FloatValue, IntValue, PointerValue},
     FloatPredicate, IntPredicate,
 };
@@ -30,7 +30,10 @@ use crate::{
         },
         ty::TypeBuilder,
     },
-    codegen::{callable::Callable, structure::Method},
+    codegen::{
+        callable::{Call, Callable},
+        structure::Method,
+    },
     err::{CompilerError, Error},
     iw::CompilerCore,
 };
@@ -41,7 +44,7 @@ pub struct ExpressionBuilder<'a, 'b> {
     pub iw: CompilerCore<'a>,
     pub tb: TypeBuilder<'a>,
     pub lvb: LvalueBuilder<'a, 'b>,
-    exit: &'b FunctionExitData<'a>,
+    pub exit: &'b FunctionExitData<'a>,
 }
 
 #[derive(Clone)]
@@ -58,86 +61,6 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
             lvb: LvalueBuilder::new(iw.clone(), exit),
             exit,
         }
-    }
-
-    fn build_function_call(
-        &self,
-        node: &Expression,
-        builder: &Builder<'a>,
-        info: &Callable<'a>,
-        args: &[BasicMetadataValueEnum<'a>],
-    ) -> Option<BasicValueEnum<'a>> {
-        if !info.typecheck_call(args) {
-            self.iw.diagnostics.borrow_mut().error(CompilerError::new(
-                node.loc,
-                Error::ArgCountMismatch(info.argc(), args.len()),
-            ));
-            return None;
-        }
-
-        if let Some(obj) = builder
-            .build_call(info.callee(), args, "")
-            .try_as_basic_value()
-            .left()
-        {
-            let temp_pv = self.exit.create_alloca(
-                builder,
-                obj.get_type(),
-                Some("temp_func"),
-                Some(super::func::AllocaInitialValue::Zero),
-            );
-            builder.build_store(temp_pv, obj);
-            self.exit.decref_on_exit(temp_pv);
-            Some(obj)
-        } else {
-            None
-        }
-    }
-
-    fn build_function_call_args(
-        &self,
-        builder: &Builder<'a>,
-        fd: &FunctionDefinition,
-        locals: &Scope<'a>,
-        args: &[FunctionCallArgument<'a>],
-        their_type: FunctionType<'a>,
-    ) -> Option<Vec<BasicMetadataValueEnum<'a>>> {
-        let mut aargs: Vec<BasicMetadataValueEnum<'a>> = vec![];
-        for (idx, arg) in args.iter().enumerate() {
-            let type_hint = if their_type.get_param_types().len() > idx {
-                Some(their_type.get_param_types()[idx])
-            } else {
-                None
-            };
-            match arg {
-                FunctionCallArgument::Expr(expr) => {
-                    if let Some(aarg) = self.build_expr(builder, fd, expr, locals, type_hint) {
-                        let aarg_type = aarg.get_type();
-                        let compat = type_hint.map_or(true, |ft| ft == aarg_type);
-                        if compat {
-                            aargs.push(BasicMetadataValueEnum::from(aarg));
-                        } else {
-                            // safe because compat is always true when no type hint is available
-                            let exp_type = self.tb.descriptor_by_llvm_type(type_hint.unwrap());
-                            self.iw.diagnostics.borrow_mut().error(CompilerError::new(
-                                expr.loc,
-                                Error::UnexpectedType(exp_type.map(|t| format!("{t}"))),
-                            ));
-                            return None;
-                        }
-                    } else {
-                        self.iw
-                            .diagnostics
-                            .borrow_mut()
-                            .error(CompilerError::new(expr.loc, Error::InvalidExpression));
-                        return None;
-                    }
-                }
-                FunctionCallArgument::Value(val) => aargs.push(*val),
-            }
-        }
-
-        Some(aargs)
     }
 
     fn widen_flt_if_needed(
@@ -344,11 +267,10 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
             struct_def.init.borrow().as_ref(),
         );
         if let Ok(init_func) = init_r {
-            let their_type = init_func.fn_type();
-            if let Some(call_args) =
-                self.build_function_call_args(builder, fd, locals, &eval_args, their_type)
+            if let Some(call_obj) =
+                Call::try_build(self, builder, fd, locals, &eval_args, init_func)
             {
-                self.build_function_call(node, builder, &init_func, &call_args);
+                call_obj.build_call(self, builder, node);
                 true
             } else {
                 self.iw
@@ -798,10 +720,10 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                     .iter()
                     .map(|arg| FunctionCallArgument::Expr(arg.clone()))
                     .collect();
-                return if let Some(args) =
-                    self.build_function_call_args(builder, fd, locals, &f_args, fv.fn_type())
+                return if let Some(call_obj) =
+                    Call::try_build(self, builder, fd, locals, &f_args, fv)
                 {
-                    self.build_function_call(node, builder, &fv, &args)
+                    call_obj.build_call(self, builder, node)
                 } else {
                     self.iw.diagnostics.borrow_mut().error(CompilerError::new(
                         node.loc,
@@ -894,14 +816,10 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
                 }
                 let method_func = resolved_callable.unwrap();
 
-                return if let Some(args) = self.build_function_call_args(
-                    builder,
-                    fd,
-                    locals,
-                    &f_args,
-                    method_func.fn_type(),
-                ) {
-                    self.build_function_call(node, builder, &method_func, &args)
+                return if let Some(call_obj) =
+                    Call::try_build(self, builder, fd, locals, &f_args, method_func)
+                {
+                    call_obj.build_call(self, builder, node)
                 } else {
                     None
                 };

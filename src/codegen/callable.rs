@@ -15,15 +15,16 @@
 use inkwell::{
     builder::Builder,
     types::FunctionType,
-    values::{BasicMetadataValueEnum, FunctionValue, PointerValue},
+    values::{BasicMetadataValueEnum, BasicValueEnum, FunctionValue, PointerValue},
 };
 
 use crate::{
-    ast::FunctionDefinition,
+    ast::{Expression, FunctionDefinition},
     builders::{
         expr::{ExpressionBuilder, FunctionCallArgument},
         scope::Scope,
     },
+    err::{CompilerError, Error},
 };
 
 fn build_not_hintable_arg_list<'a, 'b>(
@@ -207,5 +208,97 @@ impl<'a> Callable<'a> {
 
     pub fn typecheck_call(&self, args: &[BasicMetadataValueEnum]) -> bool {
         self.is_vararg() || args.len() == self.argc()
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Call<'a> {
+    target: Callable<'a>,
+    args: Vec<BasicMetadataValueEnum<'a>>,
+}
+
+impl<'a> Call<'a> {
+    pub fn try_build<'b>(
+        eb: &ExpressionBuilder<'a, 'b>,
+        builder: &Builder<'a>,
+        fd: &FunctionDefinition,
+        locals: &Scope<'a>,
+        args: &[FunctionCallArgument<'a>],
+        target: Callable<'a>,
+    ) -> Option<Call<'a>> {
+        let their_type = target.fn_type();
+
+        let mut aargs: Vec<BasicMetadataValueEnum<'a>> = vec![];
+        for (idx, arg) in args.iter().enumerate() {
+            let type_hint = if their_type.get_param_types().len() > idx {
+                Some(their_type.get_param_types()[idx])
+            } else {
+                None
+            };
+            match arg {
+                FunctionCallArgument::Expr(expr) => {
+                    if let Some(aarg) = eb.build_expr(builder, fd, expr, locals, type_hint) {
+                        let aarg_type = aarg.get_type();
+                        let compat = type_hint.map_or(true, |ft| ft == aarg_type);
+                        if compat {
+                            aargs.push(BasicMetadataValueEnum::from(aarg));
+                        } else {
+                            // safe because compat is always true when no type hint is available
+                            let exp_type = eb.tb.descriptor_by_llvm_type(type_hint.unwrap());
+                            eb.iw.diagnostics.borrow_mut().error(CompilerError::new(
+                                expr.loc,
+                                Error::UnexpectedType(exp_type.map(|t| format!("{t}"))),
+                            ));
+                            return None;
+                        }
+                    } else {
+                        eb.iw
+                            .diagnostics
+                            .borrow_mut()
+                            .error(CompilerError::new(expr.loc, Error::InvalidExpression));
+                        return None;
+                    }
+                }
+                FunctionCallArgument::Value(val) => aargs.push(*val),
+            }
+        }
+
+        Some(Call {
+            target,
+            args: aargs,
+        })
+    }
+
+    pub fn build_call<'b>(
+        &self,
+        eb: &ExpressionBuilder<'a, 'b>,
+        builder: &Builder<'a>,
+        node: &Expression,
+    ) -> Option<BasicValueEnum<'a>> {
+        if !self.target.typecheck_call(&self.args) {
+            eb.iw.diagnostics.borrow_mut().error(CompilerError::new(
+                node.loc,
+                Error::ArgCountMismatch(self.target.argc(), self.args.len()),
+            ));
+            return None;
+        }
+
+        if let Some(obj) = builder
+            .build_call(self.target.callee(), &self.args, "")
+            .try_as_basic_value()
+            .left()
+        {
+            let temp_pv = eb.exit.create_alloca(
+                builder,
+                obj.get_type(),
+                Some("temp_func"),
+                Some(crate::builders::func::AllocaInitialValue::Zero),
+            );
+            builder.build_store(temp_pv, obj);
+            eb.exit.decref_on_exit(temp_pv);
+            Some(obj)
+        } else {
+            None
+        }
     }
 }
