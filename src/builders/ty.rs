@@ -844,6 +844,19 @@ impl<'a> TypeBuilder<'a> {
         BasicTypeEnum::try_from(ty).map_or(None, |x| self.is_value_basic_type(x))
     }
 
+    pub fn is_ptr_to_value_any_type(&self, ty: AnyTypeEnum<'a>) -> Option<StructType<'a>> {
+        BasicTypeEnum::try_from(ty).map_or(None, |x| self.is_ptr_to_value_basic_type(x))
+    }
+
+    pub fn is_ptr_to_value_basic_type(&self, ty: BasicTypeEnum<'a>) -> Option<StructType<'a>> {
+        if let BasicTypeEnum::PointerType(pt) = ty {
+            let et = pt.get_element_type();
+            self.is_value_any_type(et)
+        } else {
+            None
+        }
+    }
+
     pub fn is_value_basic_type(&self, ty: BasicTypeEnum<'a>) -> Option<StructType<'a>> {
         if let BasicTypeEnum::StructType(sty) = ty {
             if self.is_value_type(sty) {
