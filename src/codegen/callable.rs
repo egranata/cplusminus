@@ -14,7 +14,7 @@
 
 use inkwell::{
     builder::Builder,
-    types::FunctionType,
+    types::{BasicTypeEnum, FunctionType},
     values::{BasicMetadataValueEnum, BasicValueEnum, FunctionValue, PointerValue},
 };
 
@@ -23,6 +23,7 @@ use crate::{
     builders::{
         expr::{ExpressionBuilder, FunctionCallArgument},
         scope::Scope,
+        ty::TypeBuilder,
     },
     err::{CompilerError, Error},
 };
@@ -55,6 +56,35 @@ fn build_not_hintable_arg_list<'a, 'b>(
     Some(out)
 }
 
+fn make_arg_compat<'a>(
+    actual_argument: BasicValueEnum<'a>,
+    formal_type: Option<BasicTypeEnum<'a>>,
+    builder: &Builder<'a>,
+    tb: &TypeBuilder<'a>,
+) -> Option<BasicValueEnum<'a>> {
+    if formal_type.is_none() {
+        return Some(actual_argument);
+    }
+    let formal_type = formal_type.unwrap();
+    let actual_type = actual_argument.get_type();
+
+    if actual_type == formal_type {
+        return Some(actual_argument);
+    }
+
+    let is_formal_value = tb.is_value_basic_type(formal_type);
+    let is_actual_ptr_value = tb.is_ptr_to_value_basic_type(actual_type);
+
+    if is_formal_value.is_some()
+        && is_actual_ptr_value.is_some()
+        && is_formal_value.unwrap() == is_actual_ptr_value.unwrap()
+    {
+        return Some(builder.build_load(actual_argument.into_pointer_value(), ""));
+    }
+
+    None
+}
+
 fn test_overload_candidate<'a>(
     eb: &ExpressionBuilder<'a, '_>,
     builder: &Builder<'a>,
@@ -72,16 +102,21 @@ fn test_overload_candidate<'a>(
             FunctionCallArgument::Expr(e) => {
                 let argv = eb.build_expr(builder, fd, e, locals, type_hint);
                 argv?;
-                if type_hint.is_some() && argv.unwrap().get_type() != type_hint.unwrap() {
-                    return None;
-                }
+                let argv = make_arg_compat(argv.unwrap(), type_hint, builder, &eb.tb);
+                argv?;
                 ret_args.push(FunctionCallArgument::Value(argv.unwrap().into()));
             }
             FunctionCallArgument::Value(v) => {
-                if type_hint.is_some() && !eb.tb.arg_type_matches(*v, type_hint.unwrap()) {
-                    return None;
-                }
-                ret_args.push(arg.clone());
+                let argv = make_arg_compat(
+                    BasicValueEnum::try_from(*v).unwrap(),
+                    type_hint,
+                    builder,
+                    &eb.tb,
+                );
+                argv?;
+                let argv = BasicMetadataValueEnum::try_from(argv.unwrap()).unwrap();
+                let argv = FunctionCallArgument::Value(argv);
+                ret_args.push(argv);
             }
         }
     }
@@ -238,10 +273,9 @@ impl<'a> Call<'a> {
             match arg {
                 FunctionCallArgument::Expr(expr) => {
                     if let Some(aarg) = eb.build_expr(builder, fd, expr, locals, type_hint) {
-                        let aarg_type = aarg.get_type();
-                        let compat = type_hint.map_or(true, |ft| ft == aarg_type);
-                        if compat {
-                            aargs.push(BasicMetadataValueEnum::from(aarg));
+                        let compat_arg = make_arg_compat(aarg, type_hint, builder, &eb.tb);
+                        if let Some(arg_value) = compat_arg {
+                            aargs.push(BasicMetadataValueEnum::from(arg_value));
                         } else {
                             // safe because compat is always true when no type hint is available
                             let exp_type = eb.tb.descriptor_by_llvm_type(type_hint.unwrap());
