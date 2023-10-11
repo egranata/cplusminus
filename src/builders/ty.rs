@@ -931,7 +931,7 @@ impl<'a> TypeBuilder<'a> {
         builder: &Builder<'a>,
         expr: BasicValueEnum<'a>,
         ty: BasicTypeEnum<'a>,
-        loc: TokenSpan,
+        _loc: TokenSpan,
         unsigned: bool,
     ) -> Option<BasicValueEnum<'a>> {
         use BasicTypeEnum::{FloatType, IntType};
@@ -973,13 +973,13 @@ impl<'a> TypeBuilder<'a> {
         // fails quickly and swiftly
         #[allow(unused, clippy::let_unit_value)]
         let unsigned = ();
-        self.iw
-            .diagnostics
-            .borrow_mut()
-            .warning(CompilerWarning::new(
-                loc,
-                crate::err::Warning::UnsignedCastIgnored,
-            ));
+        // self.iw
+        //     .diagnostics
+        //     .borrow_mut()
+        //     .warning(CompilerWarning::new(
+        //         loc,
+        //         crate::err::Warning::UnsignedCastIgnored,
+        //     ));
 
         None
     }
