@@ -931,10 +931,10 @@ impl<'a> TypeBuilder<'a> {
         builder: &Builder<'a>,
         expr: BasicValueEnum<'a>,
         ty: BasicTypeEnum<'a>,
-        _loc: TokenSpan,
+        loc: TokenSpan,
         unsigned: bool,
     ) -> Option<BasicValueEnum<'a>> {
-        use BasicTypeEnum::{FloatType, IntType};
+        use BasicTypeEnum::{FloatType, IntType, PointerType};
         use BasicValueEnum::{FloatValue, IntValue};
 
         let expr_ty = expr.get_type();
@@ -968,18 +968,34 @@ impl<'a> TypeBuilder<'a> {
             });
         }
 
+        let emit_unsigned_warning: Box<dyn Fn(TokenSpan)> = if unsigned {
+            Box::new(|loc| {
+                self.iw
+                    .diagnostics
+                    .borrow_mut()
+                    .warning(CompilerWarning::new(
+                        loc,
+                        crate::err::Warning::UnsignedCastIgnored,
+                    ));
+            })
+        } else {
+            Box::new(|_| {})
+        };
+
         // all casts from here on out should ignore unsigned
         // make it an explicit () so that any attempt to touch it by accident
         // fails quickly and swiftly
         #[allow(unused, clippy::let_unit_value)]
         let unsigned = ();
-        // self.iw
-        //     .diagnostics
-        //     .borrow_mut()
-        //     .warning(CompilerWarning::new(
-        //         loc,
-        //         crate::err::Warning::UnsignedCastIgnored,
-        //     ));
+
+        if let (PointerType(_), IntType(dest_int)) = (expr_ty, ty) {
+            emit_unsigned_warning(loc);
+            return Some(IntValue(builder.build_ptr_to_int(
+                expr.into_pointer_value(),
+                dest_int,
+                "",
+            )));
+        }
 
         None
     }
