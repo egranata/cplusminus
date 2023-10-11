@@ -235,7 +235,7 @@ impl Display for Lvalue {
         match self {
             Lvalue::Identifier(id) => write!(f, "{id}"),
             Lvalue::Dotted(parent, id) => write!(f, "{parent}.{id}"),
-            Lvalue::Indexed(parent, _) => write!(f, "{parent}[todo]"),
+            Lvalue::Indexed(parent, idx) => write!(f, "{parent}[{idx:?}]"),
             Lvalue::Increment(parent) => write!(f, "inc {parent}"),
             Lvalue::Decrement(parent) => write!(f, "dec {parent}"),
         }
