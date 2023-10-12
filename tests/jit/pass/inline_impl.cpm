@@ -13,10 +13,10 @@
 (* limitations under the License. *)
 
 val type VT {
-    x: int64,
+    x: int64
     init(n: int64) {
         self->increment(n);
-    },
+    }
     func increment(n: int64) {
         self.x = self.x + n;
     },
@@ -33,7 +33,7 @@ ref type RT {
     init() {
         self.x = 1;
         self->increment();
-    },
+    }
     func increment() {
         inc self.x;
     },

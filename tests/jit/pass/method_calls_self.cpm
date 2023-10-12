@@ -13,7 +13,7 @@
 (* limitations under the License. *)
 
 ref type T {
-    x: int64,
+    x: int64
     init(x: int64) {
         self.x = x;
     }

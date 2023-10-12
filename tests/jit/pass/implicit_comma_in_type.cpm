@@ -12,20 +12,34 @@
 (* See the License for the specific language governing permissions and *)
 (* limitations under the License. *)
 
-ref type number {
+val type V {
     x: int64
+    y: int64
+    
+    init() {
+        self.x = 12;
+        self.y = 24;
+    }
 
-    func increase() {
-        inc self.x;
+    func foo() ret int64 {
+        return self.x + self.y + 1;
+    }
+}
+
+ref type R {
+    x: int64
+    y: int64
+    
+    init() {
+        self.x = 12;
+        self.y = 24;
+    }
+
+    func foo() ret int64 {
+        return self.x + self.y + 1;
     }
 }
 
 func main() ret int32 {
-    let num = alloc number{x:12};
-    assert num.x == 12;
-    num->increase();
-    assert num.x == 13;
-    num->increase();
-    assert num.x == 14;
     return 0;
 }
