@@ -142,7 +142,7 @@ impl<'a, 'b> StatementBuilder<'a, 'b> {
                         .diagnostics
                         .borrow_mut()
                         .error(CompilerError::new(tld.decl.loc, Error::InvalidExpression));
-                } else if tld.export {
+                } else if tld.decl.export {
                     self.iw
                         .diagnostics
                         .borrow_mut()

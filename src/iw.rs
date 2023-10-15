@@ -474,7 +474,7 @@ impl<'a> CompilerCore<'a> {
                         .extrn(false)
                         .global(true)
                         .mangle(false)
-                        .export(fd.export)
+                        .export(fd.decl.export)
                         .commit();
                     fb.declare(&self.globals, &fd.decl, opts);
                 }
@@ -487,7 +487,7 @@ impl<'a> CompilerCore<'a> {
                         .export(false)
                         .commit();
                     if let Some(fv) = fb.declare(&self.globals, &fd.decl, opts) {
-                        if fd.export {
+                        if fd.decl.export {
                             let bom_entry = FunctionBomEntry::new(&fd.decl.name, &tb, fv);
                             self.bom.borrow_mut().functions.push(bom_entry);
                         }

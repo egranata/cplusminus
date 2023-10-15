@@ -391,30 +391,43 @@ peg::parser! {
             let arg_types: Vec<TypeDescriptor> = args.iter().map(|arg| arg.ty.clone()).collect();
             let ftd = FunctionTypeDescriptor::new(arg_types, ty.map(Box::new), v);
             let td = TypeDescriptor::Function(ftd);
-            let decl = FunctionDecl { loc:TokenSpan{start,end}, name,args,ty:td };
-            let extrn = ExternFunction { loc:decl.loc, decl, export };
+            let decl = FunctionDecl { loc:TokenSpan{start,end}, name,args,ty:td,export };
+            let extrn = ExternFunction { loc:decl.loc, decl };
             TopLevelDeclaration::extern_function(extrn.loc, extrn)
         }
 
-        rule inner_function_def() -> FunctionDefinition =
-        _ start:position!() export:export_attribute() "func" __() name:ident() "(" _ args:func_arg()**"," dummy_comma() ")" _ ty:function_ret()? decl_end:position!() _ body:block() end:position!() _ {
+        rule function_header() -> FunctionDecl =
+        _ start:position!() export:export_attribute() "func" __() name:ident() "(" _ args:func_arg()**"," dummy_comma() ")" _ ty:function_ret()? _ end:position!() _ {
             let arg_types: Vec<TypeDescriptor> = args.iter().map(|arg| arg.ty.clone()).collect();
             let ftd = FunctionTypeDescriptor::new(arg_types, ty.map(Box::new), false);
             let td = TypeDescriptor::Function(ftd);
-            let decl = FunctionDecl { loc:TokenSpan{start,end}, name,args,ty:td };
-            FunctionDefinition { decl,body,export }
+            FunctionDecl { loc:TokenSpan{start,end}, name,args,ty:td, export }
         }
 
+        rule full_function_def() -> FunctionDefinition =
+        _ start:position!() decl:function_header() _ body:block() _ end:position!() _ {
+            FunctionDefinition { decl,body }
+        }
+
+        rule inline_function_def() -> FunctionDefinition =
+        _ start:position!() decl:function_header() _ "=" _ body:top_level_expr() _ end:position!() _ {
+            let stmt = Stmt::Return(Some(body));
+            let statement = Statement { loc:TokenSpan{start,end}, payload: stmt };
+            FunctionDefinition { decl, body: statement }
+        }
+
+        rule base_function_def() -> FunctionDefinition = full_function_def() / inline_function_def()
+
         rule function_def_stmt() -> Statement =
-        decl:inner_function_def() {
+        decl:base_function_def() {
             Statement { loc:decl.decl.loc, payload:Stmt::Function(Box::new(decl)) }
         }
 
-        rule method_def() -> MethodDecl = fd:inner_function_def() {
+        rule method_def() -> MethodDecl = fd:base_function_def() {
             MethodDecl { loc:fd.decl.loc, imp:fd }
         }
 
-        rule function() -> TopLevelDeclaration = def:inner_function_def() {
+        rule function() -> TopLevelDeclaration = def:base_function_def() {
             TopLevelDeclaration::function(def.decl.loc, def)
         }
 

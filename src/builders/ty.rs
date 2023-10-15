@@ -419,6 +419,7 @@ impl<'a> TypeBuilder<'a> {
             name: full_name,
             args: real_args,
             ty: fn_type,
+            export,
         };
 
         let fb = FunctionBuilder::new(self.iw.clone());
@@ -457,9 +458,9 @@ impl<'a> TypeBuilder<'a> {
                 name: full_name,
                 args: real_args,
                 ty: fn_type,
+                export: false,
             },
             body: init.body.clone(),
-            export: false,
         };
 
         let fb = FunctionBuilder::new(self.iw.clone());
@@ -490,6 +491,7 @@ impl<'a> TypeBuilder<'a> {
             name: full_name,
             args: real_args,
             ty: fn_type,
+            export,
         };
 
         let fb = FunctionBuilder::new(self.iw.clone());
@@ -526,9 +528,9 @@ impl<'a> TypeBuilder<'a> {
                 name: full_name,
                 args: real_args,
                 ty: fn_type,
+                export: false,
             },
             body: dealloc.body.clone(),
-            export: false,
         };
 
         let fb = FunctionBuilder::new(self.iw.clone());

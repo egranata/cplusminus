@@ -13,9 +13,7 @@
 (* limitations under the License. *)
 
 func main() ret int64 {
-    func one() ret int64 {
-        return 1;
-    };
+    func one() ret int64 = 1;
     func plus_one(x: int64) ret int64 {
         return x + 1;
     };

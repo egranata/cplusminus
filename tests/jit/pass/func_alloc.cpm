@@ -17,14 +17,14 @@ val type foobar {
     y: int32
 }
 
-func alloc_thing() ret foobar {
-    return alloc foobar{
-        x:3,
-        y:3
-    };
+func alloc_thing() ret foobar = alloc foobar{
+    x:3,
+    y:4
 }
 
-func main() ret int64 {
+func main() ret int32 {
     let thing = alloc_thing();
-    return (thing.x - thing.y) as int64;
+    assert thing.x == 3;
+    assert thing.y == 4;
+    return 0;
 }

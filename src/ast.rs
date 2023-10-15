@@ -205,20 +205,19 @@ pub struct FunctionDecl {
     pub name: String,
     pub args: Vec<FunctionArgument>,
     pub ty: TypeDescriptor,
+    pub export: bool,
 }
 
 #[derive(Clone, Debug)]
 pub struct ExternFunction {
     pub loc: TokenSpan,
     pub decl: FunctionDecl,
-    pub export: bool,
 }
 
 #[derive(Clone, Debug)]
 pub struct FunctionDefinition {
     pub decl: FunctionDecl,
     pub body: Statement,
-    pub export: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -412,6 +411,16 @@ impl Expr {
 
     pub fn identifier(i: &str) -> Expr {
         Expr::Rvalue(Lvalue::Identifier(i.to_string()))
+    }
+}
+
+impl Expr {
+    pub fn as_rvalue(&self) -> Option<&Lvalue> {
+        if let Expr::Rvalue(lval) = &self {
+            Some(lval)
+        } else {
+            None
+        }
     }
 }
 

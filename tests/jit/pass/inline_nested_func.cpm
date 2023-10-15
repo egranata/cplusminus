@@ -11,12 +11,19 @@
 (* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. *)
 (* See the License for the specific language governing permissions and *)
 (* limitations under the License. *)
-        
-func foo(x: int32, y: int32, z: int32) ret int32 = x + y * z
-        
-func main() ret int32 {
-    let n = foo(3,4,6);
-    assert n == 27;
-    return 0;
+
+type adder = fn(int32,int32) ret int32;
+
+func make_adder() ret adder {
+    func add(x: int32, y: int32) ret int32 = x + y;
+    return add;
 }
 
+func main() ret int32 {
+    let x = 3 as int32;
+    let y = 4 as int32;
+    let add_func = make_adder();
+    let z = add_func(x,y);
+    assert z == 7;
+    return 0;
+}

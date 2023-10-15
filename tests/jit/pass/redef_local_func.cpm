@@ -19,9 +19,7 @@ func main() ret int64 {
 
     let x = magic_number() + magic_number();
 
-    func magic_number() ret int64 {
-        return 2;
-    };
+    func magic_number() ret int64 = 2;
 
     let y = magic_number();
 

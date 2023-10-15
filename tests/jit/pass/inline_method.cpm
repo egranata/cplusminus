@@ -11,12 +11,28 @@
 (* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. *)
 (* See the License for the specific language governing permissions and *)
 (* limitations under the License. *)
-        
-func foo(x: int32, y: int32, z: int32) ret int32 = x + y * z
-        
-func main() ret int32 {
-    let n = foo(3,4,6);
-    assert n == 27;
-    return 0;
+
+ref type RT {
+    x: int32
+
+    init() {
+        self.x = 0;
+    }
 }
 
+impl RT {
+    func read() ret int32 = self.x
+
+    func add(x: int32) {
+        self.x = self.x + x;
+    }
+}
+
+func main() ret int32 {
+    let t = alloc RT();
+    t->add(1);
+    assert t->read() == 1;
+    t->add(2);
+    assert t->read() == 3;
+    return 0;
+}

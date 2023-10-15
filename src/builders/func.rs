@@ -438,6 +438,7 @@ impl<'a> FunctionBuilder<'a> {
             name: fqn,
             args: new_args,
             ty: fn_type,
+            export,
         };
 
         let opts = FunctionBuilderOptions::default()
@@ -460,10 +461,11 @@ impl<'a> FunctionBuilder<'a> {
         fd: &FunctionDefinition,
         func_decl: &FunctionDecl,
     ) -> Option<FunctionValue<'a>> {
+        let mut new_decl = func_decl.clone();
+        new_decl.export = false;
         let new_def = FunctionDefinition {
-            decl: func_decl.clone(),
+            decl: new_decl,
             body: fd.body.clone(),
-            export: false,
         };
 
         self.build(scope, &new_def)
