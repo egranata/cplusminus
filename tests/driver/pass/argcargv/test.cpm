@@ -1,0 +1,50 @@
+(* Copyright 2023 Enrico Granata *)
+(* *)
+(* Licensed under the Apache License, Version 2.0 (the "License"); *)
+(* you may not use this file except in compliance with the License. *)
+(* You may obtain a copy of the License at *)
+(*  *)
+(*     http://www.apache.org/licenses/LICENSE-2.0 *)
+(*  *)
+(* Unless required by applicable law or agreed to in writing, software *)
+(* distributed under the License is distributed on an "AS IS" BASIS, *)
+(* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. *)
+(* See the License for the specific language governing permissions and *)
+(* limitations under the License. *)
+
+type c_int = int32;
+type c_str = *byte;
+
+extern func strcmp(s1: c_str, s2: c_str) ret c_int;
+
+ref type CString {
+    val: c_str
+
+    init(ptr: c_str) {
+        self.val = ptr;
+    }
+
+    func eq(other: c_str) ret bool {
+        let cmp = strcmp(self.val, other);
+        return cmp == 0;
+    }
+
+    func eq(other: CString) ret bool {
+        return self->eq(other.val);
+    }
+}
+
+func CString(val: c_str) ret CString = alloc CString(val)
+
+func main(argc: c_int, argv: *c_str) ret int32 {
+    assert argc == 5;
+    let a1 = CString(argv[1]);
+    assert a1->eq("1");
+    let a2 = CString(argv[2]);
+    assert a2->eq("hello");
+    let a3 = CString(argv[3]);
+    assert a3->eq("world");
+    let a4 = CString(argv[4]);
+    assert a4->eq("2");
+    return 0;
+}

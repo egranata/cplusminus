@@ -62,6 +62,7 @@ fn build_jit_tests(indir: &Path, outdir: &Path, pass: bool) {
 struct DriverTestConfig {
     source_files: Vec<String>,
     bom: bool,
+    args: Option<Vec<String>>,
     diags_match: Option<Vec<String>>,
     diags_no_match: Option<Vec<String>>,
     stdout_match: Option<Vec<String>>,
@@ -75,6 +76,10 @@ fn opt_vec_to_opt_str(inp: &Option<Vec<String>>) -> Option<String> {
             .collect::<Vec<String>>()
             .join(",")
     })
+}
+
+fn opt_vec_to_opt_vec(inp: &Option<Vec<String>>, name: &str) -> String {
+    opt_str_to_opt_vec(&opt_vec_to_opt_str(inp), name)
 }
 
 fn opt_str_to_opt_vec(os: &Option<String>, name: &str) -> String {
@@ -117,6 +122,7 @@ fn build_driver_test_code(func_to_call: &str, indir: &Path, outfile_path: &Path)
         }
         let test_json_str = std::fs::read_to_string(test_json_path).unwrap();
         let test_descriptor: DriverTestConfig = serde_json::from_str(&test_json_str).unwrap();
+        let args = opt_vec_to_opt_vec(&test_descriptor.args, "args");
         let diags_match = opt_vec_to_opt_str(&test_descriptor.diags_match);
         let diags_no_match = opt_vec_to_opt_str(&test_descriptor.diags_no_match);
         let stdout_match = opt_vec_to_opt_str(&test_descriptor.stdout_match);
@@ -139,6 +145,7 @@ fn build_driver_test_code(func_to_call: &str, indir: &Path, outfile_path: &Path)
             format!("#[test]\nfn driver_{}() {{\n", test_name)
         )
         .expect("<io error>");
+        write!(outfile_handle, "{}", args).expect("<io error>");
         write!(
             outfile_handle,
             "{}",
@@ -186,7 +193,7 @@ fn build_driver_test_code(func_to_call: &str, indir: &Path, outfile_path: &Path)
             outfile_handle,
             "{}",
             format!(
-                "    {func_to_call}(&sources, &dest, &opts, &diags_match, &diags_no_match, &stdout_match, &stderr_match);"
+                "    {func_to_call}(&sources, &dest, &args, &opts, &diags_match, &diags_no_match, &stdout_match, &stderr_match);"
             )
         )
         .expect("<io error>");
@@ -201,7 +208,7 @@ fn build_driver_test_code(func_to_call: &str, indir: &Path, outfile_path: &Path)
             outfile_handle,
             "{}",
             format!(
-                "    {func_to_call}(&sources, &dest, &opts, &diags_match, &diags_no_match, &stdout_match, &stderr_match);"
+                "    {func_to_call}(&sources, &dest, &args, &opts, &diags_match, &diags_no_match, &stdout_match, &stderr_match);"
             )
         )
         .expect("<io error>");

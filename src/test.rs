@@ -86,6 +86,7 @@ mod driver_tests {
     fn compile_run_temp(
         sources: &[PathBuf],
         target: &PathBuf,
+        args: &Option<Vec<String>>,
         options: &CompilerOptions,
     ) -> DriverTestResult {
         let cmplr = crate::driver::build_aout(sources, target, options.clone());
@@ -94,6 +95,9 @@ mod driver_tests {
         }
         let mut cmd = std::process::Command::new(target);
         cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+        if let Some(args) = args {
+            cmd.args(args);
+        }
         match cmd.spawn() {
             Ok(child) => {
                 let result = child.wait_with_output();
@@ -167,13 +171,14 @@ mod driver_tests {
     fn expect_driver_pass(
         sources: &[PathBuf],
         target: &PathBuf,
+        args: &Option<Vec<String>>,
         options: &CompilerOptions,
         diags_match: &Option<Vec<String>>,
         diags_no_match: &Option<Vec<String>>,
         stdout_match: &Option<Vec<String>>,
         stderr_match: &Option<Vec<String>>,
     ) {
-        let run_result = compile_run_temp(sources, target, options);
+        let run_result = compile_run_temp(sources, target, args, options);
         if let Some(expected_diags) = diags_match {
             match_diags(expected_diags, &run_result, true);
         }
@@ -211,13 +216,14 @@ mod driver_tests {
     fn expect_driver_fail(
         sources: &[PathBuf],
         target: &PathBuf,
+        args: &Option<Vec<String>>,
         options: &CompilerOptions,
         diags_match: &Option<Vec<String>>,
         diags_no_match: &Option<Vec<String>>,
         stdout_match: &Option<Vec<String>>,
         stderr_match: &Option<Vec<String>>,
     ) {
-        let run_result = compile_run_temp(sources, target, options);
+        let run_result = compile_run_temp(sources, target, args, options);
         if let Some(expected_diags) = diags_match {
             match_diags(expected_diags, &run_result, true);
         }
