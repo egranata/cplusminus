@@ -99,18 +99,15 @@ impl<'a, 'b> ExpressionBuilder<'a, 'b> {
         if x_wide == y_wide {
             return (x, y);
         }
-        // should boolean values be widened to int? eh..
-        if x_wide == 1 || y_wide == 1 {
-            return (x, y);
-        }
+        let unsigned = (x_wide == 1 || y_wide == 1) || op.is_unsigned_operation();
         let max_wide = max(x_wide, y_wide);
         let max_wide_type = self.iw.context.custom_width_int_type(max_wide);
-        let x = if op.is_unsigned_operation() {
+        let x = if unsigned {
             builder.build_int_z_extend(x, max_wide_type, "")
         } else {
             builder.build_int_s_extend(x, max_wide_type, "")
         };
-        let y = if op.is_unsigned_operation() {
+        let y = if unsigned {
             builder.build_int_z_extend(y, max_wide_type, "")
         } else {
             builder.build_int_s_extend(y, max_wide_type, "")
